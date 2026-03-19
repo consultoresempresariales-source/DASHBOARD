@@ -4062,6 +4062,10 @@ function logRenderWeek(isAdmin,visibleTrips){
           h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:${allRead?'#34d399':'#fbbf24'};font-weight:600">${allRead?'👁️ Todos confirmaron':'⚠️ '+readC+'/'+totalC+' vieron'}</div>`;
         }else if(members.length>0){h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:var(--t3)">📩 Notif. sin enviar</div>`}
       }
+      // WhatsApp button
+      if(tcs.length>0&&t.status!=='cancelled'){
+        h+=`<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;text-align:right"><button onclick="logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">📱 WhatsApp</button></div>`;
+      }
       h+=`</div>`;
     });
     h+=`</div>`;
@@ -4902,6 +4906,73 @@ function agendamientoSQL(){
 );
 ALTER TABLE agendamiento ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "agendamiento_pub" ON agendamiento FOR ALL USING (true) WITH CHECK (true);`;
+}
+
+
+// ===== WHATSAPP INTEGRATION =====
+const DEPT_FULL_LABELS={seguridad:'Seguridad Industrial (SST)',salud:'Salud Ocupacional',ambiente:'Ambiente',datos:'Protección de Datos (LOPDPD)',tthh:'Talento Humano',talento:'Talento Humano',psicologo:'Psicología Ocupacional'};
+
+function logSendWA(tripId){
+  event.stopPropagation();
+  const t=LOG.trips.find(x=>x.id===tripId);if(!t)return;
+  const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
+  const members=LOG.members.filter(m=>m.trip_id===t.id);
+  if(tcs.length===0){alert("Este viaje no tiene empresas asignadas");return}
+
+  // Get departments going on this trip
+  const depts=[...new Set(members.map(m=>m.department))];
+  const deptList=depts.map(d=>DEPT_FULL_LABELS[d]||d).join(', ');
+
+  // Calculate days until trip
+  const tripDate=new Date(t.trip_date+'T12:00:00');
+  const now=new Date();
+  const diffDays=Math.ceil((tripDate-now)/(1000*60*60*24));
+  const dateStr=tripDate.toLocaleDateString('es-EC',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Build urgency text
+  let urgText;
+  if(diffDays<=0)urgText='📍 *HOY* tenemos programada una visita';
+  else if(diffDays===1)urgText='📍 *MAÑANA* tenemos programada una visita';
+  else urgText=`📍 En *${diffDays} días* tenemos programada una visita`;
+
+  // For each company, send message
+  tcs.forEach(tc=>{
+    const co=cos.find(c=>c.id===tc.company_id);
+    if(!co)return;
+    const coName=co.name||'';
+
+    // Check if company has saved WhatsApp number
+    let phone=co.whatsapp||'';
+    if(!phone){
+      phone=prompt(`📱 Número de WhatsApp para ${coName}\n\nEjemplo: 0991234567 o +593991234567\n\n(Se guardará para futuras veces)`);
+      if(!phone||!phone.trim())return;
+      phone=phone.trim();
+      // Save to company
+      co.whatsapp=phone;
+      const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=phone;
+      sb.from("companies").update({whatsapp:phone}).eq("id",co.id);
+    }
+
+    // Clean phone number
+    let cleanPhone=phone.replace(/[^0-9+]/g,'');
+    if(cleanPhone.startsWith('0'))cleanPhone='593'+cleanPhone.substring(1);
+    if(!cleanPhone.startsWith('+')&&!cleanPhone.startsWith('593'))cleanPhone='593'+cleanPhone;
+    cleanPhone=cleanPhone.replace('+','');
+
+    // Build message
+    let msg=`Estimado/a representante de *${coName}*,\n\n`;
+    msg+=`${urgText} a su empresa.\n\n`;
+    msg+=`📅 *Fecha:* ${dateStr}\n`;
+    msg+=`⏰ *Hora de llegada:* ${t.departure_time||'08:00'}\n`;
+    if(deptList)msg+=`👥 *Departamentos:* ${deptList}\n`;
+    if(t.jornada_medica)msg+=`🩺 *Jornada Médica Ocupacional*\n`;
+    if(t.jornada_examenes)msg+=`🔬 *Jornada de Exámenes Ocupacionales*\n`;
+    msg+=`\nPor favor confirmar disponibilidad.\n`;
+    msg+=`\n_Consultores Empresariales ALTAIR_`;
+
+    const url=`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url,'_blank');
+  });
 }
 
 // ===== TRIP FORM (CREATE / EDIT) =====
