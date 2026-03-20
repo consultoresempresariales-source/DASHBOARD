@@ -4460,21 +4460,21 @@ function logRenderAgendamiento(){
   h+='<div id="agTableWrap">';
   h+='<table>';
   // Header row 1: dept groups
-  h+='<thead><tr style="background:rgba(255,255,255,0.04)">';
-  h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px">N°</th>';
-  h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:140px">EMPRESA</th>';
-  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#f472b6;min-width:36px" title="Informes enviados">📨</th>';
-  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#a78bfa;min-width:36px" title="Socializado">🤝</th>';
+  h+='<thead><tr>';
+  h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px;background:#0f172a">N°</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:140px;background:#0f172a">EMPRESA</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#f472b6;min-width:36px;background:#0f172a" title="Informes enviados">📨</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#a78bfa;min-width:36px;background:#0f172a" title="Socializado">🤝</th>';
   AG_DEPTS.forEach(d=>{
     const canEdit=agCanEditDept(d.id);
-    h+=`<th colspan="5" style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,0.08);background:${d.color}15;color:${d.color};font-size:10px;font-weight:800;${!canEdit?'opacity:0.5;':''}">${d.icon} ${d.label}</th>`;
+    h+=`<th colspan="5" style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,0.08);background:#0f172a;color:${d.color};font-size:10px;font-weight:800;${!canEdit?'opacity:0.5;':''}">${d.icon} ${d.label}</th>`;
   });
   h+='</tr>';
   // Header row 2: sub-fields
-  h+='<tr style="background:rgba(255,255,255,0.02)">';
+  h+='<tr>';
   AG_DEPTS.forEach(d=>{
     AG_FIELDS.forEach(f=>{
-      h+=`<th style="padding:4px 2px;text-align:center;border:1px solid rgba(255,255,255,0.06);font-size:8px;color:${d.color};font-weight:700;min-width:${f==='obs'?'80px':'36px'}">${AG_FIELD_LABELS[f]}</th>`;
+      h+=`<th style="padding:4px 2px;text-align:center;border:1px solid rgba(255,255,255,0.06);font-size:8px;color:${d.color};font-weight:700;min-width:${f==='obs'?'80px':'36px'};background:#111827">${AG_FIELD_LABELS[f]}</th>`;
     });
   });
   h+='</tr></thead><tbody>';
