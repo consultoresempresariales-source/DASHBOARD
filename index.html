@@ -3955,7 +3955,7 @@ function logRender(){
   // Agendamiento y Resumen: visible for ALL users
   h+=`<div onclick="LOG.tab='agendamiento';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='agendamiento'?'#10b981':'transparent'};color:${fTab==='agendamiento'?'#10b981':'var(--t3)'};transition:all 0.2s">📋 Agendamiento</div>`;
   h+=`<div onclick="LOG.tab='resumen';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='resumen'?'#818cf8':'transparent'};color:${fTab==='resumen'?'#818cf8':'var(--t3)'};transition:all 0.2s">📊 Resumen</div>`;
-  h+=`<div onclick="LOG.tab='enviados';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='enviados'?'#f472b6':'transparent'};color:${fTab==='enviados'?'#f472b6':'var(--t3)'};transition:all 0.2s">📨 Enviados</div>`;
+  h+=`<div onclick="LOG.tab='enviados';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='enviados'?'#f472b6':'transparent'};color:${fTab==='enviados'?'#f472b6':'var(--t3)'};transition:all 0.2s">💰 Cobrar</div>`;
   h+=`</div>`;
 
   // Month navigator (always visible)
@@ -4348,56 +4348,37 @@ async function agLoad(){
 }
 
 function agGetVal(companyId,deptId,field){
-  // First check manual agendamiento data
   const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
-  // For "ag" field: auto-detect from trips if not manually set
-  if(field==='ag'){
-    // If manually set to something other than default, respect it
-    if(r&&(r.ag==='SÍ'||r.ag==='N/A'))return r.ag;
-    // Auto-detect: does this company have a trip this month with this dept?
+  // If there is a manual record, ALWAYS return its value (user's choice wins)
+  if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
+    return r[field];
+  }
+  // No manual record - auto-detect from trips for ag and vis fields only
+  if(field==='ag'||field==='vis'){
     const deptRoleMap={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
     const trips=LOG._agTrips||[];
     const tripCos=LOG._agTripCos||[];
     const tripMembers=LOG._agTripMembers||[];
-    // Find trips that include this company
     const coTripIds=tripCos.filter(tc=>tc.company_id===companyId).map(tc=>tc.trip_id);
     if(coTripIds.length>0){
-      // Check if any of those trips have a member of the right department
-      const roleMatch=deptRoleMap[deptId];
-      const roles=Array.isArray(roleMatch)?roleMatch:[roleMatch];
-      for(const tid of coTripIds){
-        const members=tripMembers.filter(m=>m.trip_id===tid);
-        if(members.length===0)return 'SÍ'; // No members assigned = assume all depts
-        if(members.some(m=>roles.includes(m.department)))return 'SÍ';
-      }
-    }
-    // No trip found, return manual value or NO
-    return r?.ag||'NO';
-  }
-  if(field==='vis'){
-    // For "vis": auto-detect from completed trips
-    if(r&&(r.vis==='SÍ'||r.vis==='N/A'))return r.vis;
-    const trips=LOG._agTrips||[];
-    const tripCos=LOG._agTripCos||[];
-    const tripMembers=LOG._agTripMembers||[];
-    const coTripIds=tripCos.filter(tc=>tc.company_id===companyId).map(tc=>tc.trip_id);
-    if(coTripIds.length>0){
-      const deptRoleMap={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento']};
       const roleMatch=deptRoleMap[deptId];
       const roles=Array.isArray(roleMatch)?roleMatch:[roleMatch];
       for(const tid of coTripIds){
         const trip=trips.find(t=>t.id===tid);
-        if(trip&&trip.status==='completed'){
-          const members=tripMembers.filter(m=>m.trip_id===tid);
+        const members=tripMembers.filter(m=>m.trip_id===tid);
+        if(field==='ag'){
+          if(members.length===0)return 'SÍ';
+          if(members.some(m=>roles.includes(m.department)))return 'SÍ';
+        }
+        if(field==='vis'&&trip&&trip.status==='completed'){
           if(members.length===0)return 'SÍ';
           if(members.some(m=>roles.includes(m.department)))return 'SÍ';
         }
       }
     }
-    return r?.vis||'NO';
   }
-  if(!r)return field==='obs'?'':'NO';
-  return r[field]||'NO';
+  if(field==='obs')return '';
+  return 'NO';
 }
 
 async function agSetVal(companyId,deptId,field,val){
@@ -4444,6 +4425,7 @@ function logRenderAgendamiento(){
   h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px">N°</th>';
   h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:140px">EMPRESA</th>';
   h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#f472b6;min-width:36px" title="Informes enviados">📨</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#a78bfa;min-width:36px" title="Socializado">🤝</th>';
   AG_DEPTS.forEach(d=>{
     const canEdit=agCanEditDept(d.id);
     h+=`<th colspan="5" style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,0.08);background:${d.color}15;color:${d.color};font-size:10px;font-weight:800;${!canEdit?'opacity:0.5;':''}">${d.icon} ${d.label}</th>`;
@@ -4471,6 +4453,16 @@ function logRenderAgendamiento(){
       h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="agSetVal('${co.id}','_global','enviado',${envChecked}?'NO':'SÍ')">${envChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${envChecked?'✅':'⬜'}</span>`;
+    }
+    h+=`</td>`;
+    // Socializado check
+    const socVal=agGetVal(co.id,'_global','socializado');
+    const socChecked=socVal==='SÍ';
+    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${socChecked?'rgba(167,139,250,0.15)':'transparent'}">`;
+    if(canEditEnv){
+      h+=`<div class="cb ${socChecked?'dn':''}" style="${socChecked?'border-color:#a78bfa;background:rgba(167,139,250,0.2);color:#a78bfa':''}" onclick="agSetVal('${co.id}','_global','socializado',${socChecked}?'NO':'SÍ')">${socChecked?'✓':''}</div>`;
+    }else{
+      h+=`<span style="font-size:12px">${socChecked?'✅':'⬜'}</span>`;
     }
     h+=`</td>`;
     AG_DEPTS.forEach(d=>{
@@ -4767,12 +4759,11 @@ function logRenderEnviados(){
   h+=`<span style="font-size:11px;color:var(--t3)">${filteredCos.length} de ${allCos.length}</span>`;
   h+=`</div>`;
 
-  h+=`<div style="margin-bottom:16px"><div style="font-size:14px;font-weight:800;color:#f472b6;margin-bottom:6px">📨 Control de Informes Enviados — ${mNames[LOG.month]} ${LOG.year}</div>`;
+  h+=`<div style="margin-bottom:16px"><div style="font-size:14px;font-weight:800;color:#f472b6;margin-bottom:6px">💰 Control de Cobro — ${mNames[LOG.month]} ${LOG.year}</div>`;
   h+=`<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:var(--t3);margin-bottom:4px">`;
-  h+=`<span>✅ Informe listo</span>`;
-  h+=`<span style="color:#ef4444">❌ Falta informe (agendado pero sin informe)</span>`;
-  h+=`<span>➖ No agendado / No aplica</span>`;
-  h+=`<span style="color:#f472b6">📨 ENVIADO = Todos los informes entregados</span>`;
+  h+=`<span style="color:#34d399">💰 COBRAR = Enviado + Socializado</span>`;
+  h+=`<span style="color:#fbbf24">⏳ PENDIENTE = Falta enviar o socializar</span>`;
+  h+=`<span>➖ N/A = No agendado</span>`;
   h+=`</div></div>`;
 
   h+='<div style="overflow-x:auto;border-radius:12px;border:1px solid var(--bd)">';
@@ -4780,7 +4771,9 @@ function logRenderEnviados(){
   h+='<thead><tr style="background:rgba(244,114,182,0.1)">';
   h+='<th style="padding:10px 8px;text-align:left;border:1px solid rgba(255,255,255,0.08);color:#f472b6;font-size:10px;width:40px">N°</th>';
   h+='<th style="padding:10px 8px;text-align:left;border:1px solid rgba(255,255,255,0.08);color:#f472b6;font-size:10px;min-width:180px">EMPRESA</th>';
-  h+='<th style="padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,0.08);color:#f472b6;font-size:10px;width:140px">📨 ESTADO</th>';
+  h+='<th style="padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,0.08);color:#f472b6;font-size:10px;width:60px">📨</th>';
+  h+='<th style="padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,0.08);color:#a78bfa;font-size:10px;width:60px">🤝</th>';
+  h+='<th style="padding:10px 8px;text-align:center;border:1px solid rgba(255,255,255,0.08);color:#34d399;font-size:10px;width:100px">💰 COBRO</th>';
   AG_DEPTS.forEach(d=>{
     h+=`<th style="padding:10px 6px;text-align:center;border:1px solid rgba(255,255,255,0.08);color:${d.color};font-size:9px;font-weight:700">${d.icon} Inf.</th>`;
   });
@@ -4812,48 +4805,47 @@ function logRenderEnviados(){
       deptStatus.push({d,cellStatus,ag,inf,est});
     });
 
-    // Determine overall enviado status
+    // Determine overall status
     const envManual=agGetVal(co.id,'_global','enviado');
-    let status,statusLabel,statusIcon,statusBg,statusColor,statusBorder;
+    const socManual=agGetVal(co.id,'_global','socializado');
+    const isEnv=envManual==='SÍ';
+    const isSoc=socManual==='SÍ';
+    const canCobrar=isEnv&&isSoc;
 
-    if(allInactive||!hasAnyAgendado){
-      status='na';statusLabel='N/A';statusIcon='➖';
-      statusBg='rgba(100,116,139,0.08)';statusColor='#64748b';statusBorder='rgba(100,116,139,0.2)';
-      totalNA++;
-    }else if(envManual==='SÍ'){
-      status='si';statusLabel='ENVIADO';statusIcon='✅';
-      statusBg='rgba(244,114,182,0.15)';statusColor='#f472b6';statusBorder='#f472b6';
-      totalEnv++;
-    }else{
-      status='no';statusLabel='PENDIENTE';statusIcon='❌';
-      statusBg='rgba(239,68,68,0.08)';statusColor='#ef4444';statusBorder='rgba(239,68,68,0.3)';
-      totalPend++;
-    }
+    let status;
+    if(allInactive||!hasAnyAgendado){status='na';totalNA++}
+    else if(canCobrar){status='cobrar';totalEnv++}
+    else{status='pend';totalPend++}
 
-    const rowBg=status==='si'?'rgba(244,114,182,0.04)':status==='no'&&!allInformesReady?'rgba(239,68,68,0.03)':idx%2?'rgba(255,255,255,0.015)':'transparent';
+    const rowBg=status==='cobrar'?'rgba(52,211,153,0.04)':status==='pend'?'rgba(251,191,36,0.03)':idx%2?'rgba(255,255,255,0.015)':'transparent';
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg}">`;
     h+=`<td style="padding:8px;color:var(--t3);font-family:var(--mn);font-size:10px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
-    h+=`<td style="padding:8px;font-weight:700;font-size:12px;border:1px solid rgba(255,255,255,0.04);color:${status==='si'?'#f472b6':status==='na'?'#64748b':'var(--t1)'}">${co.name}</td>`;
+    h+=`<td style="padding:8px;font-weight:700;font-size:12px;border:1px solid rgba(255,255,255,0.04);color:${status==='cobrar'?'#34d399':status==='na'?'#64748b':'var(--t1)'}">${co.name}</td>`;
 
-    // Enviado button - only enabled when all agendado depts have informe
+    // Enviado column
+    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${isEnv?'rgba(244,114,182,0.12)':'transparent'}">`;
+    if(status==='na'){h+=`<span style="color:#64748b">➖</span>`}
+    else{h+=`<span style="font-size:14px">${isEnv?'✅':'❌'}</span>`}
+    h+=`</td>`;
+    // Socializado column
+    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${isSoc?'rgba(167,139,250,0.12)':'transparent'}">`;
+    if(status==='na'){h+=`<span style="color:#64748b">➖</span>`}
+    else{h+=`<span style="font-size:14px">${isSoc?'✅':'❌'}</span>`}
+    h+=`</td>`;
+    // Cobro status
     const missingCount=deptStatus.filter(ds=>ds.cellStatus==='missing').length;
     const readyCount=deptStatus.filter(ds=>ds.cellStatus==='ok').length;
-    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${statusBg}">`;
+    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${status==='cobrar'?'rgba(52,211,153,0.15)':status==='pend'?'rgba(251,191,36,0.08)':'rgba(100,116,139,0.05)'}">`;
     if(status==='na'){
       h+=`<span style="font-size:11px;font-weight:700;color:#64748b">➖ N/A</span>`;
-    }else if(canEditEnv){
-      if(status==='si'){
-        // Already sent - allow to undo
-        h+=`<button onclick="agSetVal('${co.id}','_global','enviado','NO')" style="padding:6px 16px;border-radius:8px;border:2px solid #f472b6;background:rgba(244,114,182,0.2);color:#f472b6;font-size:11px;font-weight:800;cursor:pointer">✅ ENVIADO</button>`;
-      }else if(missingCount>0){
-        // Cannot mark as sent - missing informes
-        h+=`<div style="font-size:10px;font-weight:700;color:#ef4444">❌ FALTAN ${missingCount}</div><div style="font-size:8px;color:var(--t3)">${readyCount} listo${readyCount!==1?'s':''}</div>`;
-      }else{
-        // All informes ready - can mark as sent
-        h+=`<button onclick="agSetVal('${co.id}','_global','enviado','SÍ')" style="padding:6px 16px;border-radius:8px;border:2px solid #34d399;background:rgba(52,211,153,0.15);color:#34d399;font-size:11px;font-weight:800;cursor:pointer;animation:pulse 2s infinite">📨 ENVIAR</button>`;
-      }
+    }else if(status==='cobrar'){
+      h+=`<span style="font-size:11px;font-weight:800;color:#34d399">💰 COBRAR</span>`;
     }else{
-      h+=`<span style="font-size:11px;font-weight:800;color:${statusColor}">${statusIcon} ${statusLabel}</span>`;
+      // Pending - show what's missing
+      const missing=[];
+      if(!isEnv)missing.push('Enviar');
+      if(!isSoc)missing.push('Socializar');
+      h+=`<div style="font-size:10px;font-weight:700;color:#fbbf24">⏳ Falta: ${missing.join(' + ')}</div>`;
     }
     h+=`</td>`;
 
@@ -4881,8 +4873,8 @@ function logRenderEnviados(){
   const pct=totalActive>0?Math.round(totalEnv/totalActive*100):0;
   const pctColor=pct>=80?'#34d399':pct>=50?'#fbbf24':'#ef4444';
   h+=`<div class="gr" style="grid-template-columns:repeat(4,1fr);margin-top:16px">`;
-  h+=`<div class="c"><div class="kl">✅ Enviados</div><div class="kv" style="color:#f472b6">${totalEnv}</div></div>`;
-  h+=`<div class="c"><div class="kl">❌ Pendientes</div><div class="kv" style="color:#ef4444">${totalPend}</div></div>`;
+  h+=`<div class="c"><div class="kl">💰 Listos para cobrar</div><div class="kv" style="color:#34d399">${totalEnv}</div></div>`;
+  h+=`<div class="c"><div class="kl">⏳ Pendientes</div><div class="kv" style="color:#fbbf24">${totalPend}</div></div>`;
   h+=`<div class="c"><div class="kl">➖ No Aplica</div><div class="kv" style="color:#64748b">${totalNA}</div></div>`;
   h+=`<div class="c"><div class="kl">📊 Avance</div><div class="kv" style="color:${pctColor}">${pct}%</div><div class="ks">${totalEnv} de ${totalActive} agendados</div></div>`;
   h+=`</div>`;
