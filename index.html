@@ -66,14 +66,16 @@ canvas{width:100%!important;max-height:220px}
 .ag-row:hover{outline:2px solid rgba(16,185,129,0.4);outline-offset:-1px}
 .ag-row:hover .ag-name{background:rgba(16,185,129,0.2)!important;color:#10b981!important}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
-#agTableWrap{overflow:auto;border-radius:12px;border:1px solid var(--bd);position:relative;height:calc(100vh - 260px);min-height:300px}
-#agTableWrap thead th{position:sticky;top:0;z-index:3;background:#111827}
-#agTableWrap thead tr:nth-child(2) th{top:32px}
-#agTableWrap::-webkit-scrollbar{height:14px;width:10px}
-#agTableWrap::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);border-radius:7px}
-#agTableWrap::-webkit-scrollbar-thumb{background:rgba(45,212,191,0.5);border-radius:7px;border:2px solid #111827}
-#agTableWrap::-webkit-scrollbar-thumb:hover{background:rgba(45,212,191,0.8)}
-#agTableWrap::-webkit-scrollbar-corner{background:#111827}
+#agTableWrap{overflow:scroll;border-radius:12px;border:1px solid var(--bd);position:relative;height:calc(100vh - 220px);min-height:350px;display:block}
+#agTableWrap table{border-collapse:separate;border-spacing:0}
+#agTableWrap thead tr:first-child th{position:sticky;top:0;z-index:4;background:#0f172a;border-bottom:2px solid rgba(255,255,255,0.15)}
+#agTableWrap thead tr:nth-child(2) th{position:sticky;top:34px;z-index:4;background:#111827;border-bottom:2px solid rgba(255,255,255,0.1)}
+#agTableWrap::-webkit-scrollbar{height:16px;width:10px}
+#agTableWrap::-webkit-scrollbar-track{background:#1e293b;border-radius:0}
+#agTableWrap::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#2dd4bf,#818cf8);border-radius:8px;border:3px solid #1e293b}
+#agTableWrap::-webkit-scrollbar-thumb:hover{background:linear-gradient(90deg,#34d399,#a78bfa)}
+#agTableWrap::-webkit-scrollbar-corner{background:#1e293b}
+@supports(scrollbar-width:thin){#agTableWrap{scrollbar-width:auto;scrollbar-color:#2dd4bf #1e293b}}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:60px;background:#080b14;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;align-items:center;padding:12px 0;z-index:100}
 .sb-item{width:46px;padding:8px 0;text-align:center;border-radius:10px;cursor:pointer;margin-bottom:3px;transition:all .15s}
 .sb-item:hover{background:rgba(255,255,255,0.06)}.sb-item.active{background:rgba(45,212,191,0.12)}
