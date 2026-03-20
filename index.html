@@ -66,12 +66,14 @@ canvas{width:100%!important;max-height:220px}
 .ag-row:hover{outline:2px solid rgba(16,185,129,0.4);outline-offset:-1px}
 .ag-row:hover .ag-name{background:rgba(16,185,129,0.2)!important;color:#10b981!important}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
-#agTableWrap{overflow-x:auto;overflow-y:auto;max-height:75vh;border-radius:12px;border:1px solid var(--bd);position:relative}
-#agTableWrap::-webkit-scrollbar{height:14px;width:8px}
-#agTableWrap::-webkit-scrollbar-track{background:rgba(255,255,255,0.03);border-radius:7px}
-#agTableWrap::-webkit-scrollbar-thumb{background:rgba(45,212,191,0.4);border-radius:7px;border:2px solid rgba(0,0,0,0.3)}
-#agTableWrap::-webkit-scrollbar-thumb:hover{background:rgba(45,212,191,0.7)}
-#agTableWrap::-webkit-scrollbar-corner{background:transparent}
+#agTableWrap{overflow:auto;border-radius:12px;border:1px solid var(--bd);position:relative;height:calc(100vh - 260px);min-height:300px}
+#agTableWrap thead th{position:sticky;top:0;z-index:3;background:#111827}
+#agTableWrap thead tr:nth-child(2) th{top:32px}
+#agTableWrap::-webkit-scrollbar{height:14px;width:10px}
+#agTableWrap::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);border-radius:7px}
+#agTableWrap::-webkit-scrollbar-thumb{background:rgba(45,212,191,0.5);border-radius:7px;border:2px solid #111827}
+#agTableWrap::-webkit-scrollbar-thumb:hover{background:rgba(45,212,191,0.8)}
+#agTableWrap::-webkit-scrollbar-corner{background:#111827}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:60px;background:#080b14;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;align-items:center;padding:12px 0;z-index:100}
 .sb-item{width:46px;padding:8px 0;text-align:center;border-radius:10px;cursor:pointer;margin-bottom:3px;transition:all .15s}
 .sb-item:hover{background:rgba(255,255,255,0.06)}.sb-item.active{background:rgba(45,212,191,0.12)}
@@ -4511,7 +4513,7 @@ function logRenderAgendamiento(){
           const isActive=val!=='INACTIVO';
           h+=`<td style="padding:2px;text-align:center;border:1px solid rgba(255,255,255,0.04);background:${isActive?'rgba(52,211,153,0.08)':'rgba(239,68,68,0.08)'}">`;
           if(canEdit){
-            h+=`<select onchange="agSetVal('${co.id}','${d.id}','est',this.value)" style="padding:2px;border:none;background:transparent;color:${isActive?'#34d399':'#ef4444'};font-size:8px;font-weight:700;cursor:pointer;text-align:center;outline:none">`;
+            h+=`<select onchange="agSetVal('${co.id}','${d.id}','est',this.value);var a=this.value!=='INACTIVO';this.style.color=a?'#34d399':'#ef4444';this.parentElement.style.background=a?'rgba(52,211,153,0.08)':'rgba(239,68,68,0.08)'" style="padding:2px;border:none;background:transparent;color:${isActive?'#34d399':'#ef4444'};font-size:8px;font-weight:700;cursor:pointer;text-align:center;outline:none">`;
             h+=`<option value="ACTIVO" ${isActive?'selected':''}>ACTIVO</option><option value="INACTIVO" ${!isActive?'selected':''}>INACTIVO</option></select>`;
           }else{
             h+=`<span style="font-size:8px;font-weight:700;color:${isActive?'#34d399':'#ef4444'}">${isActive?'ACTIVO':'INACT.'}</span>`;
@@ -4527,7 +4529,7 @@ function logRenderAgendamiento(){
           if(isInactive){
             h+=`<span style="font-size:8px;color:#64748b">N/A</span>`;
           }else if(canEdit){
-            h+=`<select onchange="agSetVal('${co.id}','${d.id}','${f}',this.value)" style="padding:2px;border:none;background:transparent;color:${txtColor};font-size:8px;font-weight:700;cursor:pointer;text-align:center;outline:none">`;
+            h+=`<select onchange="agSetVal('${co.id}','${d.id}','${f}',this.value);var v=this.value;var c=v==='SÍ'?'#34d399':v==='N/A'?'#64748b':'#ef4444';this.style.color=c;this.parentElement.style.background=v==='SÍ'?'rgba(52,211,153,0.12)':v==='N/A'?'rgba(100,116,139,0.1)':'transparent'" style="padding:2px;border:none;background:transparent;color:${txtColor};font-size:8px;font-weight:700;cursor:pointer;text-align:center;outline:none">`;
             AG_VALS.forEach(v=>{h+=`<option value="${v}" ${val===v?'selected':''}>${v}</option>`});
             h+='</select>';
           }else{
