@@ -4398,21 +4398,30 @@ function agGetVal(companyId,deptId,field){
 
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId))return;
-  // Update local
+  // Update local data
   let r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
   if(r){r[field]=val}
   else{r={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};LOG.agData.push(r)}
-  // Save scroll positions before re-render
-  const agTable=document.getElementById('agTableWrap');
-  if(agTable){LOG._agScrollTop=agTable.scrollTop;LOG._agScrollLeft=agTable.scrollLeft}
-  LOG._mainScroll=window.scrollY;
-  logRender();
-  // Save to DB
+  // Save to DB WITHOUT re-rendering (no scroll jump)
   dbs("ag-"+companyId+deptId+field,async()=>{
     const upd={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};
     const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
     if(error)console.error("agSetVal:",error);
   });
+  // Only do a full re-render for check buttons (enviado/socializado) that need visual update
+  if(field==='enviado'||field==='socializado'){
+    const agTable=document.getElementById('agTableWrap');
+    const st=agTable?agTable.scrollTop:0;
+    const sl=agTable?agTable.scrollLeft:0;
+    const ms=window.scrollY;
+    logRender();
+    requestAnimationFrame(()=>{
+      const t=document.getElementById('agTableWrap');
+      if(t){t.scrollTop=st;t.scrollLeft=sl}
+      window.scrollTo(0,ms);
+      setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
+    });
+  }
 }
 
 function logRenderAgendamiento(){
@@ -4437,7 +4446,7 @@ function logRenderAgendamiento(){
   h+=`<span style="font-size:11px;color:var(--t3)">${filteredCos.length} de ${allCos.length} empresas</span>`;
   h+=`</div>`;
 
-  h+='<div id="agTableWrap" style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:calc(100vh - 240px)">';
+  h+='<div id="agTableWrap" style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:70vh;position:relative">';
   h+='<table style="width:100%;border-collapse:collapse;font-size:10px;min-width:900px">';
   // Header row 1: dept groups
   h+='<thead><tr style="background:rgba(255,255,255,0.04)">';
@@ -4613,7 +4622,7 @@ function logRenderResumen(){
   h+=`<span style="color:#ef4444;font-weight:700">🔴 Rojo intenso = No visitado en ${mNames[prevM]}</span>`;
   h+=`</div></div>`;
 
-  h+='<div style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:calc(100vh - 280px)">';
+  h+='<div style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:70vh">';
   h+='<table style="width:100%;border-collapse:collapse;font-size:11px">';
   h+='<thead><tr style="background:rgba(129,140,248,0.1)">';
   h+='<th style="padding:10px 8px;text-align:left;border:1px solid rgba(255,255,255,0.08);color:#818cf8;font-size:10px">N°</th>';
@@ -4785,7 +4794,7 @@ function logRenderEnviados(){
   h+=`<span>➖ N/A = No agendado</span>`;
   h+=`</div></div>`;
 
-  h+='<div style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:calc(100vh - 280px)">';
+  h+='<div style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:70vh">';
   h+='<table style="width:100%;border-collapse:collapse;font-size:11px">';
   h+='<thead><tr style="background:rgba(244,114,182,0.1)">';
   h+='<th style="padding:10px 8px;text-align:left;border:1px solid rgba(255,255,255,0.08);color:#f472b6;font-size:10px;width:40px">N°</th>';
