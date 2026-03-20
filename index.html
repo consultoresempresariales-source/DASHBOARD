@@ -62,9 +62,9 @@ canvas{width:100%!important;max-height:220px}
 @media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}}
 .poa-row:hover td{background:rgba(45,212,191,0.06)!important}
 .poa-row:hover{outline:2px solid rgba(45,212,191,0.25);outline-offset:-1px}
-.ag-row:hover td{background:rgba(16,185,129,0.1)!important}
+.ag-row:hover td{background:rgba(16,185,129,0.06)!important}
 .ag-row:hover{outline:2px solid rgba(16,185,129,0.4);outline-offset:-1px}
-.ag-row:hover .ag-name{background:rgba(16,185,129,0.2)!important;color:#10b981!important}
+.ag-row:hover .ag-name{background:#1a2e2a!important;color:#2dd4bf!important}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
 #agTableWrap{overflow:scroll;border-radius:12px;border:1px solid var(--bd);position:relative;height:calc(100vh - 220px);min-height:350px;display:block}
 #agTableWrap table{border-collapse:separate;border-spacing:0}
@@ -4481,7 +4481,7 @@ function logRenderAgendamiento(){
   filteredCos.forEach((co,idx)=>{
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
-    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap;position:sticky;left:0;z-index:2;background:var(--b2)">${co.name}</td>`;
+    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap;position:sticky;left:0;z-index:5;background:#0f172a">${co.name}</td>`;
     // Enviado check
     const envVal=agGetVal(co.id,'_global','enviado');
     const envChecked=envVal==='SÍ';
