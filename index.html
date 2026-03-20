@@ -67,11 +67,12 @@ canvas{width:100%!important;max-height:220px}
 .ag-row:hover .ag-name{background:#1a2e2a!important;color:#2dd4bf!important}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
 #agTableWrap{overflow:scroll;border-radius:12px;border:1px solid var(--bd);position:relative;height:calc(100vh - 220px);min-height:350px;display:block}
-#agTableWrap table{border-collapse:separate;border-spacing:0}
-#agTableWrap thead tr:first-child th{position:sticky;top:0;z-index:4;background:#0f172a;border-bottom:2px solid rgba(255,255,255,0.15)}
-#agTableWrap thead tr:nth-child(2) th{position:sticky;top:34px;z-index:4;background:#111827;border-bottom:2px solid rgba(255,255,255,0.1)}
+#agTableWrap table{border-collapse:collapse;width:100%;font-size:10px;min-width:900px}
+#agTableWrap thead tr:first-child th{position:sticky;top:0;z-index:6;background:#0f172a;box-shadow:0 2px 4px rgba(0,0,0,0.5)}
+#agTableWrap thead tr:nth-child(2) th{position:sticky;top:28px;z-index:6;background:#111827;box-shadow:0 2px 4px rgba(0,0,0,0.3)}
+#agTableWrap .ag-name{position:sticky;left:0;z-index:5;background:#0f172a;box-shadow:2px 0 4px rgba(0,0,0,0.4)}
 #agTableWrap::-webkit-scrollbar{height:16px;width:10px}
-#agTableWrap::-webkit-scrollbar-track{background:#1e293b;border-radius:0}
+#agTableWrap::-webkit-scrollbar-track{background:#1e293b}
 #agTableWrap::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#2dd4bf,#818cf8);border-radius:8px;border:3px solid #1e293b}
 #agTableWrap::-webkit-scrollbar-thumb:hover{background:linear-gradient(90deg,#34d399,#a78bfa)}
 #agTableWrap::-webkit-scrollbar-corner{background:#1e293b}
@@ -4457,7 +4458,7 @@ function logRenderAgendamiento(){
   h+=`</div>`;
 
   h+='<div id="agTableWrap">';
-  h+='<table style="width:100%;border-collapse:collapse;font-size:10px;min-width:900px">';
+  h+='<table>';
   // Header row 1: dept groups
   h+='<thead><tr style="background:rgba(255,255,255,0.04)">';
   h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px">N°</th>';
@@ -4481,7 +4482,7 @@ function logRenderAgendamiento(){
   filteredCos.forEach((co,idx)=>{
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
-    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap;position:sticky;left:0;z-index:5;background:#0f172a">${co.name}</td>`;
+    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap">${co.name}</td>`;
     // Enviado check
     const envVal=agGetVal(co.id,'_global','enviado');
     const envChecked=envVal==='SÍ';
