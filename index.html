@@ -4064,7 +4064,7 @@ function logRenderWeek(isAdmin,visibleTrips){
       }
       // WhatsApp button
       if(tcs.length>0&&t.status!=='cancelled'){
-        h+=`<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;text-align:right"><button onclick="logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">📱 WhatsApp</button></div>`;
+        h+=`<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;display:flex;justify-content:flex-end;gap:6px"><button onclick="logEditWA('${t.id}')" style="background:rgba(255,255,255,0.06);color:var(--t3);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:10px;cursor:pointer" title="Editar numero">✏️</button><button onclick="logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">📱 WhatsApp</button></div>`;
       }
       h+=`</div>`;
     });
@@ -4139,6 +4139,8 @@ function logRenderCalendar(isAdmin,visibleTrips){
         }
         h+=`<div style="display:flex;gap:4px;margin-top:6px">`;
         h+=`<button onclick="event.stopPropagation();logSendNotifications('${t.id}')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:700;cursor:pointer" title="Enviar notificación">📩</button>`;
+        if(tcs.length>0)h+=`<button onclick="event.stopPropagation();logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:700;cursor:pointer" title="WhatsApp">📱</button>`;
+        if(tcs.length>0)h+=`<button onclick="event.stopPropagation();logEditWA('${t.id}')" style="background:rgba(255,255,255,0.06);color:var(--t3);border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:9px;cursor:pointer" title="Editar numero">✏️</button>`;
         h+=`<button onclick="event.stopPropagation();logDeleteTrip('${t.id}')" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:700;cursor:pointer" title="Eliminar viaje">🗑️</button>`;
         h+=`</div>`;
       }
@@ -4923,17 +4925,25 @@ function logSendWA(tripId){
   const depts=[...new Set(members.map(m=>m.department))];
   const deptList=depts.map(d=>DEPT_FULL_LABELS[d]||d).join(', ');
 
-  // Calculate days until trip
-  const tripDate=new Date(t.trip_date+'T12:00:00');
+  // Calculate days until trip (timezone-proof)
+  const parts=t.trip_date.split('-');
+  const tripY=+parts[0],tripM=+parts[1]-1,tripD=+parts[2];
+  const tripDate=new Date(tripY,tripM,tripD,12,0,0);
   const now=new Date();
-  const diffDays=Math.ceil((tripDate-now)/(1000*60*60*24));
-  const dateStr=tripDate.toLocaleDateString('es-EC',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const nowY=now.getFullYear(),nowM=now.getMonth(),nowD=now.getDate();
+  // Compare using pure date components, no timezone issues
+  const tripDayNum=Math.floor(new Date(tripY,tripM,tripD).getTime()/86400000);
+  const nowDayNum=Math.floor(new Date(nowY,nowM,nowD).getTime()/86400000);
+  const diffDays=tripDayNum-nowDayNum;
+  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const dateStr=dias[tripDate.getDay()]+' '+tripD+' de '+meses[tripM]+' de '+tripY;
 
   // Build urgency text
   let urgText;
-  if(diffDays<=0)urgText='📍 *HOY* tenemos programada una visita';
-  else if(diffDays===1)urgText='📍 *MAÑANA* tenemos programada una visita';
-  else urgText=`📍 En *${diffDays} días* tenemos programada una visita`;
+  if(diffDays<=0)urgText='*HOY* tenemos programada una visita';
+  else if(diffDays===1)urgText='*MANANA* tenemos programada una visita';
+  else urgText='En *'+diffDays+' dias* tenemos programada una visita';
 
   // For each company, send message
   tcs.forEach(tc=>{
@@ -4944,10 +4954,9 @@ function logSendWA(tripId){
     // Check if company has saved WhatsApp number
     let phone=co.whatsapp||'';
     if(!phone){
-      phone=prompt(`📱 Número de WhatsApp para ${coName}\n\nEjemplo: 0991234567 o +593991234567\n\n(Se guardará para futuras veces)`);
+      phone=prompt('Numero de WhatsApp para '+coName+'\n\nEjemplo: 0991234567 o +593991234567\n\n(Se guardara para futuras veces)');
       if(!phone||!phone.trim())return;
       phone=phone.trim();
-      // Save to company
       co.whatsapp=phone;
       const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=phone;
       sb.from("companies").update({whatsapp:phone}).eq("id",co.id);
@@ -4959,19 +4968,37 @@ function logSendWA(tripId){
     if(!cleanPhone.startsWith('+')&&!cleanPhone.startsWith('593'))cleanPhone='593'+cleanPhone;
     cleanPhone=cleanPhone.replace('+','');
 
-    // Build message
-    let msg=`Estimado/a representante de *${coName}*,\n\n`;
-    msg+=`${urgText} a su empresa.\n\n`;
-    msg+=`📅 *Fecha:* ${dateStr}\n`;
-    msg+=`⏰ *Hora de llegada:* ${t.departure_time||'08:00'}\n`;
-    if(deptList)msg+=`👥 *Departamentos:* ${deptList}\n`;
-    if(t.jornada_medica)msg+=`🩺 *Jornada Médica Ocupacional*\n`;
-    if(t.jornada_examenes)msg+=`🔬 *Jornada de Exámenes Ocupacionales*\n`;
-    msg+=`\nPor favor confirmar disponibilidad.\n`;
-    msg+=`\n_Consultores Empresariales ALTAIR_`;
+    // Build message - clean professional format
+    let msg='Estimado/a,\n\n';
+    msg+='Le saluda *Consultores Empresariales ALTAIR*.\n\n';
+    msg+=urgText+' a *'+coName+'*.\n\n';
+    msg+='-----------------------------\n';
+    msg+='Fecha: *'+dateStr+'*\n';
+    msg+='Hora: *'+(t.departure_time||'08:00')+'*\n';
+    if(deptList)msg+='Departamentos:\n*'+depts.map(d=>DEPT_FULL_LABELS[d]||d).join('*\n*')+'*\n';
+    if(t.jornada_medica)msg+='Jornada Medica Ocupacional\n';
+    if(t.jornada_examenes)msg+='Jornada de Examenes Ocupacionales\n';
+    msg+='-----------------------------\n\n';
+    msg+='Agradecemos confirmar su disponibilidad.\n\n';
+    msg+='Saludos cordiales.';
 
     const url=`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url,'_blank');
+  });
+}
+
+function logEditWA(tripId){
+  event.stopPropagation();
+  const t=LOG.trips.find(x=>x.id===tripId);if(!t)return;
+  const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
+  tcs.forEach(tc=>{
+    const co=cos.find(c=>c.id===tc.company_id);if(!co)return;
+    const newPhone=prompt('Editar numero de WhatsApp para '+co.name+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
+    if(newPhone===null)return;
+    co.whatsapp=newPhone.trim();
+    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=newPhone.trim();
+    sb.from("companies").update({whatsapp:newPhone.trim()}).eq("id",co.id);
+    alert('Numero actualizado para '+co.name+': '+newPhone.trim());
   });
 }
 
