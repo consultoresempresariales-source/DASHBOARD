@@ -4940,10 +4940,11 @@ function logSendWA(tripId){
   const dateStr=dias[tripDate.getDay()]+' '+tripD+' de '+meses[tripM]+' de '+tripY;
 
   // Build urgency text
+  const pin=String.fromCodePoint(0x1F4CD);
   let urgText;
-  if(diffDays<=0)urgText='*HOY* tenemos programada una visita';
-  else if(diffDays===1)urgText='*MANANA* tenemos programada una visita';
-  else urgText='En *'+diffDays+' dias* tenemos programada una visita';
+  if(diffDays<=0)urgText=pin+' *HOY* tenemos programada una visita';
+  else if(diffDays===1)urgText=pin+' *MANANA* tenemos programada una visita';
+  else urgText=pin+' En *'+diffDays+' dias* tenemos programada una visita';
 
   // For each company, send message
   tcs.forEach(tc=>{
@@ -4968,22 +4969,24 @@ function logSendWA(tripId){
     if(!cleanPhone.startsWith('+')&&!cleanPhone.startsWith('593'))cleanPhone='593'+cleanPhone;
     cleanPhone=cleanPhone.replace('+','');
 
-    // Build message - clean professional format
-    let msg='Estimado/a,\n\n';
-    msg+='Le saluda *Consultores Empresariales ALTAIR*.\n\n';
-    msg+=urgText+' a *'+coName+'*.\n\n';
-    msg+='-----------------------------\n';
-    msg+='Fecha: *'+dateStr+'*\n';
-    msg+='Hora: *'+(t.departure_time||'08:00')+'*\n';
-    if(deptList)msg+='Departamentos:\n*'+depts.map(d=>DEPT_FULL_LABELS[d]||d).join('*\n*')+'*\n';
-    if(t.jornada_medica)msg+='Jornada Medica Ocupacional\n';
-    if(t.jornada_examenes)msg+='Jornada de Examenes Ocupacionales\n';
-    msg+='-----------------------------\n\n';
-    msg+='Agradecemos confirmar su disponibilidad.\n\n';
-    msg+='Saludos cordiales.';
+    // Build message
+    var msg='Estimado/a representante de *'+coName+'*,\n\n';
+    msg+='Se recuerda que:\n';
+    msg+=urgText+' a su empresa.\n\n';
+    msg+=String.fromCodePoint(0x1F4C5)+' *Fecha:* '+dateStr+'\n';
+    msg+=String.fromCodePoint(0x1F552)+' *Hora programada:* '+(t.departure_time||'08:00')+'\n';
+    if(depts.length>0){
+      msg+=String.fromCodePoint(0x1F465)+' *Departamentos:*\n';
+      depts.forEach(d=>{msg+='   '+String.fromCodePoint(0x2705)+' '+(DEPT_FULL_LABELS[d]||d)+'\n'});
+    }
+    if(t.jornada_medica)msg+=String.fromCodePoint(0x1FA7A)+' Jornada Medica Ocupacional\n';
+    if(t.jornada_examenes)msg+=String.fromCodePoint(0x1F52C)+' Jornada de Examenes Ocupacionales\n';
+    msg+='\nPor favor confirmar disponibilidad.\n\n';
+    msg+='Atentamente\n';
+    msg+='_Consultores Empresariales ALTAIR_';
 
     const url=`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
-    window.open(url,'_blank');
+    window.open(url,'whatsapp_tab');
   });
 }
 
