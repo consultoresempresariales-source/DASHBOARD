@@ -3979,10 +3979,17 @@ function logRender(){
   mc.innerHTML=h;
   // Restore scroll positions for agendamiento/resumen/cobrar tables
   if(fTab==='agendamiento'||fTab==='resumen'||fTab==='enviados'){
+    const _st=LOG._agScrollTop,_sl=LOG._agScrollLeft,_ms=LOG._mainScroll;
     requestAnimationFrame(()=>{
-      const agTable=document.querySelector('#logMc div[style*="overflow"]');
-      if(agTable&&LOG._agScrollTop!=null){agTable.scrollTop=LOG._agScrollTop;agTable.scrollLeft=LOG._agScrollLeft}
-      if(LOG._mainScroll!=null)window.scrollTo(0,LOG._mainScroll);
+      const agTable=document.getElementById('agTableWrap');
+      if(agTable&&_st!=null){agTable.scrollTop=_st;agTable.scrollLeft=_sl}
+      if(_ms!=null)window.scrollTo(0,_ms);
+      // Double-ensure after a tiny delay (some browsers need this)
+      setTimeout(()=>{
+        const agT2=document.getElementById('agTableWrap');
+        if(agT2&&_st!=null){agT2.scrollTop=_st;agT2.scrollLeft=_sl}
+        if(_ms!=null)window.scrollTo(0,_ms);
+      },50);
     });
   }
   // Restore focus to search input if it was active
@@ -4396,10 +4403,9 @@ async function agSetVal(companyId,deptId,field,val){
   if(r){r[field]=val}
   else{r={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};LOG.agData.push(r)}
   // Save scroll positions before re-render
-  const agTable=document.querySelector('#logMc div[style*="overflow"]');
+  const agTable=document.getElementById('agTableWrap');
   if(agTable){LOG._agScrollTop=agTable.scrollTop;LOG._agScrollLeft=agTable.scrollLeft}
-  const mainScroll=document.getElementById('logMc')?.parentElement;
-  if(mainScroll)LOG._mainScroll=window.scrollY;
+  LOG._mainScroll=window.scrollY;
   logRender();
   // Save to DB
   dbs("ag-"+companyId+deptId+field,async()=>{
@@ -4431,7 +4437,7 @@ function logRenderAgendamiento(){
   h+=`<span style="font-size:11px;color:var(--t3)">${filteredCos.length} de ${allCos.length} empresas</span>`;
   h+=`</div>`;
 
-  h+='<div style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:calc(100vh - 240px)">';
+  h+='<div id="agTableWrap" style="overflow:auto;border-radius:12px;border:1px solid var(--bd);max-height:calc(100vh - 240px)">';
   h+='<table style="width:100%;border-collapse:collapse;font-size:10px;min-width:900px">';
   // Header row 1: dept groups
   h+='<thead><tr style="background:rgba(255,255,255,0.04)">';
