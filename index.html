@@ -3977,6 +3977,14 @@ function logRender(){
   else if(fTab==="enviados") h+=logRenderEnviados();
 
   mc.innerHTML=h;
+  // Restore scroll positions for agendamiento/resumen/cobrar tables
+  if(fTab==='agendamiento'||fTab==='resumen'||fTab==='enviados'){
+    requestAnimationFrame(()=>{
+      const agTable=document.querySelector('#logMc div[style*="overflow"]');
+      if(agTable&&LOG._agScrollTop!=null){agTable.scrollTop=LOG._agScrollTop;agTable.scrollLeft=LOG._agScrollLeft}
+      if(LOG._mainScroll!=null)window.scrollTo(0,LOG._mainScroll);
+    });
+  }
   // Restore focus to search input if it was active
   if(fTab==='agendamiento'&&LOG._agSearch){
     const inp=document.getElementById('agSearchInput');
@@ -4387,6 +4395,11 @@ async function agSetVal(companyId,deptId,field,val){
   let r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
   if(r){r[field]=val}
   else{r={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};LOG.agData.push(r)}
+  // Save scroll positions before re-render
+  const agTable=document.querySelector('#logMc div[style*="overflow"]');
+  if(agTable){LOG._agScrollTop=agTable.scrollTop;LOG._agScrollLeft=agTable.scrollLeft}
+  const mainScroll=document.getElementById('logMc')?.parentElement;
+  if(mainScroll)LOG._mainScroll=window.scrollY;
   logRender();
   // Save to DB
   dbs("ag-"+companyId+deptId+field,async()=>{
