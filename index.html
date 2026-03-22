@@ -4056,7 +4056,9 @@ function logRenderWeek(isAdmin,visibleTrips){
       const members=LOG.members.filter(m=>m.trip_id===t.id);
       const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
       const acts=LOG.activities.filter(a=>a.trip_id===t.id);
-      h+=`<div onclick="logViewTrip('${t.id}')" style="background:${st.color}10;border-left:4px solid ${st.color};border-radius:8px;padding:12px;margin-bottom:6px;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='${st.color}20'" onmouseout="this.style.background='${st.color}10'">`;
+      h+=`<div onclick="logViewTrip('${t.id}')" style="background:${st.color}10;border-left:4px solid ${st.color};border-radius:8px;padding:12px;margin-bottom:6px;cursor:pointer;transition:background 0.2s;display:flex;gap:12px" onmouseover="this.style.background='${st.color}20'" onmouseout="this.style.background='${st.color}10'">`;
+      // LEFT: trip info
+      h+=`<div style="flex:1">`;
       h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
       if(tcs.length>0){
         h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">🏢 ${tcs.map(c=>c.companies?.name||'').join(' · ')}</div>`;
@@ -4088,9 +4090,32 @@ function logRenderWeek(isAdmin,visibleTrips){
           h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:${allRead?'#34d399':'#fbbf24'};font-weight:600">${allRead?'👁️ Todos confirmaron':'⚠️ '+readC+'/'+totalC+' vieron'}</div>`;
         }else if(members.length>0){h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:var(--t3)">📩 Notif. sin enviar</div>`}
       }
-      // WhatsApp button
-      if(tcs.length>0&&t.status!=='cancelled'){
-        h+=`<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;display:flex;justify-content:flex-end;gap:6px"><button onclick="logEditWA('${t.id}')" style="background:rgba(255,255,255,0.06);color:var(--t3);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;font-size:10px;cursor:pointer" title="Editar numero">✏️</button><button onclick="logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">📱 WhatsApp</button></div>`;
+      h+=`</div>`;
+      // RIGHT: contacts + WhatsApp buttons
+      if(tcs.length>0){
+        h+=`<div style="min-width:160px;max-width:200px;border-left:1px solid rgba(255,255,255,0.06);padding-left:12px;display:flex;flex-direction:column;justify-content:center;gap:6px">`;
+        h+=`<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Contactos</div>`;
+        tcs.forEach(tc=>{
+          const co=cos.find(c=>c.id===tc.company_id);
+          if(!co)return;
+          const name=co.whatsapp_contact||'';
+          const phone=co.whatsapp||'';
+          if(name||phone){
+            h+=`<div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px;padding:6px 8px">`;
+            if(name)h+=`<div style="font-size:10px;font-weight:700;color:#2dd4bf">${name}</div>`;
+            if(phone)h+=`<div style="font-size:9px;color:var(--t3)">${phone}</div>`;
+            h+=`</div>`;
+          }else{
+            h+=`<div style="font-size:9px;color:var(--t3);opacity:0.5">Sin contacto</div>`;
+          }
+        });
+        if(t.status!=='cancelled'){
+          h+=`<div style="display:flex;gap:4px;margin-top:4px">`;
+          h+=`<button onclick="event.stopPropagation();logEditWA('${t.id}')" style="background:rgba(255,255,255,0.06);color:var(--t3);border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:9px;cursor:pointer;flex:1" title="Editar contacto">✏️</button>`;
+          h+=`<button onclick="event.stopPropagation();logSendWA('${t.id}')" style="background:#25d366;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:9px;font-weight:700;cursor:pointer;flex:1">📱 WhatsApp</button>`;
+          h+=`</div>`;
+        }
+        h+=`</div>`;
       }
       h+=`</div>`;
     });
@@ -4149,7 +4174,11 @@ function logRenderCalendar(isAdmin,visibleTrips){
       h+=`<div style="flex:1"><div style="font-weight:700;font-size:12px;color:var(--t1)">🚐 ${t.destination_city}</div>`;
       h+=`<div style="font-size:10px;color:var(--t3)">⏰ ${t.departure_time||'07:00'} · 🚗 ${t.transport_type==='car'?'Vehículo':t.transport_type==='bus'?'Bus':'Mixto'} · ${t.days||1}d</div>`;
       h+=`<div style="font-size:10px;color:var(--t3);margin-top:2px">👥 ${members.map(m=>m.app_users?.name||m.department).join(', ')||'Sin asignar'}</div>`;
-      if(tcs.length>0)h+=`<div style="font-size:9px;color:var(--t3);margin-top:2px">🏢 ${tcs.map(c=>c.companies?.name||'').join(', ')}</div>`;
+      if(tcs.length>0){
+        h+=`<div style="font-size:9px;color:var(--t3);margin-top:2px">🏢 ${tcs.map(c=>c.companies?.name||'').join(', ')}</div>`;
+        const tcC=tcs.map(tc=>{const co=cos.find(c=>c.id===tc.company_id);return co&&co.whatsapp?'📱 '+(co.whatsapp_contact||'')+' '+co.whatsapp:''}).filter(Boolean);
+        if(tcC.length>0)h+=`<div style="font-size:9px;color:#2dd4bf;margin-top:1px">${tcC.join(' · ')}</div>`;
+      }
       h+=`</div>`;
       h+=`<div style="text-align:right"><span style="background:${st.color}20;color:${st.color};font-size:9px;font-weight:700;padding:3px 8px;border-radius:12px">${st.icon} ${st.label}</span>`;
       if(isAdmin){
@@ -5000,14 +5029,17 @@ async function logSendWA(tripId){
     // Check if company has saved WhatsApp number
     let phone=co.whatsapp||'';
     if(!phone){
-      phone=prompt('Numero de WhatsApp para '+coName+'\n\nEjemplo: 0991234567 o +593991234567\n\n(Se guardara para futuras veces)');
-      if(!phone||!phone.trim())return;
+      const contactName=prompt('Nombre del contacto de '+coName+'\n\nEjemplo: Juan Pérez');
+      if(contactName===null)continue;
+      phone=prompt('Numero de WhatsApp de '+(contactName||coName)+'\n\nEjemplo: 0991234567 o +593991234567');
+      if(!phone||!phone.trim())continue;
       phone=phone.trim();
       co.whatsapp=phone;
-      const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=phone;
-      const{error}=await sb.from("companies").update({whatsapp:phone}).eq("id",co.id);
+      co.whatsapp_contact=(contactName||'').trim();
+      const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=phone;cos[ci].whatsapp_contact=(contactName||'').trim()}
+      const{error}=await sb.from("companies").update({whatsapp:phone,whatsapp_contact:(contactName||'').trim()}).eq("id",co.id);
       if(error)console.error("Error guardando WhatsApp:",error.message);
-      else console.log("WhatsApp guardado OK:",coName,phone);
+      else console.log("WhatsApp guardado OK:",coName,contactName,phone);
     }
 
     // Clean phone number
@@ -5017,7 +5049,8 @@ async function logSendWA(tripId){
     cleanPhone=cleanPhone.replace('+','');
 
     // Build message
-    var msg='Estimado/a representante de *'+coName+'*,\n\n';
+    var contactGreet=co.whatsapp_contact?co.whatsapp_contact:'representante de *'+coName+'*';
+    var msg='Estimado/a '+contactGreet+',\n\n';
     msg+='Se recuerda que:\n';
     msg+=urgText+' a su empresa.\n\n';
     msg+=String.fromCodePoint(0x1F4C5)+' *Fecha:* '+dateStr+'\n';
@@ -5048,14 +5081,17 @@ async function logEditWA(tripId){
   const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
   for(const tc of tcs){
     const co=cos.find(c=>c.id===tc.company_id);if(!co)continue;
-    const newPhone=prompt('Editar numero de WhatsApp para '+co.name+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
+    const newContact=prompt('Nombre del contacto de '+co.name+'\n\nActual: '+(co.whatsapp_contact||'sin nombre'),co.whatsapp_contact||'');
+    if(newContact===null)continue;
+    const newPhone=prompt('Numero de WhatsApp de '+(newContact||co.name)+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
     if(newPhone===null)continue;
     const cleaned=newPhone.trim();
-    co.whatsapp=cleaned;
-    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=cleaned;
-    const{error}=await sb.from("companies").update({whatsapp:cleaned}).eq("id",co.id);
-    if(error){console.error("Error guardando WhatsApp:",error.message);alert('Error guardando: '+error.message)}
-    else{console.log("WhatsApp guardado OK:",co.name,cleaned);alert('Numero actualizado para '+co.name+': '+cleaned)}
+    const cleanedName=newContact.trim();
+    co.whatsapp=cleaned;co.whatsapp_contact=cleanedName;
+    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=cleaned;cos[ci].whatsapp_contact=cleanedName}
+    const{error}=await sb.from("companies").update({whatsapp:cleaned,whatsapp_contact:cleanedName}).eq("id",co.id);
+    if(error){console.error("Error guardando WhatsApp:",error.message);alert('Error: '+error.message)}
+    else{console.log("WhatsApp guardado OK:",co.name,cleanedName,cleaned);alert('Contacto actualizado: '+cleanedName+' - '+cleaned)}
   }
 }
 
