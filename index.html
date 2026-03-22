@@ -4408,17 +4408,26 @@ function agGetVal(companyId,deptId,field){
 }
 
 async function agSetVal(companyId,deptId,field,val){
-  if(!agCanEditDept(deptId))return;
+  if(!agCanEditDept(deptId)&&deptId!=='_global')return;
   // Update local data
   let r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
   if(r){r[field]=val}
   else{r={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};LOG.agData.push(r)}
-  // Save to DB WITHOUT re-rendering (no scroll jump)
-  dbs("ag-"+companyId+deptId+field,async()=>{
-    const upd={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};
-    const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
-    if(error)console.error("agSetVal:",error);
-  });
+  // Save to DB
+  const upd={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};
+  if(field==='enviado'||field==='socializado'){
+    // Save immediately for critical fields (no debounce)
+    try{
+      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
+      if(error)console.error("agSetVal ERROR:",field,error.message);
+      else console.log("agSetVal OK:",companyId,field,val);
+    }catch(e){console.error("agSetVal CATCH:",e)}
+  }else{
+    dbs("ag-"+companyId+deptId+field,async()=>{
+      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
+      if(error)console.error("agSetVal:",error);
+    });
+  }
   // Only do a full re-render for check buttons (enviado/socializado) that need visual update
   if(field==='enviado'||field==='socializado'){
     const agTable=document.getElementById('agTableWrap');
@@ -5022,7 +5031,12 @@ function logSendWA(tripId){
     msg+='_Consultores Empresariales ALTAIR_';
 
     const waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
-    window.open(waUrl,'whatsapp_tab');
+    if(!window._waTab||window._waTab.closed){
+      window._waTab=window.open(waUrl,'_blank');
+    }else{
+      window._waTab.location.href=waUrl;
+      window._waTab.focus();
+    }
   });
 }
 
