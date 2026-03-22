@@ -4661,13 +4661,18 @@ function logRenderResumen(){
       const hasTrip=curMap[co.id]&&curMap[co.id].has(d.id);
       const hadPrevTrip=prevMap[co.id]&&prevMap[co.id].has(d.id);
 
-      // Determine status: manual override wins, then auto
+      // Determine status: manual value ALWAYS wins over auto-detect
       let isNA=manualEst==='INACTIVO'||manualAg==='N/A';
       let isSi=false;
       if(isNA){
         // N/A
-      }else if(manualAg==='SÍ'||hasTrip){
+      }else if(manualAg==='SÍ'){
         isSi=true;
+      }else if(manualAg==='NO'){
+        isSi=false; // User explicitly said NO, respect it
+      }else{
+        // No manual value set - use auto-detect from trips
+        if(hasTrip)isSi=true;
       }
 
       // Was this company+dept NOT visited last month? (only if it was active)
