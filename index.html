@@ -5040,6 +5040,7 @@ async function logSendWA(tripId){
       const{error}=await sb.from("companies").update({whatsapp:phone,whatsapp_contact:(contactName||'').trim()}).eq("id",co.id);
       if(error)console.error("Error guardando WhatsApp:",error.message);
       else console.log("WhatsApp guardado OK:",coName,contactName,phone);
+      logRender(); // Refresh to show contact in card
     }
 
     // Clean phone number
@@ -5093,6 +5094,7 @@ async function logEditWA(tripId){
     if(error){console.error("Error guardando WhatsApp:",error.message);alert('Error: '+error.message)}
     else{console.log("WhatsApp guardado OK:",co.name,cleanedName,cleaned);alert('Contacto actualizado: '+cleanedName+' - '+cleaned)}
   }
+  logRender(); // Refresh to show updated contacts
 }
 
 // ===== TRIP FORM (CREATE / EDIT) =====
