@@ -4959,7 +4959,7 @@ CREATE POLICY "agendamiento_pub" ON agendamiento FOR ALL USING (true) WITH CHECK
 // ===== WHATSAPP INTEGRATION =====
 const DEPT_FULL_LABELS={seguridad:'Seguridad Industrial (SST)',salud:'Salud Ocupacional',ambiente:'Ambiente',datos:'Protección de Datos (LOPDPD)',tthh:'Talento Humano',talento:'Talento Humano',psicologo:'Psicología Ocupacional'};
 
-function logSendWA(tripId){
+async function logSendWA(tripId){
   event.stopPropagation();
   const t=LOG.trips.find(x=>x.id===tripId);if(!t)return;
   const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
@@ -4992,9 +4992,9 @@ function logSendWA(tripId){
   else urgText=pin+' En *'+diffDays+' dias* tenemos programada una visita';
 
   // For each company, send message
-  tcs.forEach(tc=>{
+  for(const tc of tcs){
     const co=cos.find(c=>c.id===tc.company_id);
-    if(!co)return;
+    if(!co)continue;
     const coName=co.name||'';
 
     // Check if company has saved WhatsApp number
@@ -5005,7 +5005,9 @@ function logSendWA(tripId){
       phone=phone.trim();
       co.whatsapp=phone;
       const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=phone;
-      sb.from("companies").update({whatsapp:phone}).eq("id",co.id);
+      const{error}=await sb.from("companies").update({whatsapp:phone}).eq("id",co.id);
+      if(error)console.error("Error guardando WhatsApp:",error.message);
+      else console.log("WhatsApp guardado OK:",coName,phone);
     }
 
     // Clean phone number
@@ -5037,22 +5039,24 @@ function logSendWA(tripId){
       window._waTab.location.href=waUrl;
       window._waTab.focus();
     }
-  });
+  }
 }
 
-function logEditWA(tripId){
+async function logEditWA(tripId){
   event.stopPropagation();
   const t=LOG.trips.find(x=>x.id===tripId);if(!t)return;
   const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
-  tcs.forEach(tc=>{
-    const co=cos.find(c=>c.id===tc.company_id);if(!co)return;
+  for(const tc of tcs){
+    const co=cos.find(c=>c.id===tc.company_id);if(!co)continue;
     const newPhone=prompt('Editar numero de WhatsApp para '+co.name+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
-    if(newPhone===null)return;
-    co.whatsapp=newPhone.trim();
-    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=newPhone.trim();
-    sb.from("companies").update({whatsapp:newPhone.trim()}).eq("id",co.id);
-    alert('Numero actualizado para '+co.name+': '+newPhone.trim());
-  });
+    if(newPhone===null)continue;
+    const cleaned=newPhone.trim();
+    co.whatsapp=cleaned;
+    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0)cos[ci].whatsapp=cleaned;
+    const{error}=await sb.from("companies").update({whatsapp:cleaned}).eq("id",co.id);
+    if(error){console.error("Error guardando WhatsApp:",error.message);alert('Error guardando: '+error.message)}
+    else{console.log("WhatsApp guardado OK:",co.name,cleaned);alert('Numero actualizado para '+co.name+': '+cleaned)}
+  }
 }
 
 // ===== TRIP FORM (CREATE / EDIT) =====
