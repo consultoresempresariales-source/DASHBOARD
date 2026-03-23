@@ -161,6 +161,7 @@ canvas{width:100%!important;max-height:220px}
 <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" value="talento"> 👥 Talento</label>
 <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" value="datos"> 🛡 Datos</label>
 <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" value="ambiente"> 🌿 Ambiente</label>
+<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" value="contador"> 💰 Contador/a</label>
 </div>
 <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid #fbbf24;border-radius:6px;background:rgba(251,191,36,0.05)"><input type="checkbox" value="jefe"> 👔 Jefe (Solo lectura)</label>
 <label>Nueva contraseña <span style="font-size:10px;color:var(--t3)">(dejar vacío para no cambiar)</span></label>
@@ -223,7 +224,7 @@ canvas{width:100%!important;max-height:220px}
 </div>
 <script>
 let MOD="salud";
-let CURRENT_USER=null;const ROLE_LABELS={admin:"👑 Administrador",jefe:"👔 Jefe",salud:"🩺 Salud Ocupacional",seguridad:"🔧 Seguridad Industrial",psicologo:"🧠 Psicología Ocupacional",talento:"👥 Talento Humano",datos:"🛡 Protección de Datos",ambiente:"🌿 Ambiente"};
+let CURRENT_USER=null;const ROLE_LABELS={admin:"👑 Administrador",jefe:"👔 Jefe",salud:"🩺 Salud Ocupacional",seguridad:"🔧 Seguridad Industrial",psicologo:"🧠 Psicología Ocupacional",talento:"👥 Talento Humano",datos:"🛡 Protección de Datos",ambiente:"🌿 Ambiente",contador:"💰 Contador/a"};
 const IS_JEFE=()=>CURRENT_USER?.role==='jefe'||(CURRENT_USER?.modules&&CURRENT_USER.modules.includes('jefe'));
 const IS_ADMIN_OR_JEFE=()=>CURRENT_USER?.role==='admin'||IS_JEFE();
 
@@ -345,13 +346,14 @@ function applyUserRole(){
       'talento':['talento'],
       'datos':['datos'],
       'ambiente':['salud'],
-      'psicologo':['salud']
+      'psicologo':['salud'],
+      'contador':['logistica']
     };
     if(u.role&&u.role!=='multi'&&roleModMap[u.role]){
       effectiveMods=roleModMap[u.role];
     }else{
       // For 'multi' role or unmapped roles: map each module to its sidebar equivalent
-      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'salud','psicologo':'salud'};
+      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'salud','psicologo':'salud','contador':'logistica'};
       const filtered=rawMods.filter(m=>m!=="jefe"&&m!=="admin");
       const mapped=filtered.map(m=>modToSidebar[m]||m).filter(Boolean);
       effectiveMods=[...new Set(mapped)];
@@ -371,7 +373,7 @@ function applyUserRole(){
     const cfgEl=document.getElementById("sb-config");if(cfgEl)cfgEl.style.display="block";
     const pendEl=document.getElementById("sb-pendientes");if(pendEl)pendEl.style.display="block";
   }
-  // Logística: ALWAYS show for all users
+  // Logística: show for all users
   const logEl=document.getElementById("sb-logistica");
   if(logEl)logEl.style.display="block";
   // User info in sidebar
@@ -3952,18 +3954,21 @@ function logRender(){
     return;
   }
 
-  // Tab bar - workers only see Mensual/Semanal, admin sees all
-  h+=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid rgba(255,255,255,0.06)">`;
-  h+=`<div onclick="LOG.tab='calendar';LOG.calView='month';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='calendar'&&LOG.calView!=='week'?LOG_COLOR:'transparent'};color:${fTab==='calendar'&&LOG.calView!=='week'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📅 Mensual</div>`;
-  h+=`<div onclick="LOG.tab='calendar';LOG.calView='week';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${LOG.calView==='week'?LOG_COLOR:'transparent'};color:${LOG.calView==='week'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📆 Semanal</div>`;
-  if(isAdmin||IS_JEFE()){
-    h+=`<div onclick="LOG.tab='budget';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='budget'?LOG_COLOR:'transparent'};color:${fTab==='budget'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">💰 Presupuesto</div>`;
-    h+=`<div onclick="LOG.tab='coverage';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='coverage'?LOG_COLOR:'transparent'};color:${fTab==='coverage'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📊 Cobertura</div>`;
+  // Tab bar
+  const isContador=IS_CONTADOR();
+  h+=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid rgba(255,255,255,0.06);flex-wrap:wrap">`;
+  if(!isContador){
+    h+=`<div onclick="LOG.tab='calendar';LOG.calView='month';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='calendar'&&LOG.calView!=='week'?LOG_COLOR:'transparent'};color:${fTab==='calendar'&&LOG.calView!=='week'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📅 Mensual</div>`;
+    h+=`<div onclick="LOG.tab='calendar';LOG.calView='week';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${LOG.calView==='week'?LOG_COLOR:'transparent'};color:${LOG.calView==='week'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📆 Semanal</div>`;
+    if(isAdmin||IS_JEFE()){
+      h+=`<div onclick="LOG.tab='budget';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='budget'?LOG_COLOR:'transparent'};color:${fTab==='budget'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">💰 Presupuesto</div>`;
+      h+=`<div onclick="LOG.tab='coverage';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='coverage'?LOG_COLOR:'transparent'};color:${fTab==='coverage'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">📊 Cobertura</div>`;
+    }
+    if(isAdmin){
+      h+=`<div onclick="LOG.tab='destinations';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='destinations'?LOG_COLOR:'transparent'};color:${fTab==='destinations'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">⚙️ Destinos</div>`;
+    }
   }
-  if(isAdmin){
-    h+=`<div onclick="LOG.tab='destinations';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='destinations'?LOG_COLOR:'transparent'};color:${fTab==='destinations'?LOG_COLOR:'var(--t3)'};transition:all 0.2s">⚙️ Destinos</div>`;
-  }
-  // Agendamiento y Resumen: visible for ALL users
+  // Agendamiento, Resumen, Cobrar: visible for ALL users
   h+=`<div onclick="LOG.tab='agendamiento';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='agendamiento'?'#10b981':'transparent'};color:${fTab==='agendamiento'?'#10b981':'var(--t3)'};transition:all 0.2s">📋 Agendamiento</div>`;
   h+=`<div onclick="LOG.tab='resumen';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='resumen'?'#818cf8':'transparent'};color:${fTab==='resumen'?'#818cf8':'var(--t3)'};transition:all 0.2s">📊 Resumen</div>`;
   h+=`<div onclick="LOG.tab='enviados';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='enviados'?'#f472b6':'transparent'};color:${fTab==='enviados'?'#f472b6':'var(--t3)'};transition:all 0.2s">💰 Cobrar</div>`;
