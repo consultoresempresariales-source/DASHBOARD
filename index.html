@@ -3878,6 +3878,8 @@ function logRender(){
   const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   // Workers can only see calendar tabs, not budget/coverage/destinations
   if(!_canViewLog&&(tab==='budget'||tab==='destinations'||tab==='coverage')){LOG.tab='calendar'}
+  // Contador only sees agendamiento, resumen, cobrar
+  if(IS_CONTADOR()&&LOG.tab!=='agendamiento'&&LOG.tab!=='resumen'&&LOG.tab!=='enviados'){LOG.tab='enviados'}
   // Allow agendamiento and resumen for all users (read-only for non-admin/jefe)
   const fTab=LOG.tab;
 
