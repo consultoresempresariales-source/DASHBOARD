@@ -3984,6 +3984,16 @@ function logRender(){
     h+=`<button onclick="logPrevMonth()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">◀</button>`;
     h+=`<span style="font-size:16px;font-weight:800;color:${fTab==='agendamiento'?'#10b981':fTab==='resumen'?'#818cf8':LOG_COLOR}">${mNames[LOG.month]} ${LOG.year}</span>`;
     h+=`<button onclick="logNextMonth()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">▶</button>`;
+    if(isAdmin&&fTab==='calendar'){
+      h+=`<div style="position:relative;margin-left:16px"><button onclick="document.getElementById('waGroupMenu').style.display=document.getElementById('waGroupMenu').style.display==='none'?'block':'none'" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📱 Enviar al Grupo ▾</button>`;
+      h+=`<div id="waGroupMenu" style="display:none;position:absolute;top:40px;right:0;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:6px;z-index:20;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">`;
+      h+=`<div onclick="logSendGroupWA('hoy');document.getElementById('waGroupMenu').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#2dd4bf;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(45,212,191,0.1)'" onmouseout="this.style.background='transparent'">📅 Viajes de HOY</div>`;
+      h+=`<div onclick="logSendGroupWA('manana');document.getElementById('waGroupMenu').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#818cf8;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(129,140,248,0.1)'" onmouseout="this.style.background='transparent'">📆 Viajes de MAÑANA</div>`;
+      h+=`<div onclick="logSendGroupWA('semana');document.getElementById('waGroupMenu').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#f59e0b;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(245,158,11,0.1)'" onmouseout="this.style.background='transparent'">🗓️ Viajes de la SEMANA</div>`;
+      h+=`<div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:4px;padding-top:4px">`;
+      h+=`<div onclick="logEditGroupWA();document.getElementById('waGroupMenu').style.display='none'" style="padding:8px 14px;cursor:pointer;border-radius:8px;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">✏️ Cambiar grupo</div>`;
+      h+=`</div></div></div>`;
+    }
     h+=`</div>`;
   }
 
@@ -4039,6 +4049,16 @@ function logRenderWeek(isAdmin,visibleTrips){
   h+=`<button onclick="logPrevWeek()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">◀</button>`;
   h+=`<span style="font-size:14px;font-weight:800;color:${LOG_COLOR}">${ws.getDate()} ${mNames[ws.getMonth()]} — ${we.getDate()} ${mNames[we.getMonth()]} ${we.getFullYear()}</span>`;
   h+=`<button onclick="logNextWeek()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">▶</button>`;
+  if(isAdmin){
+    h+=`<div style="position:relative;margin-left:16px"><button onclick="document.getElementById('waGroupMenu2').style.display=document.getElementById('waGroupMenu2').style.display==='none'?'block':'none'" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📱 Enviar al Grupo ▾</button>`;
+    h+=`<div id="waGroupMenu2" style="display:none;position:absolute;top:40px;right:0;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:6px;z-index:20;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">`;
+    h+=`<div onclick="logSendGroupWA('hoy');document.getElementById('waGroupMenu2').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#2dd4bf;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(45,212,191,0.1)'" onmouseout="this.style.background='transparent'">📅 Viajes de HOY</div>`;
+    h+=`<div onclick="logSendGroupWA('manana');document.getElementById('waGroupMenu2').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#818cf8;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(129,140,248,0.1)'" onmouseout="this.style.background='transparent'">📆 Viajes de MAÑANA</div>`;
+    h+=`<div onclick="logSendGroupWA('semana');document.getElementById('waGroupMenu2').style.display='none'" style="padding:10px 14px;cursor:pointer;border-radius:8px;font-size:12px;font-weight:700;color:#f59e0b;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(245,158,11,0.1)'" onmouseout="this.style.background='transparent'">🗓️ Viajes de la SEMANA</div>`;
+    h+=`<div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:4px;padding-top:4px">`;
+    h+=`<div onclick="logEditGroupWA();document.getElementById('waGroupMenu2').style.display='none'" style="padding:8px 14px;cursor:pointer;border-radius:8px;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">✏️ Cambiar grupo</div>`;
+    h+=`</div></div></div>`;
+  }
   h+=`</div>`;
 
   const today=new Date().toISOString().split('T')[0];
@@ -5013,6 +5033,132 @@ CREATE POLICY "agendamiento_pub" ON agendamiento FOR ALL USING (true) WITH CHECK
 
 // ===== WHATSAPP INTEGRATION =====
 const DEPT_FULL_LABELS={seguridad:'Seguridad Industrial (SST)',salud:'Salud Ocupacional',ambiente:'Ambiente',datos:'Protección de Datos (LOPDPD)',tthh:'Talento Humano',talento:'Talento Humano',psicologo:'Psicología Ocupacional'};
+
+async function logSendGroupWA(tipo){
+  // Get or ask for group link/number
+  let groupId=localStorage.getItem('wa_group_id')||'';
+  if(!groupId){
+    groupId=prompt('Pega el link de invitación del grupo de WhatsApp\n\nEjemplo: https://chat.whatsapp.com/AbCdEfGhIjK\n\nO el número del grupo si lo tienes');
+    if(!groupId||!groupId.trim())return;
+    groupId=groupId.trim();
+    localStorage.setItem('wa_group_id',groupId);
+  }
+
+  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const now=new Date();
+  let trips=[];
+  let titulo='';
+
+  if(tipo==='hoy'){
+    const hoy=now.toISOString().split('T')[0];
+    trips=LOG.trips.filter(t=>t.trip_date===hoy&&t.status!=='cancelled');
+    titulo='PLANIFICACION DE HOY '+dias[now.getDay()].toUpperCase()+' '+now.getDate()+' de '+meses[now.getMonth()];
+  }else if(tipo==='manana'){
+    const man=new Date(now);man.setDate(man.getDate()+1);
+    const manStr=man.toISOString().split('T')[0];
+    trips=LOG.trips.filter(t=>t.trip_date===manStr&&t.status!=='cancelled');
+    titulo='PLANIFICACION DE MANANA '+dias[man.getDay()].toUpperCase()+' '+man.getDate()+' de '+meses[man.getMonth()];
+  }else{
+    // Semana: lunes a viernes de la semana actual
+    const day=now.getDay();
+    const lunes=new Date(now);lunes.setDate(now.getDate()-(day===0?6:day-1));
+    const viernes=new Date(lunes);viernes.setDate(lunes.getDate()+4);
+    const lunesStr=lunes.toISOString().split('T')[0];
+    const viernesStr=viernes.toISOString().split('T')[0];
+    trips=LOG.trips.filter(t=>t.trip_date>=lunesStr&&t.trip_date<=viernesStr&&t.status!=='cancelled');
+    titulo='PLANIFICACION SEMANAL ('+lunes.getDate()+' al '+viernes.getDate()+' de '+meses[lunes.getMonth()]+')';
+  }
+
+  if(trips.length===0){alert('No hay viajes para '+tipo);return}
+
+  // Sort by date and time
+  trips.sort((a,b)=>a.trip_date.localeCompare(b.trip_date)||(a.departure_time||'07:00').localeCompare(b.departure_time||'07:00'));
+
+  // Build message
+  const star=String.fromCodePoint(0x2B50);
+  const pin=String.fromCodePoint(0x1F4CD);
+  const clock=String.fromCodePoint(0x1F552);
+  const bus=String.fromCodePoint(0x1F690);
+  const people=String.fromCodePoint(0x1F465);
+  const check=String.fromCodePoint(0x2705);
+  const cal=String.fromCodePoint(0x1F4C5);
+  const med=String.fromCodePoint(0x1FA7A);
+  const micro=String.fromCodePoint(0x1F52C);
+  const doc=String.fromCodePoint(0x1F4CB);
+
+  let msg=star+' *'+titulo+'*\n';
+  msg+='_Consultores Empresariales ALTAIR_\n\n';
+
+  let currentDate='';
+  trips.forEach(t=>{
+    // Date header
+    const parts=t.trip_date.split('-');
+    const d=new Date(+parts[0],+parts[1]-1,+parts[2],12,0,0);
+    const dateKey=t.trip_date;
+    if(dateKey!==currentDate){
+      currentDate=dateKey;
+      msg+='-----------------------------\n';
+      msg+=cal+' *'+dias[d.getDay()].toUpperCase()+' '+d.getDate()+' de '+meses[d.getMonth()]+'*\n';
+      msg+='-----------------------------\n';
+    }
+
+    // Trip info
+    const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
+    const members=LOG.members.filter(m=>m.trip_id===t.id);
+    const coNames=tcs.map(tc=>{const co=cos.find(c=>c.id===tc.company_id);return co?.name||''}).filter(Boolean).join(', ');
+
+    msg+='\n'+pin+' *'+coNames+'* - '+t.destination_city+'\n';
+    msg+=clock+' Salida: *'+(t.departure_time||'07:00')+'*\n';
+
+    if(members.length>0){
+      const DEPT_FULL={seguridad:'SST',salud:'Salud',ambiente:'Ambiente',datos:'Datos',tthh:'TTHH',talento:'TTHH',psicologo:'Psicología'};
+      msg+=people+' Equipo:\n';
+      members.forEach(m=>{
+        const name=m.app_users?.name||m.department;
+        const dept=DEPT_FULL[m.department]||m.department;
+        msg+='   '+check+' '+name+' ('+dept+')\n';
+      });
+    }
+
+    if(t.jornada_medica)msg+=med+' *JORNADA MEDICA OCUPACIONAL*\n';
+    if(t.jornada_examenes)msg+=micro+' *JORNADA DE EXAMENES*\n';
+    if(t.socializacion)msg+=doc+' *SOCIALIZACION*\n';
+    msg+='\n';
+  });
+
+  msg+='Total: *'+trips.length+' viaje'+(trips.length!==1?'s':'')+'*';
+
+  // Open WhatsApp
+  let waUrl;
+  if(groupId.includes('chat.whatsapp.com')){
+    // Group invite link - can't send message directly, use wa.me with text
+    // Extract group from link - user needs to copy link from group info
+    alert('Para enviar al grupo:\n\n1. Se abrira WhatsApp con el mensaje\n2. Pega el mensaje en el grupo\n\nSi quieres enviar directo, usa el numero del grupo en vez del link de invitacion.');
+    waUrl='https://web.whatsapp.com/send?text='+encodeURIComponent(msg);
+  }else{
+    let cleanPhone=groupId.replace(/[^0-9+]/g,'');
+    if(cleanPhone.startsWith('0'))cleanPhone='593'+cleanPhone.substring(1);
+    if(!cleanPhone.startsWith('593'))cleanPhone='593'+cleanPhone;
+    cleanPhone=cleanPhone.replace('+','');
+    waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
+  }
+
+  if(!window._waTab||window._waTab.closed){
+    window._waTab=window.open(waUrl,'_blank');
+  }else{
+    window._waTab.location.href=waUrl;
+    window._waTab.focus();
+  }
+}
+
+function logEditGroupWA(){
+  const current=localStorage.getItem('wa_group_id')||'sin configurar';
+  const newVal=prompt('Editar numero/link del grupo de WhatsApp\n\nActual: '+current,current==='sin configurar'?'':current);
+  if(newVal===null)return;
+  localStorage.setItem('wa_group_id',newVal.trim());
+  alert('Grupo actualizado: '+newVal.trim());
+}
 
 async function logSendWA(tripId){
   event.stopPropagation();
