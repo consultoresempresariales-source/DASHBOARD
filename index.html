@@ -4076,7 +4076,7 @@ function logRenderWeek(isAdmin,visibleTrips){
       h+=`<span style="background:${st.color}20;color:${st.color};font-size:9px;font-weight:700;padding:3px 8px;border-radius:12px">${st.icon} ${st.label}</span>`;
       h+=`</div>`;
       h+=`<div style="font-size:11px;color:var(--t2);margin-bottom:6px">⏰ Salida: <strong>${t.departure_time||'07:00'}</strong> · 🚗 ${t.transport_type==='car'?'Vehículo':t.transport_type==='bus'?'Bus':'Mixto'} · ${t.days||1} día${(t.days||1)>1?'s':''}</div>`;
-      if(t.jornada_medica||t.jornada_examenes){h+=`<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">`;if(t.jornada_medica)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(45,212,191,0.15);color:#2dd4bf;border:1px solid rgba(45,212,191,0.3)">🩺 Jornada Médica</span>`;if(t.jornada_examenes)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(129,140,248,0.15);color:#818cf8;border:1px solid rgba(129,140,248,0.3)">🔬 Jornada Exámenes</span>`;h+=`</div>`}
+      if(t.jornada_medica||t.jornada_examenes||t.socializacion){h+=`<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">`;if(t.jornada_medica)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(45,212,191,0.15);color:#2dd4bf;border:1px solid rgba(45,212,191,0.3)">🩺 Jornada Médica</span>`;if(t.jornada_examenes)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(129,140,248,0.15);color:#818cf8;border:1px solid rgba(129,140,248,0.3)">🔬 Jornada Exámenes</span>`;if(t.socializacion)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(244,114,182,0.15);color:#f472b6;border:1px solid rgba(244,114,182,0.3)">📋 Socialización</span>`;h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px;background:${t.modalidad==='telematica'?'rgba(96,165,250,0.15)':'rgba(245,158,11,0.15)'};color:${t.modalidad==='telematica'?'#60a5fa':'#f59e0b'};border:1px solid ${t.modalidad==='telematica'?'rgba(96,165,250,0.3)':'rgba(245,158,11,0.3)'}">${t.modalidad==='telematica'?'💻 Telemática':'📍 Presencial'}</span>`;h+=`</div>`}
       // Team
       h+=`<div style="margin-bottom:6px">`;
       members.forEach(m=>{
@@ -5085,6 +5085,8 @@ async function logSendWA(tripId){
     }
     if(t.jornada_medica)msg+=String.fromCodePoint(0x1FA7A)+' Jornada Medica Ocupacional\n';
     if(t.jornada_examenes)msg+=String.fromCodePoint(0x1F52C)+' Jornada de Examenes Ocupacionales\n';
+    if(t.socializacion)msg+=String.fromCodePoint(0x1F4CB)+' Socializacion de Informe Mensual\n';
+    msg+=String.fromCodePoint(0x1F4CD)+' *Modalidad:* '+(t.modalidad==='telematica'?'Telematica (Zoom)':'Presencial')+'\n';
     msg+='\nPor favor confirmar disponibilidad.\n\n';
     msg+='Atentamente\n';
     msg+='_Consultores Empresariales ALTAIR_';
@@ -5778,12 +5780,21 @@ function logRenderForm(){
   h+=`</div>`;
 
   // JORNADA TYPE CHECKBOXES
-  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">🩺 TIPO DE JORNADA <span style="font-size:9px;font-weight:400">(opcional)</span></div>`;
-  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap">`;
+  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">🩺 TIPO DE ACTIVIDAD <span style="font-size:9px;font-weight:400">(opcional)</span></div>`;
+  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">`;
   const jMed=e.jornada_medica||false;
   const jExam=e.jornada_examenes||false;
+  const jSoc=e.socializacion||false;
   h+=`<button onclick="LOG.editTrip.jornada_medica=!LOG.editTrip.jornada_medica;logRender()" style="padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${jMed?'#2dd4bf':'rgba(255,255,255,0.1)'};background:${jMed?'rgba(45,212,191,0.15)':'rgba(255,255,255,0.04)'};color:${jMed?'#2dd4bf':'var(--t2)'};transition:all 0.15s">${jMed?'✅':'⬜'} Jornada Médica Ocupacional</button>`;
   h+=`<button onclick="LOG.editTrip.jornada_examenes=!LOG.editTrip.jornada_examenes;logRender()" style="padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${jExam?'#818cf8':'rgba(255,255,255,0.1)'};background:${jExam?'rgba(129,140,248,0.15)':'rgba(255,255,255,0.04)'};color:${jExam?'#818cf8':'var(--t2)'};transition:all 0.15s">${jExam?'✅':'⬜'} Jornada de Exámenes Ocupacionales</button>`;
+  h+=`<button onclick="LOG.editTrip.socializacion=!LOG.editTrip.socializacion;logRender()" style="padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${jSoc?'#f472b6':'rgba(255,255,255,0.1)'};background:${jSoc?'rgba(244,114,182,0.15)':'rgba(255,255,255,0.04)'};color:${jSoc?'#f472b6':'var(--t2)'};transition:all 0.15s">${jSoc?'✅':'⬜'} Socialización de Informe Mensual</button>`;
+  h+=`</div>`;
+  // MODALIDAD
+  h+=`<div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">📍 MODALIDAD</div>`;
+  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap">`;
+  const mod=e.modalidad||'presencial';
+  h+=`<button onclick="LOG.editTrip.modalidad='presencial';logRender()" style="padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${mod==='presencial'?'#f59e0b':'rgba(255,255,255,0.1)'};background:${mod==='presencial'?'rgba(245,158,11,0.15)':'rgba(255,255,255,0.04)'};color:${mod==='presencial'?'#f59e0b':'var(--t2)'};transition:all 0.15s">${mod==='presencial'?'✅':'⬜'} Presencial</button>`;
+  h+=`<button onclick="LOG.editTrip.modalidad='telematica';logRender()" style="padding:10px 18px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${mod==='telematica'?'#60a5fa':'rgba(255,255,255,0.1)'};background:${mod==='telematica'?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.04)'};color:${mod==='telematica'?'#60a5fa':'var(--t2)'};transition:all 0.15s">${mod==='telematica'?'✅':'⬜'} Telemática (Zoom)</button>`;
   h+=`</div></div>`;
 
   // DATE/TIME/DAYS/TRANSPORT
@@ -5984,7 +5995,7 @@ async function logSaveTrip(){
   const fCost=(e.food_per_person||0)*np*days;
   const hCost=(e.hotel_per_person||0)*np*Math.max(days-1,0);
   const total=tCost+fCost+hCost;
-  const payload={destination_city:e.destination_city,trip_date:e.trip_date,days:days,transport_type:e.transport_type||'car',transport_cost:tCost,food_per_person:e.food_per_person||0,hotel_per_person:e.hotel_per_person||0,total_cost:total,departure_time:e.departure_time||'07:00',status:e.status||'planned',notes:e.notes||'',year:parseInt(e.trip_date.split('-')[0]),created_by:CURRENT_USER?.id,jornada_medica:e.jornada_medica||false,jornada_examenes:e.jornada_examenes||false};
+  const payload={destination_city:e.destination_city,trip_date:e.trip_date,days:days,transport_type:e.transport_type||'car',transport_cost:tCost,food_per_person:e.food_per_person||0,hotel_per_person:e.hotel_per_person||0,total_cost:total,departure_time:e.departure_time||'07:00',status:e.status||'planned',notes:e.notes||'',year:parseInt(e.trip_date.split('-')[0]),created_by:CURRENT_USER?.id,jornada_medica:e.jornada_medica||false,jornada_examenes:e.jornada_examenes||false,socializacion:e.socializacion||false,modalidad:e.modalidad||'presencial'};
   const isNew=!e.id;
   try{
     if(e.id){
