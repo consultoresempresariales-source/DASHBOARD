@@ -4068,6 +4068,10 @@ function logRenderWeek(isAdmin,visibleTrips){
       h+=`<div onclick="logViewTrip('${t.id}')" style="background:${st.color}10;border-left:4px solid ${st.color};border-radius:8px;padding:12px;margin-bottom:6px;cursor:pointer;transition:background 0.2s;display:flex;gap:12px" onmouseover="this.style.background='${st.color}20'" onmouseout="this.style.background='${st.color}10'">`;
       // LEFT: trip info
       h+=`<div style="flex:1">`;
+      // Banners at the VERY TOP
+      if(t.jornada_medica)h+=`<div style="background:linear-gradient(135deg,rgba(45,212,191,0.25),rgba(129,140,248,0.25));border:2px solid rgba(45,212,191,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#2dd4bf;letter-spacing:1px">🩺 JORNADA MÉDICA OCUPACIONAL</div></div>`;
+      if(t.jornada_examenes)h+=`<div style="background:linear-gradient(135deg,rgba(129,140,248,0.25),rgba(244,114,182,0.25));border:2px solid rgba(129,140,248,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#818cf8;letter-spacing:1px">🔬 JORNADA DE EXÁMENES OCUPACIONALES</div></div>`;
+      if(t.socializacion)h+=`<div style="background:linear-gradient(135deg,rgba(244,114,182,0.25),rgba(251,191,36,0.25));border:2px solid rgba(244,114,182,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#f472b6;letter-spacing:1px">📋 SOCIALIZACIÓN DE INFORME MENSUAL</div></div>`;
       h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
       if(tcs.length>0){
         h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">🏢 ${tcs.map(c=>c.companies?.name||'').join(' · ')}</div>`;
@@ -4076,10 +4080,6 @@ function logRenderWeek(isAdmin,visibleTrips){
       h+=`<span style="background:${st.color}20;color:${st.color};font-size:9px;font-weight:700;padding:3px 8px;border-radius:12px">${st.icon} ${st.label}</span>`;
       h+=`</div>`;
       h+=`<div style="font-size:11px;color:var(--t2);margin-bottom:6px">⏰ Salida: <strong>${t.departure_time||'07:00'}</strong> · 🚗 ${t.transport_type==='car'?'Vehículo':t.transport_type==='bus'?'Bus':'Mixto'} · ${t.days||1} día${(t.days||1)>1?'s':''}</div>`;
-      if(t.jornada_medica||t.jornada_examenes){
-        t.jornada_medica&&(()=>{h+=`<div style="background:linear-gradient(135deg,rgba(45,212,191,0.25),rgba(129,140,248,0.25));border:2px solid rgba(45,212,191,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#2dd4bf;letter-spacing:1px">🩺 JORNADA MÉDICA OCUPACIONAL</div></div>`})();
-        t.jornada_examenes&&(()=>{h+=`<div style="background:linear-gradient(135deg,rgba(129,140,248,0.25),rgba(244,114,182,0.25));border:2px solid rgba(129,140,248,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#818cf8;letter-spacing:1px">🔬 JORNADA DE EXÁMENES OCUPACIONALES</div></div>`})();
-      }
       // Team
       h+=`<div style="margin-bottom:6px">`;
       members.forEach(m=>{
