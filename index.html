@@ -5127,7 +5127,14 @@ async function logSendGroupWA(tipo){
     msg+='\n';
   });
 
-  msg+='Total: *'+trips.length+' viaje'+(trips.length!==1?'s':'')+'*';
+  msg+='Total: *'+trips.length+' viaje'+(trips.length!==1?'s':'')+'*\n\n';
+  msg+='-----------------------------\n';
+  msg+=doc+' *RECORDATORIO:*\n';
+  msg+='- Preparar material de trabajo\n';
+  msg+='- Registros de asistencia\n';
+  msg+='- Documentacion de la empresa\n';
+  msg+='- Revisar hora de salida\n\n';
+  msg+='_Cualquier novedad comunicar con anticipacion._';
 
   // Open WhatsApp
   let waUrl;
