@@ -226,6 +226,7 @@ canvas{width:100%!important;max-height:220px}
 let MOD="salud";
 let CURRENT_USER=null;const ROLE_LABELS={admin:"👑 Administrador",jefe:"👔 Jefe",salud:"🩺 Salud Ocupacional",seguridad:"🔧 Seguridad Industrial",psicologo:"🧠 Psicología Ocupacional",talento:"👥 Talento Humano",datos:"🛡 Protección de Datos",ambiente:"🌿 Ambiente",contador:"💰 Contador/a"};
 const IS_JEFE=()=>CURRENT_USER?.role==='jefe'||(CURRENT_USER?.modules&&CURRENT_USER.modules.includes('jefe'));
+const IS_CONTADOR=()=>CURRENT_USER?.role==='contador'||(CURRENT_USER?.modules&&CURRENT_USER.modules.includes('contador'));
 const IS_ADMIN_OR_JEFE=()=>CURRENT_USER?.role==='admin'||IS_JEFE();
 
 // Jefe read-only: whitelist of allowed onclick patterns
