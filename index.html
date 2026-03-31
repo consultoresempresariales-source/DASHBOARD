@@ -212,6 +212,7 @@ canvas{width:100%!important;max-height:220px}
 <div id="pvBox" style="flex:1;display:flex;justify-content:center;align-items:center;min-width:100px"></div>
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="cs" id="cSel"></div><div class="yr" id="yrBox"><span>AÑO</span><select id="yrSel" onchange="setYear(+this.value)"></select><button class="add-btn" style="padding:3px 8px;font-size:10px" onclick="promptYr()">+</button></div><div id="sySt" class="si ld">⏳</div><div class="nv" id="nv"></div></div>
 </div>
+<div id="saludPerfilSST" style="padding:0 16px"></div>
 <div class="mn" id="mc"></div>
 <div id="ft" style="height:6px"></div></div>
 <div id="seguridadModule" style="display:none">
@@ -220,6 +221,7 @@ canvas{width:100%!important;max-height:220px}
 <div id="sstPvBox" style="flex:1;display:flex;justify-content:center;min-width:100px"></div>
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="cs" id="sstCSel"></div><button class="add-btn" style="padding:5px 10px;font-size:11px" onclick="showSSTNc()">+ Empresa</button><div class="yr"><span>AÑO</span><select id="sstYrSel" onchange="sstSetYear(+this.value)"></select><button class="add-btn" style="padding:3px 8px;font-size:10px" onclick="sstPromptYr()">+</button></div><div id="sstSySt" class="si ok">✓</div><div class="nv" id="sstNv"></div></div>
 </div>
+<div id="sstPerfilSST" style="padding:0 16px"></div>
 <div class="mn" id="sstMc"></div>
 </div>
 </div>
@@ -938,6 +940,7 @@ function render(){
   // Also style the + button
   document.querySelectorAll(".cs button").forEach(e=>{if(sbc){e.style.background=sbc;e.style.borderColor=sbc}if(stc){e.style.color=stc}});
   const mc=document.getElementById("mc");let h="";
+  const saludPerfil=document.getElementById("saludPerfilSST");if(saludPerfil)saludPerfil.innerHTML=renderPerfilSST(c);
 
   if(V==="dashboard"){
     h+=`<div class="gr g6">`;
@@ -1700,6 +1703,50 @@ function getCIIURisk(code){
 function getRiskLabel(r){return r==='A'?'🔴 Alto':r==='M'?'🟡 Medio':'🟢 Bajo'}
 function getRiskColor(r){return r==='A'?'#ef4444':r==='M'?'#fbbf24':'#34d399'}
 
+// Hours table from AM 196 Art. 13
+function getHorasSST(tw,risk){
+  if(tw>=200){return{horas:'8h diarias (permanente)',extra:risk==='A'?'+ 1 técnico c/100 trab.':'+ 1 técnico c/200 trab.'}}
+  if(tw>=100){return{horas:'8h diarias (permanente)',extra:''}}
+  if(tw>=50){
+    if(risk==='A')return{horas:'64 horas/mes',extra:''};
+    if(risk==='M')return{horas:'48 horas/mes',extra:''};
+    return{horas:'32 horas/mes',extra:''};
+  }
+  if(tw>=10){
+    if(risk==='A')return{horas:'48 horas/mes',extra:'Técnico requerido'};
+    if(risk==='M')return{horas:'32 horas/mes',extra:''};
+    return{horas:'16 horas/mes',extra:''};
+  }
+  // 1-9
+  if(risk==='A')return{horas:'16 horas/mes',extra:'Técnico requerido'};
+  return{horas:'8 horas/mes',extra:''};
+}
+
+function renderPerfilSST(c){
+  const tw=c.total_workers||1;
+  const ciiu=c.ciiu_code||'';
+  const risk=getCIIURisk(ciiu);
+  const rc=getRiskColor(risk);
+  const perfil=getSSTPerfil(tw,risk);
+  const horas=getHorasSST(tw,risk);
+  const clasificacion=tw>=200?'Grande':tw>=100?'Mediana B':tw>=50?'Mediana A':tw>=10?'Pequeña':'Micro';
+  const seccion=ciiu?CIIU_SECTIONS[ciiu[0]]||'':'Sin código CIIU';
+  let h=`<div style="border:1px solid ${rc}50;border-radius:10px;background:${rc}08;padding:12px;margin-bottom:16px">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:12px;font-weight:800;color:${rc}">⚡ PERFIL SST — AM 196</div><span style="font-size:10px;font-weight:700;color:${rc};background:${rc}18;padding:3px 10px;border-radius:5px">${getRiskLabel(risk)}</span></div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:11px">`;
+  h+=`<div style="color:var(--t3)">📋 CIIU: <b style="color:var(--t1)">${ciiu||'—'}</b></div>`;
+  h+=`<div style="color:var(--t3)">🏢 Clasificación: <b style="color:var(--t1)">${clasificacion} (${tw} trab.)</b></div>`;
+  h+=`<div style="color:var(--t3)">🏭 Sector: <b style="color:var(--t1)">${seccion}</b></div>`;
+  h+=`<div style="color:var(--t3)">⏰ Horas mínimas: <b style="color:#fbbf24">${horas.horas}</b></div>`;
+  h+=`<div style="color:var(--t3)">👷 Responsable: <b style="color:var(--t1)">${perfil.tecnico?'Técnico SST':'Monitor SST'}</b></div>`;
+  h+=`<div style="color:var(--t3)">🤝 Organismo: <b style="color:var(--t1)">${perfil.comite?'Comité Paritario':perfil.delegado?'Delegado SST':'N/A'}</b></div>`;
+  h+=`</div>`;
+  if(horas.extra)h+=`<div style="font-size:9px;color:#fbbf24;margin-top:6px;font-weight:600">⚠️ ${horas.extra}</div>`;
+  if(!ciiu)h+=`<div style="font-size:9px;color:#fb923c;margin-top:6px">💡 Ingresa el código CIIU en Configuración para determinar el nivel de riesgo exacto</div>`;
+  h+=`</div>`;
+  return h;
+}
+
 // Determine what SST role is required based on workers + risk
 // AM 196 Art. 13
 function getSSTPerfil(tw,risk){
@@ -2232,6 +2279,7 @@ async function sstLoad(){
     const sstYrSel=document.getElementById("sstYrSel");if(sstYrSel){sstYrSel.innerHTML='';(SST.allYears||[SST_YR]).forEach(y=>{const o=document.createElement("option");o.value=y;o.textContent=y;if(y===SST_YR)o.selected=true;sstYrSel.appendChild(o)})}
     // Apply colors to ALL selectors AFTER they exist
     document.querySelectorAll("#sstHd select").forEach(e=>{if(sbc){e.style.background=sbc;e.style.borderColor=sbc}if(stc){e.style.color=stc}})
+    const sstPerfil=document.getElementById("sstPerfilSST");if(sstPerfil)sstPerfil.innerHTML=renderPerfilSST(c);
   }
   if(!c||c.mod_seguridad!==true){document.getElementById("sstMc").innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">Esta empresa no tiene Seguridad Industrial activada.<br>Actívala en ⚙️ Config.</div>';sstRNav();return}
   try{
@@ -2346,7 +2394,7 @@ function sstRender(){
     const perfil=getSSTPerfil(tw,riskLevel);
     const perfilTxt=perfil.tecnico?'Técnico':'Monitor';
     const orgTxt=perfil.comite?'Comité Paritario':perfil.delegado?'Delegado SST':'—';
-    h+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">👥 ${tw} trabajadores · ${getRiskLabel(riskLevel)} · ${ciiuCode||'Sin CIIU'} · <b style="color:${getRiskColor(riskLevel)}">${perfilTxt}</b> + <b>${orgTxt}</b> — Mostrando ${fa.length} de ${SST.acts.length} actividades</div>`;
+    h+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">👥 ${tw} trab. · ${getRiskLabel(riskLevel)} · ${perfilTxt} + ${orgTxt} — ${fa.length} de ${SST.acts.length} actividades</div>`;
     h+='<div class="tw"><table><thead><tr><th style="min-width:34px">#</th><th style="min-width:180px;text-align:left">Actividad</th><th style="min-width:80px;text-align:left">Responsable</th><th style="min-width:90px;text-align:center">📅 Fecha</th><th style="min-width:70px;text-align:center">⏳ Vigencia</th><th style="min-width:40px;text-align:center">⚠️</th>';
     MO.forEach(m=>{h+=`<th style="width:38px;text-align:center">${m}</th>`});
     h+='<th style="width:46px;text-align:center">%</th>';
