@@ -2373,7 +2373,7 @@ function sstRender(){
     const chDone=filteredCharlas.filter(x=>x.done).length;const chTot=filteredCharlas.length;const chPct=chTot>0?Math.round(chDone/chTot*100):0;const curM=new Date().getMonth();
     h+=`<div class="gr g3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div class="c"><div class="kl">Total</div><div class="kv" style="color:#fbbf24">${chTot}</div></div><div class="c"><div class="kl">Realizadas</div><div class="kv" style="color:#34d399">${chDone}</div><div class="ks">${chPct}%</div></div><div class="c"><div class="kl">Pendientes</div><div class="kv" style="color:#fb923c">${chTot-chDone}</div></div></div>`;
     h+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">👥 ${tw} trabajadores — ${chTot} capacitaciones aplicables</div>`;
-    h+=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="addCharla('sst')" style="background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">➕ Agregar Capacitación</button></div>`;
+    h+=`<div style="display:flex;justify-content:space-between;margin-bottom:10px"><button onclick="sstReloadCharlas()" style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">🔄 Actualizar Capacitaciones (AM 196)</button><button onclick="addCharla('sst')" style="background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">➕ Agregar Capacitación</button></div>`;
     h+='<div class="cg">';filteredCharlas.forEach((ch,i)=>{
       const origIdx=SST.charlas.indexOf(ch);
       const pm=ch.planned_month!=null?ch.planned_month:-1;
@@ -2567,31 +2567,28 @@ function sstSaveChF(id,f,v){const ch=SST.charlas.find(x=>x.id===id);if(!ch)retur
 function sstSaveChPM(id,v){const ch=SST.charlas.find(x=>x.id===id);if(!ch)return;ch.planned_month=+v;sstRender();dbs("scpm-"+id,()=>sb.from("sst_charlas").update({planned_month:+v}).eq("id",id))}
 function sstSaveChTr(id,v){const ch=SST.charlas.find(x=>x.id===id);if(!ch)return;ch.trained=+v;sstRender();dbs("sctr-"+id,()=>sb.from("sst_charlas").update({trained:+v}).eq("id",id))}
 async function sstReloadCharlas(){
-  const CH2=[
-  ["sc1","Socialización del POA","📋","#818cf8"],
-  ["sc2","Intro. y Fundamentos de Seguridad y Salud","📚","#3b82f6"],
-  ["sc3","Conformación y Funciones de Organismos Paritarios","🤝","#8b5cf6"],
-  ["sc4","Riesgos Físicos y Químicos","⚗️","#ef4444"],
-  ["sc5","Riesgos Mecánicos y Biológicos","⚙️","#f59e0b"],
-  ["sc6","Riesgos Ergonómicos","🪑","#a78bfa"],
-  ["sc7","Riesgos Psicosociales","🧠","#f472b6"],
-  ["sc8","Uso y Mantenimiento de Ropa de Trabajo y EPP","🦺","#10b981"],
-  ["sc9","Conformación y Funciones de Brigadas de Emergencia","🚒","#dc2626"],
-  ["sc10","Taller de Refuerzo: Seguridad Industrial","🔧","#f59e0b"],
-  ["sc11","Simulacro de Emergencia","🚨","#ef4444"],
-  ["sc12","Evaluación de conocimientos EPP","📝","#06b6d4"],
-  ["sc13","Uso y Mantenimiento de Ropa de Trabajo","👔","#64748b"],
-  ["sc14","Orden y Limpieza en el Puesto de Trabajo","🧹","#2dd4bf"],
-  ["sc15","Uso y manejo de extintores","🧯","#fb923c"],
-  ["sc16","Conformación y Funciones de Brigadas de Emergencias","🏥","#e11d48"],
-  ["sc17","Respuesta ante emergencias: Incendios","🔥","#dc2626"],
-  ["sc18","Respuesta ante emergencias: Primeros Auxilios","🩹","#f472b6"],
-  ["sc19","Respuesta ante emergencias: Evacuación y Rescate","🚪","#f59e0b"],
-  ["sc21","Revisión Anual de Seguridad","🔍","#34d399"]
+  if(!confirm('¿Actualizar capacitaciones a las 10 del AM 196?\n\nEsto reemplazará las capacitaciones actuales.\nLas que ya estén marcadas como realizadas se perderán.\n\n¿Continuar?'))return;
+  const allOrOne=cos.filter(c=>c.mod_seguridad).length>1?confirm('¿Actualizar TODAS las empresas?\n\nAceptar = Todas las empresas\nCancelar = Solo esta empresa'):false;
+  const CH=[
+  ["sc1","Socialización del POA","📋","#818cf8","all"],
+  ["sc2","Fundamentos de Seguridad y Salud en el Trabajo","📚","#3b82f6","all"],
+  ["sc3","Identificación de Riesgos Laborales (Físicos, Químicos, Mecánicos, Biológicos, Ergonómicos, Psicosociales)","⚠️","#ef4444","all"],
+  ["sc4","Conformación y Funciones de Organismos Paritarios","🤝","#8b5cf6",">10"],
+  ["sc5","Orden y Limpieza en el Puesto de Trabajo","🧹","#2dd4bf","all"],
+  ["sc6","Uso, Mantenimiento y Disposición Final de EPP y Ropa de Trabajo","🦺","#10b981","all"],
+  ["sc7","Conformación y Funciones de Brigadas de Emergencia","🚒","#dc2626",">10"],
+  ["sc8","Simulacro de Emergencia","🚨","#f59e0b","all"],
+  ["sc9","Uso y Manejo de Extintores","🧯","#fb923c","all"],
+  ["sc10","Respuesta ante Emergencias: Primeros Auxilios","🩹","#f472b6","all"]
   ];
   try{
-    const{error}=await sb.from("sst_charlas").upsert(CH2.map(c=>({company_id:CID,year:SST_YR,charla_key:c[0],name:c[1],icon:c[2],color:c[3]})),{onConflict:'company_id,year,charla_key'});
-    if(error){alert("Error: "+error.message+"\n\nCompany ID: "+CID+"\nYear: "+SST_YR+"\n\nVerifica que la empresa existe en Supabase.");return}
+    const targets=allOrOne?cos.filter(c=>c.mod_seguridad).map(c=>c.id):[CID];
+    for(const cid of targets){
+      await sb.from("sst_charlas").delete().eq("company_id",cid).eq("year",SST_YR);
+      const{error}=await sb.from("sst_charlas").insert(CH.map(c=>({company_id:cid,year:SST_YR,charla_key:c[0],name:c[1],icon:c[2],color:c[3],size_filter:c[4]})));
+      if(error){console.error("Error charlas:",cid,error.message);alert("Error en "+cid+": "+error.message);return}
+    }
+    alert('✅ Capacitaciones actualizadas para '+(allOrOne?targets.length+' empresas':'esta empresa'));
     await sstLoad();
   }catch(e){alert("Error: "+e.message)}
 }
