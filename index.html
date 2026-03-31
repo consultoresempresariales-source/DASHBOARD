@@ -1671,7 +1671,19 @@ ckS();
 // === SST MODULE (uses companies table directly) ===
 const SST={acts:[],charlas:[],verifs:[],allYears:[2026]};
 let SST_YR=2026,SST_V="dashboard",SST_FC="all";
-const SST_CATS=[{id:"ga",name:"G. Administrativa",icon:"📋",color:"#818cf8"},{id:"gt",name:"G. Técnica",icon:"🔬",color:"#f59e0b"},{id:"gth",name:"G. Talento Humano",icon:"👥",color:"#10b981"},{id:"pob",name:"Proc. Operativos",icon:"⚙️",color:"#ef4444"}];
+const SST_CATS=[{id:"ga",name:"G. Administrativa",icon:"📋",color:"#818cf8"},{id:"gt",name:"G. Técnica",icon:"🔬",color:"#f59e0b"},{id:"gth",name:"G. Talento Humano",icon:"👥",color:"#10b981"},{id:"po",name:"Proc. Operativos",icon:"⚙️",color:"#ef4444"},{id:"sp",name:"Serv. Permanentes",icon:"🏥",color:"#64748b"}];
+
+function sstMatchesSize(act,tw){
+  const sf=act.size_filter||'all';
+  if(sf==='all')return true;
+  if(sf==='1-10')return tw<=10;
+  if(sf==='>10')return tw>10;
+  if(sf==='<50')return tw<50;
+  if(sf==='>=50')return tw>=50;
+  if(sf==='>=50-2km')return tw>=50;
+  if(sf==='>10-<50')return tw>10&&tw<50;
+  return true;
+}
 function sortActs(acts,cats){const ci={};cats.forEach((c,i)=>ci[c.id]=i);acts.sort((a,b)=>{const ca=(ci[a.category]!=null?ci[a.category]:999);const cb=(ci[b.category]!=null?ci[b.category]:999);if(ca!==cb)return ca-cb;const na=parseInt(a.code.replace(/\D/g,''))||0;const nb=parseInt(b.code.replace(/\D/g,''))||0;return na-nb});return acts}
 const SST_EVT=[{id:"accidente",label:"Accidente"},{id:"incidente",label:"Incidente"},{id:"enfermedad",label:"Enf. Ocup."}];
 
@@ -2045,28 +2057,18 @@ async function initSSTData(cid,yr){
   // 21 Charlas SST
   if(!hasCharlas){
   const CH2=[
-  ["sc1","Socialización del POA","📋","#818cf8"],
-  ["sc2","Intro. y Fundamentos de Seguridad y Salud","📚","#3b82f6"],
-  ["sc3","Conformación y Funciones de Organismos Paritarios","🤝","#8b5cf6"],
-  ["sc4","Riesgos Físicos y Químicos","⚗️","#ef4444"],
-  ["sc5","Riesgos Mecánicos y Biológicos","⚙️","#f59e0b"],
-  ["sc6","Riesgos Ergonómicos","🪑","#a78bfa"],
-  ["sc7","Riesgos Psicosociales","🧠","#f472b6"],
-  ["sc8","Uso y Mantenimiento de Ropa de Trabajo y EPP","🦺","#10b981"],
-  ["sc9","Conformación y Funciones de Brigadas de Emergencia","🚒","#dc2626"],
-  ["sc10","Taller de Refuerzo: Seguridad Industrial","🔧","#f59e0b"],
-  ["sc11","Simulacro de Emergencia","🚨","#ef4444"],
-  ["sc12","Evaluación de conocimientos EPP","📝","#06b6d4"],
-  ["sc13","Uso y Mantenimiento de Ropa de Trabajo","👔","#64748b"],
-  ["sc14","Orden y Limpieza en el Puesto de Trabajo","🧹","#2dd4bf"],
-  ["sc15","Uso y manejo de extintores","🧯","#fb923c"],
-  ["sc16","Conformación y Funciones de Brigadas de Emergencias","🏥","#e11d48"],
-  ["sc17","Respuesta ante emergencias: Incendios","🔥","#dc2626"],
-  ["sc18","Respuesta ante emergencias: Primeros Auxilios","🩹","#f472b6"],
-  ["sc19","Respuesta ante emergencias: Evacuación y Rescate","🚪","#f59e0b"],
-  ["sc21","Revisión Anual de Seguridad","🔍","#34d399"]
+  ["sc1","Socialización del POA","📋","#818cf8","all"],
+  ["sc2","Fundamentos de Seguridad y Salud en el Trabajo","📚","#3b82f6","all"],
+  ["sc3","Identificación de Riesgos Laborales (Físicos, Químicos, Mecánicos, Biológicos, Ergonómicos, Psicosociales)","⚠️","#ef4444","all"],
+  ["sc4","Conformación y Funciones de Organismos Paritarios","🤝","#8b5cf6",">10"],
+  ["sc5","Orden y Limpieza en el Puesto de Trabajo","🧹","#2dd4bf","all"],
+  ["sc6","Uso, Mantenimiento y Disposición Final de EPP y Ropa de Trabajo","🦺","#10b981","all"],
+  ["sc7","Conformación y Funciones de Brigadas de Emergencia","🚒","#dc2626",">10"],
+  ["sc8","Simulacro de Emergencia","🚨","#f59e0b","all"],
+  ["sc9","Uso y Manejo de Extintores","🧯","#fb923c","all"],
+  ["sc10","Respuesta ante Emergencias: Primeros Auxilios","🩹","#f472b6","all"]
   ];
-  await sb.from("sst_charlas").upsert(CH2.map(c=>({company_id:cid,year:yr,charla_key:c[0],name:c[1],icon:c[2],color:c[3]})),{onConflict:'company_id,year,charla_key'});
+  await sb.from("sst_charlas").upsert(CH2.map(c=>({company_id:cid,year:yr,charla_key:c[0],name:c[1],icon:c[2],color:c[3],size_filter:c[4]})),{onConflict:'company_id,year,charla_key'});
   }
   // 5 Verifications
   if(!hasVerifs){
@@ -2289,7 +2291,10 @@ function sstRender(){
     h+='</div>';
     h+=`<div class="hn">💡 Clic derecho en mes para planificar. Clic izquierdo para marcar cumplimiento.</div>`;
     if(isAdm)h+=`<div style="margin-bottom:10px"><button class="add-btn" onclick="sstAddAct()" style="font-size:11px;padding:6px 14px">+ Agregar Actividad</button></div>`;
-    const fa=sstFC==="all"?SST.acts:SST.acts.filter(a=>a.category===sstFC);
+    const tw=c.total_workers||10;
+    const allActs=SST.acts.filter(a=>sstMatchesSize(a,tw));
+    const fa=sstFC==="all"?allActs:allActs.filter(a=>a.category===sstFC);
+    h+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">👥 ${tw} trabajadores — Mostrando ${fa.length} de ${SST.acts.length} actividades aplicables</div>`;
     h+='<div class="tw"><table><thead><tr><th style="min-width:34px">#</th><th style="min-width:180px;text-align:left">Actividad</th><th style="min-width:80px;text-align:left">Responsable</th><th style="min-width:90px;text-align:center">📅 Fecha</th><th style="min-width:70px;text-align:center">⏳ Vigencia</th><th style="min-width:40px;text-align:center">⚠️</th>';
     MO.forEach(m=>{h+=`<th style="width:38px;text-align:center">${m}</th>`});
     h+='<th style="width:46px;text-align:center">%</th>';
@@ -2355,11 +2360,22 @@ function sstRender(){
     h+='</tbody></table></div>';
 
   } else if(SST_V==="charlas"){
-    const chDone=SST.charlas.filter(x=>x.done).length;const chTot=SST.charlas.length;const chPct=chTot>0?Math.round(chDone/chTot*100):0;const curM=new Date().getMonth();
+    const tw=c.total_workers||10;
+    const filteredCharlas=SST.charlas.filter(ch=>{
+      const sf=ch.size_filter||'all';
+      if(sf==='all')return true;
+      if(sf==='>10')return tw>10;
+      if(sf==='<50')return tw<50;
+      if(sf==='>=50')return tw>=50;
+      if(sf==='1-10')return tw<=10;
+      return true;
+    });
+    const chDone=filteredCharlas.filter(x=>x.done).length;const chTot=filteredCharlas.length;const chPct=chTot>0?Math.round(chDone/chTot*100):0;const curM=new Date().getMonth();
     h+=`<div class="gr g3" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div class="c"><div class="kl">Total</div><div class="kv" style="color:#fbbf24">${chTot}</div></div><div class="c"><div class="kl">Realizadas</div><div class="kv" style="color:#34d399">${chDone}</div><div class="ks">${chPct}%</div></div><div class="c"><div class="kl">Pendientes</div><div class="kv" style="color:#fb923c">${chTot-chDone}</div></div></div>`;
-    if(chTot<21)h+=`<div class="hn" style="color:#fbbf24;border-color:#fbbf24;margin-bottom:10px">⚠️ Faltan capacitaciones. <button class="add-btn" style="font-size:10px;padding:3px 10px;margin-left:8px" onclick="sstReloadCharlas()">🔄 Actualizar a 21 capacitaciones</button></div>`;
+    h+=`<div style="font-size:10px;color:var(--t3);margin-bottom:8px">👥 ${tw} trabajadores — ${chTot} capacitaciones aplicables</div>`;
     h+=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="addCharla('sst')" style="background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer">➕ Agregar Capacitación</button></div>`;
-    h+='<div class="cg">';SST.charlas.forEach((ch,i)=>{
+    h+='<div class="cg">';filteredCharlas.forEach((ch,i)=>{
+      const origIdx=SST.charlas.indexOf(ch);
       const pm=ch.planned_month!=null?ch.planned_month:-1;
       let urgency='',urgLabel='',urgBorder='var(--bd)',urgBg='';
       if(ch.done){urgency='done';urgLabel='✅ Completada';urgBorder='rgba(52,211,153,0.4)';urgBg='rgba(52,211,153,0.04)'}
@@ -2372,8 +2388,8 @@ function sstRender(){
       const tr=ch.trained||0;const trPct=Math.round(tr/tw*100);const trC=trPct>=85?'#34d399':trPct>=50?'#fbbf24':'#ef4444';
       h+=`<div class="cc" style="border-color:${urgBorder};background:${urgBg}"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:10px;font-weight:700;color:var(--t3);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px;font-family:var(--mn)">${i+1}/${chTot}</span>`;
       if(urgLabel)h+=`<span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;color:${urgency==='overdue'?'#ef4444':urgency==='now'?'#fbbf24':urgency==='done'?'#34d399':urgency==='soon'?'#60a5fa':'var(--t3)'};background:${urgency==='overdue'?'rgba(239,68,68,0.12)':urgency==='now'?'rgba(251,191,36,0.12)':urgency==='done'?'rgba(52,211,153,0.12)':urgency==='soon'?'rgba(96,165,250,0.12)':'rgba(255,255,255,0.06)'}">${urgLabel}</span>`;
-      h+=`</div><div style="font-size:22px;margin-bottom:4px">${ch.icon}</div><div style="font-size:13px;font-weight:700;margin-bottom:4px;color:${ch.done?'#34d399':ch.color}" contenteditable="true" onblur="editCharlaName('sst',${i},this.textContent)">${ch.name}</div>`;
-      h+=`<div style="display:flex;gap:6px;margin-bottom:6px"><button onclick="delCharla('sst',${i})" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:10px;padding:3px 10px;border-radius:6px;font-weight:600">🗑 Eliminar</button></div>`;
+      h+=`</div><div style="font-size:22px;margin-bottom:4px">${ch.icon}</div><div style="font-size:13px;font-weight:700;margin-bottom:4px;color:${ch.done?'#34d399':ch.color}" contenteditable="true" onblur="editCharlaName('sst',${origIdx},this.textContent)">${ch.name}</div>`;
+      h+=`<div style="display:flex;gap:6px;margin-bottom:6px"><button onclick="delCharla('sst',${origIdx})" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;cursor:pointer;font-size:10px;padding:3px 10px;border-radius:6px;font-weight:600">🗑 Eliminar</button></div>`;
       h+=`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--t3)">Cobertura</span><span style="color:${trC};font-weight:700;font-family:var(--mn)">${trPct}% (${tr}/${tw})</span></div><div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(trPct,100)}%;background:${trC};border-radius:3px"></div></div><div style="font-size:8px;color:var(--t3);margin-top:2px">Meta ≥85%</div></div>`;
       h+=`<div style="display:flex;flex-direction:column;gap:6px"><div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:2px">Mes planificado</label><select onchange="sstSaveChPM(${ch.id},this.value)" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--bd);background:${c.select_bg_color||'rgba(255,255,255,0.05)'};color:${c.select_text_color||'var(--t1)'};font-size:11px;font-weight:600"><option value="-1" ${pm<0?'selected':''}>Sin planificar</option>`;
       MF.forEach((m,mi)=>{h+=`<option value="${mi}" ${pm===mi?'selected':''}>${m}</option>`});
