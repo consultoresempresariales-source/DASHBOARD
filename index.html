@@ -688,7 +688,17 @@ async function delImcYr(yr){if(!confirm("¿Eliminar IMC "+yr+"?"))return;try{awa
 
 // === SAVES ===
 function saveTW(v){D.tw=Math.max(1,+v||1);render();dbs("tw",()=>sb.from("companies").update({total_workers:D.tw}).eq("id",CID))}
-function saveCIIU(v){const c=cos.find(x=>x.id===CID);if(c)c.ciiu_code=v.trim();render();dbs("ciiu",()=>sb.from("companies").update({ciiu_code:v.trim()}).eq("id",CID))}
+function saveCIIU(v){
+  const c=cos.find(x=>x.id===CID);if(c)c.ciiu_code=v.trim();
+  // Update the risk label inline without full re-render
+  const risk=getCIIURisk(v.trim());
+  document.querySelectorAll('.ciiu-risk-badge').forEach(el=>{el.textContent=getRiskLabel(risk);el.style.color=getRiskColor(risk)});
+  document.querySelectorAll('.ciiu-perfil-card').forEach(el=>{el.style.borderColor=getRiskColor(risk)+'50';el.style.background=getRiskColor(risk)+'08'});
+  dbs("ciiu",()=>sb.from("companies").update({ciiu_code:v.trim()}).eq("id",CID));
+  // Delayed re-render to update all dependent UI
+  clearTimeout(window._ciiuTimer);
+  window._ciiuTimer=setTimeout(()=>{if(MOD==='seguridad'){sstRender()}else{render()}},1500);
+}
 function saveField(f,v){D.comp[f]=v;dbs("f-"+f,()=>sb.from("companies").update({[f]:v}).eq("id",CID))}
 function saveRepLegal(v){D.comp.rep_legal=v;const co=cos.find(c=>c.id===CID);if(co)co.rep_legal=v;dbs("rl",()=>sb.from("companies").update({rep_legal:v}).eq("id",CID))}
 function saveCoName(v){v=v.trim();if(!v)return;D.comp.name=v;const co=cos.find(c=>c.id===CID);if(co)co.name=v;render();dbs("cn",()=>sb.from("companies").update({name:v}).eq("id",CID))}
@@ -1730,19 +1740,23 @@ function renderPerfilSST(c){
   const perfil=getSSTPerfil(tw,risk);
   const horas=getHorasSST(tw,risk);
   const clasificacion=tw>=200?'Grande':tw>=100?'Mediana B':tw>=50?'Mediana A':tw>=10?'Pequeña':'Micro';
-  const seccion=ciiu?CIIU_SECTIONS[ciiu[0]]||'':'Sin código CIIU';
-  let h=`<div style="border:1px solid ${rc}50;border-radius:10px;background:${rc}08;padding:12px;margin-bottom:16px">`;
-  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:12px;font-weight:800;color:${rc}">⚡ PERFIL SST — AM 196</div><span style="font-size:10px;font-weight:700;color:${rc};background:${rc}18;padding:3px 10px;border-radius:5px">${getRiskLabel(risk)}</span></div>`;
-  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:11px">`;
-  h+=`<div style="color:var(--t3)">📋 CIIU: <b style="color:var(--t1)">${ciiu||'—'}</b></div>`;
-  h+=`<div style="color:var(--t3)">🏢 Clasificación: <b style="color:var(--t1)">${clasificacion} (${tw} trab.)</b></div>`;
-  h+=`<div style="color:var(--t3)">🏭 Sector: <b style="color:var(--t1)">${seccion}</b></div>`;
-  h+=`<div style="color:var(--t3)">⏰ Horas mínimas: <b style="color:#fbbf24">${horas.horas}</b></div>`;
-  h+=`<div style="color:var(--t3)">👷 Responsable: <b style="color:var(--t1)">${perfil.tecnico?'Técnico SST':'Monitor SST'}</b></div>`;
-  h+=`<div style="color:var(--t3)">🤝 Organismo: <b style="color:var(--t1)">${perfil.comite?'Comité Paritario':perfil.delegado?'Delegado SST':'N/A'}</b></div>`;
+  const seccion=ciiu?CIIU_SECTIONS[ciiu[0]]||'':'';
+  const canEdit=!CURRENT_USER||CURRENT_USER.role==='admin'||CURRENT_USER.role==='seguridad'||CURRENT_USER.role==='salud';
+  let h=`<div class="ciiu-perfil-card" style="border:1px solid ${rc}50;border-radius:10px;background:${rc}08;padding:12px;margin-bottom:12px">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:12px;font-weight:800;color:${rc}">⚡ PERFIL SST — AM 196</div><span class="ciiu-risk-badge" style="font-size:10px;font-weight:700;color:${rc};background:${rc}18;padding:3px 10px;border-radius:5px">${getRiskLabel(risk)}</span></div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 16px;font-size:11px;align-items:center">`;
+  if(canEdit){
+    h+=`<div style="color:var(--t3)">📋 CIIU: <input value="${ciiu}" onchange="saveCIIU(this.value)" placeholder="Ej: G4711.00" style="width:90px;padding:2px 6px;border-radius:4px;border:1px solid ${rc}40;background:${rc}10;color:var(--t1);font-size:11px;font-family:var(--mn);font-weight:700;outline:none"></div>`;
+  } else {
+    h+=`<div style="color:var(--t3)">📋 CIIU: <b style="color:var(--t1);font-family:var(--mn)">${ciiu||'—'}</b></div>`;
+  }
+  h+=`<div style="color:var(--t3)">🏢 <b style="color:var(--t1)">${clasificacion}</b> (${tw} trab.)</div>`;
+  h+=`<div style="color:var(--t3)">⏰ Horas: <b style="color:#fbbf24">${horas.horas}</b></div>`;
+  h+=`<div style="color:var(--t3)">🏭 ${seccion||'<span style="color:#fb923c">Sin CIIU</span>'}</div>`;
+  h+=`<div style="color:var(--t3)">👷 <b style="color:var(--t1)">${perfil.tecnico?'Técnico SST':'Monitor SST'}</b></div>`;
+  h+=`<div style="color:var(--t3)">🤝 <b style="color:var(--t1)">${perfil.comite?'Comité Paritario':perfil.delegado?'Delegado SST':'N/A'}</b></div>`;
   h+=`</div>`;
-  if(horas.extra)h+=`<div style="font-size:9px;color:#fbbf24;margin-top:6px;font-weight:600">⚠️ ${horas.extra}</div>`;
-  if(!ciiu)h+=`<div style="font-size:9px;color:#fb923c;margin-top:6px">💡 Ingresa el código CIIU en Configuración para determinar el nivel de riesgo exacto</div>`;
+  if(horas.extra)h+=`<div style="font-size:9px;color:#fbbf24;margin-top:4px;font-weight:600">⚠️ ${horas.extra}</div>`;
   h+=`</div>`;
   return h;
 }
