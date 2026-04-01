@@ -96,6 +96,7 @@ canvas{width:100%!important;max-height:220px}
   <div class="sb-item" onclick="switchModule('seguridad')" id="sb-seguridad" style="display:none"><span class="sb-icon">🔧</span><span class="sb-label">SEGUR.</span></div>
   <div class="sb-item" onclick="switchModule('talento')" id="sb-talento" style="display:none"><span class="sb-icon">👥</span><span class="sb-label">TTHH</span></div>
   <div class="sb-item" onclick="switchModule('datos')" id="sb-datos" style="display:none"><span class="sb-icon">🛡</span><span class="sb-label">DATOS</span></div>
+  <div class="sb-item" onclick="switchModule('ambiente')" id="sb-ambiente" style="display:none"><span class="sb-icon">🌿</span><span class="sb-label">AMBIENT.</span></div>
   <div class="sb-item" onclick="switchModule('logistica')" id="sb-logistica" style="display:none"><span class="sb-icon">🚐</span><span class="sb-label">LOGÍST.</span></div>
   <div style="flex:1"></div>
   <div class="sb-item" onclick="switchModule('pendientes')" id="sb-pendientes" style="display:none"><span class="sb-icon">📋</span><span class="sb-label">TAREAS</span></div>
@@ -198,6 +199,14 @@ canvas{width:100%!important;max-height:220px}
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="cs" id="datosCSel"></div><div id="datosSySt" class="si ok">✓</div><div class="nv" id="datosNv"></div></div>
 </div>
 <div class="mn" id="datosMc"></div>
+</div>
+<div id="ambienteModule" style="display:none">
+<div class="hd" id="ambHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+<div style="display:flex;align-items:center;gap:12px"><div class="lg" id="ambCoLogo" style="background:linear-gradient(135deg,#22c55e,#4ade80)">🌿</div><div class="bn"><h1 id="ambBN">Seguridad Ambiental</h1><p id="ambBS" style="color:var(--t3)">Gestión y Auditoría</p></div><div class="mod-badge" style="background:rgba(34,197,94,0.12);color:#22c55e;border:1px solid rgba(34,197,94,0.3)">🌿 Seguridad Ambiental</div></div>
+<div id="ambPvBox" style="flex:1;display:flex;justify-content:center;min-width:100px"></div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="cs" id="ambCSel"></div><div id="ambSySt" class="si ok">✓</div><div class="nv" id="ambNv"></div></div>
+</div>
+<div class="mn" id="ambMc"></div>
 </div>
 <div id="logisticaModule" style="display:none">
 <div class="hd" id="logHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -349,7 +358,7 @@ function applyUserRole(){
       'tthh':['talento'],
       'talento':['talento'],
       'datos':['datos'],
-      'ambiente':['salud'],
+      'ambiente':['ambiente'],
       'psicologo':['salud'],
       'contador':['logistica']
     };
@@ -357,7 +366,7 @@ function applyUserRole(){
       effectiveMods=roleModMap[u.role];
     }else{
       // For 'multi' role or unmapped roles: map each module to its sidebar equivalent
-      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'salud','psicologo':'salud','contador':'logistica'};
+      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'ambiente','psicologo':'salud','contador':'logistica'};
       const filtered=rawMods.filter(m=>m!=="jefe"&&m!=="admin");
       const mapped=filtered.map(m=>modToSidebar[m]||m).filter(Boolean);
       effectiveMods=[...new Set(mapped)];
@@ -412,7 +421,7 @@ async function showPostLoginNotifications(){
     const{data:trips}=await sb.from("logistics_trips").select("*").in("id",tids).gte("trip_date",today).order("trip_date");
     if(!trips||trips.length===0)return;
     // Get companies for these trips
-    const{data:tCos}=await sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone,companies(name)").in("trip_id",tids);
+    const{data:tCos}=await sb.from("logistics_trip_companies").select("*,companies(name)").in("trip_id",tids);
     const coMap={};(tCos||[]).forEach(tc=>{if(!coMap[tc.trip_id])coMap[tc.trip_id]=[];coMap[tc.trip_id].push(tc.custom_name||tc.companies?.name||'')});
     // Get unread notifications
     const{data:notifs}=await sb.from("logistics_notifications").select("*").eq("user_id",uid).eq("read",false).order("created_at",{ascending:false}).limit(10);
@@ -552,7 +561,7 @@ async function forgotPassword(){
   await sb.from("app_users").update({password_reset_requested:true}).eq("id",data[0].id);
   errEl.style.color="#34d399";errEl.textContent="✅ Solicitud enviada. El administrador restablecerá su contraseña pronto."
 }
-function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","talentoModule","datosModule","logisticaModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",talento:"talentoModule",datos:"datosModule",logistica:"logisticaModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="logistica"){logLoad()}}
+function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","talentoModule","datosModule","ambienteModule","logisticaModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}}
 const MO=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"],MF=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS=[{id:"admin",name:"G. Administrativa",color:"#2dd4bf",icon:"🏛"},{id:"tecnica",name:"G. Técnica",color:"#818cf8",icon:"⚙️"},{id:"talento",name:"G. Talento Humano",color:"#f472b6",icon:"👥"},{id:"operativos",name:"Proc. Operativos",color:"#fb923c",icon:"📋"},{id:"psicosocial",name:"R. Psicosociales",color:"#a78bfa",icon:"🧠"},{id:"drogas",name:"Prev. Drogas",color:"#34d399",icon:"🛡"},{id:"servicios",name:"Serv. Permanentes",color:"#fbbf24",icon:"🔧"}];
 const EXT=[{id:"ingreso",label:"Ex. Ingreso",color:"#2dd4bf"},{id:"periodico",label:"Ex. Periódico",color:"#818cf8"},{id:"reintegro",label:"Ex. Reintegro",color:"#f472b6"},{id:"egreso",label:"Ex. Egreso",color:"#fb923c"}];
@@ -661,7 +670,7 @@ async function uploadLogo(file,field){
   D.comp[field]=urlData.publicUrl;const ci=cos.findIndex(c=>c.id===CID);if(ci>=0)cos[ci][field]=urlData.publicUrl;
   ss("ok");render();if(MOD==="seguridad")sstRender()}catch(e){alert("Error subiendo logo: "+e.message);ss("er")}}
 function triggerUpload(field){const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=()=>{if(inp.files[0])uploadLogo(inp.files[0],field)};inp.click()}
-async function delLogo(field){if(!confirm("Eliminar esta imagen?"))return;ss("ld");try{await sb.from("companies").update({[field]:""}).eq("id",CID);D.comp[field]="";const ci=cos.findIndex(c=>c.id===CID);if(ci>=0)cos[ci][field]="";ss("ok");render();if(MOD==="seguridad")sstRender();if(MOD==="talento")tthhLoad();if(MOD==="datos")datosLoad()}catch(e){alert(e.message);ss("er")}}
+async function delLogo(field){if(!confirm("Eliminar esta imagen?"))return;ss("ld");try{await sb.from("companies").update({[field]:""}).eq("id",CID);D.comp[field]="";const ci=cos.findIndex(c=>c.id===CID);if(ci>=0)cos[ci][field]="";ss("ok");render();if(MOD==="seguridad")sstRender();if(MOD==="talento")tthhLoad();if(MOD==="datos")datosLoad();if(MOD==="ambiente")ambienteLoad()}catch(e){alert(e.message);ss("er")}}
 function setPvSize(v){D.comp.provider_logo_size=v;render();dbs("pvs",()=>sb.from("companies").update({provider_logo_size:v}).eq("id",CID))}
 function setSstPvSize(v){D.comp.sst_provider_logo_size=v;sstRender();dbs("spvs",()=>sb.from("companies").update({sst_provider_logo_size:v}).eq("id",CID))}
 function setTthhPvSize(v){D.comp.tthh_provider_logo_size=v;tthhUpdateHeader();dbs("tpvs",()=>sb.from("companies").update({tthh_provider_logo_size:v}).eq("id",CID))}
@@ -1127,7 +1136,7 @@ function render(){
     // Module activation checkboxes
     h+='<div style="margin-bottom:20px;padding:16px;border:1px solid var(--bd);border-radius:10px;background:rgba(255,255,255,0.02)"><div class="st">📦 Módulos Activos</div><div class="hn">Activa los módulos que aplican para esta empresa. Al activar Seguridad Industrial se crean automáticamente las 97 actividades del POA SST.</div>';
     h+='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px">';
-    [{k:"mod_salud",l:"🩺 Salud Ocupacional",cl:"#2dd4bf",def:true},{k:"mod_seguridad",l:"🔧 Seguridad Industrial",cl:"#f59e0b",def:false},{k:"mod_datos",l:"🔒 Protección de Datos",cl:"#818cf8",def:false},{k:"mod_tthh",l:"👥 Talento Humano",cl:"#f472b6",def:false},{k:"mod_logistica",l:"🚐 Logística",cl:"#f97316",def:false}].forEach(md=>{
+    [{k:"mod_salud",l:"🩺 Salud Ocupacional",cl:"#2dd4bf",def:true},{k:"mod_seguridad",l:"🔧 Seguridad Industrial",cl:"#f59e0b",def:false},{k:"mod_datos",l:"🔒 Protección de Datos",cl:"#818cf8",def:false},{k:"mod_tthh",l:"👥 Talento Humano",cl:"#f472b6",def:false},{k:"mod_ambiente",l:"🌿 Seguridad Ambiental",cl:"#22c55e",def:false},{k:"mod_logistica",l:"🚐 Logística",cl:"#f97316",def:false}].forEach(md=>{
       const on=c[md.k]===true||(c[md.k]===null&&md.def);
       h+=`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid ${on?md.cl+"44":"var(--bd)"};background:${on?md.cl+"11":"transparent"};transition:all .15s"><input type="checkbox" ${on?"checked":""} onchange="toggleMod('${md.k}',this.checked)" style="accent-color:${md.cl};width:16px;height:16px;cursor:pointer"><span style="font-size:12px;font-weight:600;color:${on?md.cl:"var(--t3)"}">${md.l}</span></label>`;
     });
@@ -1799,7 +1808,7 @@ const SST_EVT=[{id:"accidente",label:"Accidente"},{id:"incidente",label:"Inciden
 async function renderConfig(){
   const mc=document.getElementById("configMc");if(!mc)return;
   if(sb){try{await loadCos()}catch(e){}}
-  const mods=[{k:"mod_salud",l:"🩺 Salud Ocupacional",cl:"#2dd4bf"},{k:"mod_seguridad",l:"🔧 Seguridad Industrial",cl:"#f59e0b"},{k:"mod_datos",l:"🔒 Protección de Datos",cl:"#818cf8"},{k:"mod_tthh",l:"👥 Talento Humano",cl:"#f472b6"},{k:"mod_logistica",l:"🚐 Logística",cl:"#f97316"}];
+  const mods=[{k:"mod_salud",l:"🩺 Salud Ocupacional",cl:"#2dd4bf"},{k:"mod_seguridad",l:"🔧 Seguridad Industrial",cl:"#f59e0b"},{k:"mod_datos",l:"🔒 Protección de Datos",cl:"#818cf8"},{k:"mod_tthh",l:"👥 Talento Humano",cl:"#f472b6"},{k:"mod_ambiente",l:"🌿 Seguridad Ambiental",cl:"#22c55e"},{k:"mod_logistica",l:"🚐 Logística",cl:"#f97316"}];
   const activas=cos.filter(co=>mods.some(m=>co[m.k]===true||(co[m.k]==null&&m.k==="mod_salud")));
   const inactivas=cos.filter(co=>!mods.some(m=>co[m.k]===true||(co[m.k]==null&&m.k==="mod_salud")));
   let h='';
@@ -2204,7 +2213,7 @@ function updateSidebar(){
     return;
   }
   // Only for admin: show/hide based on which companies have which modules enabled
-  const mods=[{k:"mod_salud",sb:"sb-salud",m:"salud"},{k:"mod_seguridad",sb:"sb-seguridad",m:"seguridad"},{k:"mod_tthh",sb:"sb-talento",m:"talento"},{k:"mod_datos",sb:"sb-datos",m:"datos"}];
+  const mods=[{k:"mod_salud",sb:"sb-salud",m:"salud"},{k:"mod_seguridad",sb:"sb-seguridad",m:"seguridad"},{k:"mod_tthh",sb:"sb-talento",m:"talento"},{k:"mod_datos",sb:"sb-datos",m:"datos"},{k:"mod_ambiente",sb:"sb-ambiente",m:"ambiente"}];
   mods.forEach(md=>{
     const has=cos.some(c=>c[md.k]===true||(c[md.k]==null&&md.k==="mod_salud"));
     const el=document.getElementById(md.sb);
@@ -2582,6 +2591,10 @@ function sstRender(){
       h+=`<div class="st" style="font-size:13px;margin-top:20px;color:#10b981">🛡 Configuración Protección de Datos</div>`;
       h+=`<div style="margin-bottom:12px;padding:12px;border:1px solid rgba(251,191,36,0.3);border-radius:8px;background:rgba(251,191,36,0.04)"><label style="font-size:11px;color:var(--t3);font-weight:600;display:block;margin-bottom:4px">👔 Representante Legal</label><input class="ni" value="${c.rep_legal||''}" onchange="saveRepLegal(this.value)" placeholder="Nombre del representante legal" style="width:100%;padding:8px;font-size:13px"></div>`;
       h+=`<div class="gr g2" style="margin-bottom:16px"><div><label style="font-size:11px;color:var(--t3);font-weight:600;display:block;margin-bottom:6px">Logo Prestador Datos</label><div class="lu" onclick="triggerUpload('datos_provider_logo_url')">${c.datos_provider_logo_url?`<img src="${c.datos_provider_logo_url}">`:'<div style="font-size:11px;color:var(--t3)">Clic para subir</div>'}</div>${c.datos_provider_logo_url?`<button class="del-btn" style="margin-top:4px" onclick="delLogo('datos_provider_logo_url')">Eliminar</button><div style="margin-top:6px"><label style="font-size:10px;color:var(--t3)">Tamaño: <input type="number" value="${c.datos_provider_logo_size||50}" onchange="setDatosPvSize(+this.value)" style="width:50px;background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t1);border-radius:4px;padding:2px 4px;font-size:10px">px</label><input type="range" min="20" max="300" value="${c.datos_provider_logo_size||50}" oninput="this.previousElementSibling.querySelector('input').value=this.value;setDatosPvSize(+this.value)" style="width:100%;accent-color:#10b981"></div>`:''}</div></div>`;
+    }
+    if(c.mod_ambiente){
+      h+=`<div class="st" style="font-size:13px;margin-top:20px;color:#22c55e">🌿 Configuración Seguridad Ambiental</div>`;
+      h+=`<div class="gr g2" style="margin-bottom:16px"><div><label style="font-size:11px;color:var(--t3);font-weight:600;display:block;margin-bottom:6px">Logo Prestador Ambiente</label><div class="lu" onclick="triggerUpload('ambiente_provider_logo_url')">${c.ambiente_provider_logo_url?`<img src="${c.ambiente_provider_logo_url}">`:'<div style="font-size:11px;color:var(--t3)">Clic para subir</div>'}</div>${c.ambiente_provider_logo_url?`<button class="del-btn" style="margin-top:4px" onclick="delLogo('ambiente_provider_logo_url')">Eliminar</button>`:''}</div></div>`;
     }
   }
   mc.innerHTML=h;sstRNav();
@@ -3168,8 +3181,8 @@ function getCatLabel(catId,allCats){
 // ===== GENERIC TABBED MODULE =====
 async function genModLoad(mod,prefix,thColor,auditActTable,auditStTable,planActTable,planStTable){
   if(!sb||!CID)return;
-  const M=mod==="tthh"?TTHH:DATOS;
-  const modKey=mod==="tthh"?"mod_tthh":"mod_datos";
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
+  const modKey=mod==="tthh"?"mod_tthh":mod==="ambiente"?"mod_ambiente":"mod_datos";
   const{data:freshCo}=await sb.from("companies").select("*").eq("id",CID).single();
   const c=freshCo||((D.comp&&D.comp.id===CID)?D.comp:cos.find(x=>x.id===CID));
   if(freshCo){const ci=cos.findIndex(x=>x.id===CID);if(ci>=0)cos[ci]=freshCo;if(D.comp&&D.comp.id===CID)D.comp=freshCo}
@@ -3181,7 +3194,7 @@ async function genModLoad(mod,prefix,thColor,auditActTable,auditStTable,planActT
     const modCos=cos.filter(x=>x[modKey]===true);
     if(modCos.length===0){document.getElementById(prefix+"Mc").innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">No hay empresas con este módulo activado.<br>Actívalo en ⚙️ Config → Módulos.</div>';return}
     if(!modCos.find(x=>x.id===CID)){CID=modCos[0].id}
-    const loadFn=mod==="tthh"?"tthhLoad()":"datosLoad()";
+    const loadFn=mod==="tthh"?"tthhLoad()":mod==="ambiente"?"ambienteLoad()":"datosLoad()";
     const selBg=c.select_bg_color||'rgba(255,255,255,0.05)';
     const selTx=c.select_text_color||'var(--t1)';
     const selBd=c.select_bg_color||'var(--bd)';
@@ -3191,7 +3204,7 @@ async function genModLoad(mod,prefix,thColor,auditActTable,auditStTable,planActT
     document.addEventListener('click',function _cl(e){if(!document.getElementById(ddId)?.contains(e.target)){const l=document.getElementById(ddId+'L');if(l)l.style.display='none'}},{once:false});
   }
   try{
-    const charlasTable=mod==="tthh"?"tthh_charlas":"datos_charlas";
+    const charlasTable=mod==="tthh"?"tthh_charlas":mod==="ambiente"?"ambiente_charlas":"datos_charlas";
     const[a1,a2,a3,a4]=await Promise.all([
       sb.from(auditActTable).select("*").eq("active",true).order("category").order("sort_order"),
       sb.from(auditStTable).select("*").eq("company_id",CID).eq("year",YR),
@@ -3217,13 +3230,13 @@ async function genModLoad(mod,prefix,thColor,auditActTable,auditStTable,planActT
 
 function genModRender(mod,prefix,thColor,auditStTable,planStTable,auditActTable,planActTable){
   const mc=document.getElementById(prefix+"Mc");if(!mc)return;
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
   const userMods=CURRENT_USER?parseModules(CURRENT_USER):[];
-  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")));
+  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")))||(mod==="ambiente"&&(CURRENT_USER?.role==="ambiente"||userMods.includes("ambiente")));
   const tab=M.tab||"audit";
-  const loadFn=mod==="tthh"?"tthhLoad()":"datosLoad()";
-  const modVar=mod==="tthh"?"TTHH":"DATOS";
+  const loadFn=mod==="tthh"?"tthhLoad()":mod==="ambiente"?"ambienteLoad()":"datosLoad()";
+  const modVar=mod==="tthh"?"TTHH":mod==="ambiente"?"AMBIENTE":"DATOS";
 
   // Tab bar
   let h=`<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid rgba(255,255,255,0.06);flex-wrap:wrap">`;
@@ -3246,10 +3259,10 @@ function genModRender(mod,prefix,thColor,auditStTable,planStTable,auditActTable,
 }
 
 function renderGenModCharlas(mod,thColor){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const charlas=M.charlas||[];
-  const modLabel=mod==="tthh"?"Talento Humano":"Protección de Datos";
-  const table=mod==="tthh"?"tthh_charlas":"datos_charlas";
+  const modLabel=mod==="tthh"?"Talento Humano":mod==="ambiente"?"Seguridad Ambiental":"Protección de Datos";
+  const table=mod==="tthh"?"tthh_charlas":mod==="ambiente"?"ambiente_charlas":"datos_charlas";
   const curM=new Date().getMonth();
   const c=cos.find(x=>x.id===CID)||{};
   const tw=c.total_workers||1;
@@ -3326,12 +3339,12 @@ async function addGenModCharla(mod){
       const{error}=await sb.from(table).insert({company_id:CID,year:YR,charla_key:key,name:name.trim(),icon:icon,color:color,done:false,planned_month:null});
       if(error)throw error;
     }
-    if(mod==='tthh')tthhLoad();else datosLoad();
+    if(mod==='tthh')tthhLoad();else if(mod==='ambiente')ambienteLoad();else datosLoad();
   }catch(e){alert("Error: "+e.message)}
 }
 
 async function delGenModCharla(mod,idx){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const ch=M.charlas[idx];if(!ch)return;
   const table=mod==='tthh'?'tthh_charlas':'datos_charlas';
   if(!confirm(`¿Eliminar la capacitación "${ch.name}"?`))return;
@@ -3344,13 +3357,13 @@ async function delGenModCharla(mod,idx){
     }else{
       await sb.from(table).delete().eq("id",ch.id);
     }
-    if(mod==='tthh')tthhLoad();else datosLoad();
+    if(mod==='tthh')tthhLoad();else if(mod==='ambiente')ambienteLoad();else datosLoad();
   }catch(e){alert("Error: "+e.message)}
 }
 
 function editGenModCharla(mod,idx,newName){
   if(!newName||!newName.trim())return;
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const ch=M.charlas[idx];if(!ch||ch.name===newName.trim())return;
   const table=mod==='tthh'?'tthh_charlas':'datos_charlas';
   const oldName=ch.name;
@@ -3364,19 +3377,19 @@ function editGenModCharla(mod,idx,newName){
 }
 
 function toggleGenModCharla(mod,id){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const table=mod==='tthh'?'tthh_charlas':'datos_charlas';
   const ch=M.charlas.find(x=>x.id===id);if(!ch)return;
   ch.done=!ch.done;
   if(ch.done&&!ch.event_date&&!ch.date){const td=new Date().toISOString().split('T')[0];ch.event_date=td;ch.date=td}
   // Re-render locally first
-  const prefix=mod==="tthh"?"tthh":"datos";
+  const prefix=mod==="tthh"?"tthh":mod==="ambiente"?"amb":"datos";
   const thColor=mod==="tthh"?"#a855f7":"#10b981";
   genModRender(mod,prefix,thColor,
-    mod==="tthh"?"tthh_company_status":"datos_company_status",
-    mod==="tthh"?"tthh_plan_status":"datos_plan_status",
-    mod==="tthh"?"tthh_activities":"datos_activities",
-    mod==="tthh"?"tthh_plan_activities":"datos_plan_activities");
+    mod==="tthh"?"tthh_company_status":mod==="ambiente"?"ambiente_company_status":"datos_company_status",
+    mod==="tthh"?"tthh_plan_status":mod==="ambiente"?"ambiente_plan_status":"datos_plan_status",
+    mod==="tthh"?"tthh_activities":mod==="ambiente"?"ambiente_activities":"datos_activities",
+    mod==="tthh"?"tthh_plan_activities":mod==="ambiente"?"ambiente_plan_activities":"datos_plan_activities");
   // Save IMMEDIATELY to DB (no debounce) so it persists
   (async()=>{
     try{
@@ -3398,16 +3411,16 @@ function toggleGenModCharla(mod,id){
 }
 
 function saveGenModCharlaField(mod,id,field,val){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const table=mod==='tthh'?'tthh_charlas':'datos_charlas';
   const ch=M.charlas.find(x=>x.id===id);if(!ch)return;
   ch[field]=val;
   if(field==='event_date'){ch.date=val;ch.event_date=val}
   if(field==='date'){ch.event_date=val;ch.date=val}
   // Re-render locally so UI updates immediately
-  const prefix=mod==="tthh"?"tthh":"datos";
+  const prefix=mod==="tthh"?"tthh":mod==="ambiente"?"amb":"datos";
   const thColor=mod==="tthh"?"#a855f7":"#10b981";
-  genModRender(mod,prefix,thColor,mod==="tthh"?"tthh_company_status":"datos_company_status",mod==="tthh"?"tthh_plan_status":"datos_plan_status",mod==="tthh"?"tthh_activities":"datos_activities",mod==="tthh"?"tthh_plan_activities":"datos_plan_activities");
+  genModRender(mod,prefix,thColor,mod==="tthh"?"tthh_company_status":mod==="ambiente"?"ambiente_company_status":"datos_company_status",mod==="tthh"?"tthh_plan_status":mod==="ambiente"?"ambiente_plan_status":"datos_plan_status",mod==="tthh"?"tthh_activities":mod==="ambiente"?"ambiente_activities":"datos_activities",mod==="tthh"?"tthh_plan_activities":mod==="ambiente"?"ambiente_plan_activities":"datos_plan_activities");
   dbs("gcf-"+id+field,async()=>{
     const upd={[field]:val};
     if(field==='event_date'||field==='date'){upd.event_date=val;upd.date=val}
@@ -3431,10 +3444,10 @@ function renderModConfig(mod,prefix,thColor){
   const pvField=mod==="tthh"?"tthh_provider_logo_url":"datos_provider_logo_url";
   const pvSzField=mod==="tthh"?"tthh_provider_logo_size":"datos_provider_logo_size";
   const pvSetFn=mod==="tthh"?"setTthhPvSize":"setDatosPvSize";
-  const modLabel=mod==="tthh"?"Talento Humano":"Protección de Datos";
+  const modLabel=mod==="tthh"?"Talento Humano":mod==="ambiente"?"Seguridad Ambiental":"Protección de Datos";
   const modIcon=mod==="tthh"?"👥":"🛡";
   const accent=thColor;
-  const loadFn=mod==="tthh"?"tthhLoad()":"datosLoad()";
+  const loadFn=mod==="tthh"?"tthhLoad()":mod==="ambiente"?"ambienteLoad()":"datosLoad()";
   const currentPvUrl=c[pvField]||c.provider_logo_url||"";
   const currentPvSz=c[pvSzField]||c.provider_logo_size||50;
   const hasOwnLogo=!!c[pvField];
@@ -3471,11 +3484,11 @@ function renderModConfig(mod,prefix,thColor){
 
 // ===== AUDIT TAB =====
 function renderAuditTab(mod,prefix,thColor,stTable,actTable){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const acts=M.auditActs;const sts=M.auditSts;
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
   const userMods=CURRENT_USER?parseModules(CURRENT_USER):[];
-  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")));
+  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")))||(mod==="ambiente"&&(CURRENT_USER?.role==="ambiente"||userMods.includes("ambiente")));
   const fnPfx=mod==="tthh"?"tthh":"datos";
   if(acts.length===0){
     return `<div style="text-align:center;padding:60px;color:var(--t3)">No hay procesos de auditoría definidos.${isModOwner?`<br><br><button class="add-btn" onclick="${fnPfx}AddAudit()" style="padding:10px 20px;font-size:14px">+ Agregar primer proceso</button>`:' El administrador debe crearlos.'}</div>`;
@@ -3527,11 +3540,11 @@ function renderAuditTab(mod,prefix,thColor,stTable,actTable){
 
 // ===== PLAN/ACTIVITIES TAB =====
 function renderPlanTab(mod,prefix,thColor,stTable,actTable){
-  const M=mod==="tthh"?TTHH:DATOS;
+  const M=mod==="tthh"?TTHH:mod==="ambiente"?AMBIENTE:DATOS;
   const acts=M.planActs;const sts=M.planSts;
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
   const userMods=CURRENT_USER?parseModules(CURRENT_USER):[];
-  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")));
+  const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")))||(mod==="ambiente"&&(CURRENT_USER?.role==="ambiente"||userMods.includes("ambiente")));
   const fnPfx=mod==="tthh"?"tthh":"datos";
   if(acts.length===0){
     return `<div style="text-align:center;padding:60px;color:var(--t3)">No hay actividades definidas.${isModOwner?`<br><br><button class="add-btn" onclick="${fnPfx}AddPlan()" style="padding:10px 20px;font-size:14px">+ Agregar primera actividad</button>`:' El administrador debe crearlas.'}</div>`;
@@ -3785,6 +3798,45 @@ async function datosSetAuditSt(stId,actId,val){
 async function datosSetAuditObs(stId,actId,val){
   let st=DATOS.auditSts.find(s=>s.id===stId);if(!st){st=await datosGetOrCreateAuditSt(actId);if(!st)return}
   st.observations=val;dbs("da-obs-"+st.id,()=>sb.from("datos_company_status").update({observations:val}).eq("id",st.id));
+}
+
+// ===== AMBIENTE (SEGURIDAD AMBIENTAL) MODULE =====
+const AMBIENTE={acts:[],auditActs:[],auditSts:[],planActs:[],planSts:[]};
+const AMB_CATS_AUDIT=[{id:"ga",name:"Gestión Ambiental",icon:"🌿",color:"#22c55e"},{id:"rl",name:"Residuos y Reciclaje",icon:"♻️",color:"#16a34a"},{id:"ca",name:"Control Ambiental",icon:"🔬",color:"#15803d"},{id:"em",name:"Emisiones y Efluentes",icon:"💨",color:"#166534"},{id:"cap",name:"Capacitación Ambiental",icon:"📚",color:"#4ade80"},{id:"doc",name:"Documentación",icon:"📋",color:"#86efac"}];
+const AMB_CATS_PLAN=[{id:"ob",name:"Obligaciones",icon:"📋",color:"#22c55e"},{id:"pr",name:"Programas",icon:"🔄",color:"#16a34a"},{id:"mon",name:"Monitoreo",icon:"📊",color:"#15803d"}];
+
+function ambienteLoad(){genModLoad("ambiente","amb","#22c55e","ambiente_activities","ambiente_company_status","ambiente_plan_activities","ambiente_plan_status").then(()=>ambienteUpdateHeader())}
+function ambienteRender(){genModRender("ambiente","amb","#22c55e","ambiente_company_status","ambiente_plan_status","ambiente_activities","ambiente_plan_activities")}
+
+function ambienteUpdateHeader(){
+  const c=cos.find(x=>x.id===CID);if(!c)return;
+  const lSz=c.logo_size||40;
+  const el=document.getElementById("ambCoLogo");
+  if(el){if(c.logo_url){el.innerHTML=`<img src="${c.logo_url}">`;el.style.background="transparent";el.style.borderRadius="8px"}else{el.innerHTML=(c.name||"?").charAt(0);el.style.background="linear-gradient(135deg,#22c55e,#4ade80)";el.style.borderRadius="11px"}el.style.width=lSz+'px';el.style.height=lSz+'px';el.style.fontSize=(lSz*0.45)+'px'}
+  document.getElementById("ambBN").textContent=c.name||"Seguridad Ambiental";
+  document.getElementById("ambBS").textContent=`${c.location||""} · ${c.total_workers||0} trab. · RUC: ${c.ruc||""}${c.rep_legal?" · Rep. Legal: "+c.rep_legal:""}`;
+  const pvSz=c.ambiente_provider_logo_size||c.provider_logo_size||50;
+  const pvUrl=c.ambiente_provider_logo_url||c.provider_logo_url||"";
+  const pvBox=document.getElementById("ambPvBox");if(pvBox)pvBox.innerHTML=pvUrl?`<img src="${pvUrl}" style="height:${pvSz}px;max-width:${pvSz*5}px;object-fit:contain" onerror="this.style.display='none'">`:'';
+  const hdr=document.getElementById("ambHd");if(hdr)hdr.style.background=c.header_color||'linear-gradient(135deg,rgba(34,197,94,0.08),rgba(74,222,128,0.06))';
+  const htc=c.header_text_color||'';
+  if(htc){document.querySelectorAll("#ambHd .bn h1").forEach(e=>{e.style.background='none';e.style.webkitTextFillColor=htc;e.style.color=htc});document.querySelectorAll("#ambHd .bn p").forEach(e=>e.style.color=htc+'99')}
+  const sbc=c.select_bg_color,stc=c.select_text_color;
+  document.querySelectorAll("#ambHd select").forEach(e=>{if(sbc){e.style.background=sbc;e.style.borderColor=sbc}if(stc){e.style.color=stc}});
+}
+
+async function ambienteGetOrCreateAuditSt(actId){
+  let st=AMBIENTE.auditSts.find(s=>s.activity_id===actId);if(st)return st;
+  const{data}=await sb.from("ambiente_company_status").insert({activity_id:actId,company_id:CID,year:YR,status:"no_tiene",planned:[0,0,0,0,0,0,0,0,0,0,0,0],done:[0,0,0,0,0,0,0,0,0,0,0,0],observations:""}).select().single();
+  if(data){AMBIENTE.auditSts.push(data);return data}return null;
+}
+async function ambienteSetAuditSt(stId,actId,val){
+  let st=AMBIENTE.auditSts.find(s=>s.id===stId);if(!st){st=await ambienteGetOrCreateAuditSt(actId);if(!st)return}
+  st.status=val;ambienteRender();dbs("amb-st-"+st.id,()=>sb.from("ambiente_company_status").update({status:val}).eq("id",st.id));
+}
+async function ambienteSetAuditObs(stId,actId,val){
+  let st=AMBIENTE.auditSts.find(s=>s.id===stId);if(!st){st=await ambienteGetOrCreateAuditSt(actId);if(!st)return}
+  st.observations=val;dbs("amb-obs-"+st.id,()=>sb.from("ambiente_company_status").update({observations:val}).eq("id",st.id));
 }
 async function datosAddAudit(){
   if(!canManageMod("datos"))return;
@@ -4563,7 +4615,7 @@ async function agLoad(){
     if(LOG._agTrips.length>0){
       const tids=LOG._agTrips.map(t=>t.id);
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone").in("trip_id",tids),
+        sb.from("logistics_trip_companies").select("*").in("trip_id",tids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",tids)
       ]);
       LOG._agTripCos=tcR.data||[];
@@ -4971,7 +5023,7 @@ async function resLoadTrips(){
     const allTids=[...LOG._resTrips,...LOG._resPrevTrips].map(t=>t.id);
     if(allTids.length>0){
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone").in("trip_id",allTids),
+        sb.from("logistics_trip_companies").select("*").in("trip_id",allTids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",allTids)
       ]);
       const allTc=tcR.data||[];
@@ -5350,9 +5402,9 @@ async function logSendWA(tripId){
         phone=prompt('Número de WhatsApp de '+coName+'\n\nEjemplo: 0991234567 o +593991234567');
         if(!phone||!phone.trim())continue;
         phone=phone.trim();
-        // Save to DB
-        await sb.from("logistics_trip_companies").update({custom_phone:phone}).eq("trip_id",t.id).eq("custom_name",tc.custom_name);
         tc.custom_phone=phone;
+        // Try to save - might fail if column doesn't exist yet
+        try{await sb.from("logistics_trip_companies").update({custom_phone:phone}).eq("trip_id",t.id).is("company_id",null).eq("custom_name",tc.custom_name)}catch(e){console.log("custom_phone save failed:",e.message)}
         logRender();
       }
       contactGreet=tc.custom_contact||coName;
@@ -5424,8 +5476,7 @@ async function logEditWA(tripId){
       if(newPhone===null)continue;
       tc.custom_contact=newContact.trim();
       tc.custom_phone=newPhone.trim();
-      const{error}=await sb.from("logistics_trip_companies").update({custom_contact:newContact.trim(),custom_phone:newPhone.trim()}).eq("trip_id",t.id).eq("custom_name",tc.custom_name);
-      if(error)alert('Error: '+error.message);
+      try{await sb.from("logistics_trip_companies").update({custom_contact:newContact.trim(),custom_phone:newPhone.trim()}).eq("trip_id",t.id).is("company_id",null).eq("custom_name",tc.custom_name)}catch(e){console.log("Edit save failed:",e.message)}
     }else{
       const co=cos.find(c=>c.id===tc.company_id);if(!co)continue;
       const newContact=prompt('Nombre del contacto de '+co.name+'\n\nActual: '+(co.whatsapp_contact||'sin nombre'),co.whatsapp_contact||'');
@@ -5847,7 +5898,7 @@ async function syncTripActivityToCharla(actId,opts){
     const nameLower=rawName.toLowerCase();
     
     // Query trip companies DIRECTLY from DB (don't rely on cached LOG.tripCompanies)
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,custom_contact,custom_phone").eq("trip_id",act.trip_id);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("*").eq("trip_id",act.trip_id);
     const companyIds=(tcs||[]).map(tc=>tc.company_id).filter(Boolean);
     if(companyIds.length===0)return;
     
@@ -5910,7 +5961,7 @@ async function logDiagSync(tripId){
   let msg="=== DIAGNÓSTICO DE SINCRONIZACIÓN ===\n\n";
   try{
     // 1. Check trip companies
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,custom_contact,custom_phone,companies(name)").eq("trip_id",tripId);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("*,companies(name)").eq("trip_id",tripId);
     msg+="📌 EMPRESAS DEL VIAJE:\n";
     if(!tcs||tcs.length===0){
       msg+="  ❌ NO HAY EMPRESAS ASIGNADAS AL VIAJE!\n  Este es el problema.\n";
