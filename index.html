@@ -1758,7 +1758,8 @@ function renderPerfilSST(c){
   const horas=getHorasSST(tw,risk);
   const clasificacion=tw>=200?'Grande':tw>=100?'Mediana B':tw>=50?'Mediana A':tw>=10?'Pequeña':'Micro';
   const seccion=ciiu?CIIU_SECTIONS[ciiu[0]]||'':'';
-  const canEdit=!CURRENT_USER||CURRENT_USER.role==='admin'||CURRENT_USER.role==='seguridad'||CURRENT_USER.role==='salud';
+  const role=CURRENT_USER?.role||'';
+  const canEdit=!CURRENT_USER||role==='admin'||role==='seguridad'||role==='salud'||IS_JEFE()||MOD==='seguridad'||MOD==='salud'||(CURRENT_USER.modules&&(CURRENT_USER.modules.includes('seguridad')||CURRENT_USER.modules.includes('salud')));
   let h=`<div class="ciiu-perfil-card" style="border:1px solid ${rc}50;border-radius:10px;background:${rc}08;padding:12px;margin-bottom:12px">`;
   h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:12px;font-weight:800;color:${rc}">⚡ PERFIL SST — AM 196</div><span class="ciiu-risk-badge" style="font-size:10px;font-weight:700;color:${rc};background:${rc}18;padding:3px 10px;border-radius:5px">${getRiskLabel(risk)}</span></div>`;
   h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 16px;font-size:11px;align-items:center">`;
@@ -4841,6 +4842,205 @@ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   }catch(e){alert("Error generando informe: "+e.message);ss("er");console.error(e)}
 }
 
+async function genAgInformePptx(){
+  const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const mesLabel=mNames[LOG.month]+" "+LOG.year;
+  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(allCos.length===0){alert("No hay empresas");return}
+
+  // Stats
+  const stats={};
+  AG_DEPTS.forEach(d=>{
+    let tot=0,ag=0,vis=0,inf=0;
+    allCos.forEach(co=>{
+      if(agGetVal(co.id,d.id,'ag')==='N/A')return;
+      tot++;
+      if(agGetVal(co.id,d.id,'ag')==='SÍ')ag++;
+      if(agGetVal(co.id,d.id,'vis')==='SÍ')vis++;
+      if(agGetVal(co.id,d.id,'inf')==='SÍ')inf++;
+    });
+    stats[d.id]={tot,ag,vis,inf,agP:tot?Math.round(ag/tot*100):0,visP:tot?Math.round(vis/tot*100):0,infP:tot?Math.round(inf/tot*100):0};
+  });
+  let gT=0,gA=0,gV=0,gI=0;
+  AG_DEPTS.forEach(d=>{const s=stats[d.id];gT+=s.tot;gA+=s.ag;gV+=s.vis;gI+=s.inf});
+
+  ss("ld");
+  try{
+  // Load PptxGenJS
+  if(typeof PptxGenJS==='undefined'){
+    await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+  }
+
+  const pres=new PptxGenJS();
+  pres.layout='LAYOUT_16x9';
+  pres.author='Consultores Empresariales ALTAIR';
+  pres.title='Informe Ejecutivo de Cumplimiento - '+mesLabel;
+
+  const DK='0F172A',WH='FFFFFF',GY='64748B',LG='F1F5F9',TEAL='2DD4BF',PURP='7C3AED',GRN='22C55E',RED='EF4444',YEL='F59E0B';
+  const shd=()=>({type:'outer',blur:4,offset:2,color:'000000',opacity:0.25});
+
+  // ===== SLIDE 1: PORTADA =====
+  const s1=pres.addSlide();
+  s1.background={fill:DK};
+  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.08,fill:{color:TEAL}});
+  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:5.545,w:'100%',h:0.08,fill:{color:TEAL}});
+  s1.addText('INFORME EJECUTIVO',{x:0.5,y:1.0,w:9,h:0.8,fontSize:40,fontFace:'Georgia',color:WH,bold:true});
+  s1.addText('DE CUMPLIMIENTO',{x:0.5,y:1.7,w:9,h:0.7,fontSize:36,fontFace:'Georgia',color:TEAL,bold:true});
+  s1.addShape(pres.shapes.RECTANGLE,{x:0.5,y:2.6,w:3,h:0.04,fill:{color:TEAL}});
+  s1.addText('Agendamiento y Gestión Mensual',{x:0.5,y:2.8,w:9,h:0.5,fontSize:18,fontFace:'Calibri',color:GY});
+  s1.addText(mesLabel.toUpperCase(),{x:0.5,y:3.4,w:9,h:0.6,fontSize:24,fontFace:'Calibri',color:TEAL,bold:true});
+  s1.addText('CONSULTORES EMPRESARIALES ALTAIR',{x:0.5,y:4.6,w:9,h:0.4,fontSize:12,fontFace:'Calibri',color:GY,charSpacing:4});
+
+  // ===== SLIDE 2: KPIs GLOBALES =====
+  const s2=pres.addSlide();
+  s2.background={fill:DK};
+  s2.addText('INDICADORES GLOBALES',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
+  s2.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+
+  const kpis=[
+    {label:'AGENDAMIENTO',val:gT?Math.round(gA/gT*100):0,det:gA+' de '+gT,color:TEAL},
+    {label:'VISITAS',val:gT?Math.round(gV/gT*100):0,det:gV+' de '+gT,color:GRN},
+    {label:'INFORMES',val:gT?Math.round(gI/gT*100):0,det:gI+' de '+gT,color:PURP}
+  ];
+  kpis.forEach((k,i)=>{
+    const x=0.5+i*3.2;
+    s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x,y:1.3,w:2.9,h:2.2,fill:{color:k.color},shadow:shd(),rectRadius:0.15});
+    s2.addText(k.label,{x,y:1.4,w:2.9,h:0.5,fontSize:13,fontFace:'Calibri',color:WH,bold:true,align:'center'});
+    s2.addText(k.val+'%',{x,y:1.8,w:2.9,h:1.0,fontSize:54,fontFace:'Georgia',color:WH,bold:true,align:'center',valign:'middle'});
+    s2.addText(k.det,{x,y:2.9,w:2.9,h:0.4,fontSize:12,fontFace:'Calibri',color:WH,align:'center'});
+  });
+
+  // Semáforo
+  const globalPct=gT?Math.round(gA/gT*100):0;
+  const semColor=globalPct>=80?GRN:globalPct>=50?YEL:RED;
+  const semLabel=globalPct>=80?'BUENO':globalPct>=50?'EN PROGRESO':'CRÍTICO';
+  s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:3.5,y:3.8,w:3,h:1.2,fill:{color:semColor},shadow:shd(),rectRadius:0.1});
+  s2.addText(semLabel,{x:3.5,y:3.85,w:3,h:0.5,fontSize:16,fontFace:'Calibri',color:WH,bold:true,align:'center'});
+  s2.addText('Cumplimiento Global: '+globalPct+'%',{x:3.5,y:4.3,w:3,h:0.5,fontSize:12,fontFace:'Calibri',color:WH,align:'center'});
+
+  // ===== SLIDE 3: CUMPLIMIENTO POR ÁREA =====
+  const s3=pres.addSlide();
+  s3.background={fill:WH};
+  s3.addText('CUMPLIMIENTO POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:DK,bold:true});
+  s3.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+
+  // Table
+  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:10}},{text:'TOTAL',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}}];
+  const rows=[hdr];
+  AG_DEPTS.forEach((d,i)=>{
+    const s=stats[d.id];const bg=i%2?LG:WH;
+    const pc=v=>({text:v+'%',options:{fontSize:11,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
+    rows.push([
+      {text:d.icon+' '+d.label,options:{fontSize:10,bold:true,fill:bg}},
+      {text:String(s.tot),options:{fontSize:10,align:'center',fill:bg}},
+      {text:String(s.ag),options:{fontSize:10,align:'center',fill:bg}},
+      pc(s.agP),
+      {text:String(s.vis),options:{fontSize:10,align:'center',fill:bg}},
+      pc(s.visP),
+      {text:String(s.inf),options:{fontSize:10,align:'center',fill:bg}},
+      pc(s.infP)
+    ]);
+  });
+  // Total row
+  rows.push([
+    {text:'TOTAL',options:{fontSize:11,bold:true,fill:TEAL,color:WH}},
+    {text:String(gT),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:String(gA),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:(gT?Math.round(gA/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:String(gV),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:(gT?Math.round(gV/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:String(gI),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:(gT?Math.round(gI/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
+  ]);
+  s3.addTable(rows,{x:0.5,y:1.2,w:9,colW:[2.2,0.9,0.9,0.8,0.9,0.8,0.9,0.8],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.4});
+
+  // ===== SLIDE 4: ANÁLISIS POR ÁREA (barras) =====
+  const s4=pres.addSlide();
+  s4.background={fill:DK};
+  s4.addText('ANÁLISIS POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
+  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+
+  AG_DEPTS.forEach((d,i)=>{
+    const s=stats[d.id];
+    const y=1.2+i*0.7;
+    const barW=5.5;
+    // Label
+    s4.addText(d.icon+' '+d.label,{x:0.5,y,w:1.8,h:0.5,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
+    // Bar background
+    s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW,h:0.3,fill:{color:'1E293B'}});
+    // Agendamiento bar
+    if(s.agP>0)s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW*s.agP/100,h:0.3,fill:{color:TEAL}});
+    // % label
+    s4.addText(s.agP+'%',{x:8.2,y,w:1.2,h:0.5,fontSize:14,fontFace:'Georgia',color:s.agP>=80?GRN:s.agP>=50?YEL:RED,bold:true,align:'center',valign:'middle'});
+  });
+
+  // ===== SLIDE 5: DETALLE POR EMPRESA =====
+  const s5=pres.addSlide();
+  s5.background={fill:WH};
+  s5.addText('DETALLE POR EMPRESA',{x:0.5,y:0.15,w:9,h:0.45,fontSize:22,fontFace:'Georgia',color:DK,bold:true});
+
+  const dHdr=[{text:'N°',options:{fill:DK,color:WH,bold:true,fontSize:7,align:'center'}},{text:'EMPRESA',options:{fill:DK,color:WH,bold:true,fontSize:7}}];
+  AG_DEPTS.forEach(d=>{dHdr.push({text:d.label,options:{fill:DK,color:WH,bold:true,fontSize:7,align:'center'}})});
+  const dRows=[dHdr];
+
+  allCos.forEach((co,i)=>{
+    const bg=i%2?LG:WH;
+    const row=[{text:String(i+1),options:{fontSize:7,align:'center',fill:bg}},{text:(co.name||'').substring(0,28),options:{fontSize:7,fill:bg}}];
+    AG_DEPTS.forEach(d=>{
+      const ag=agGetVal(co.id,d.id,'ag');
+      const vis=agGetVal(co.id,d.id,'vis');
+      const inf=agGetVal(co.id,d.id,'inf');
+      let txt='—',clr=GY;
+      if(ag==='N/A'){txt='N/A';clr=GY}
+      else if(inf==='SÍ'){txt='✅';clr=GRN}
+      else if(vis==='SÍ'){txt='🏢';clr='3B82F6'}
+      else if(ag==='SÍ'){txt='📋';clr=YEL}
+      else{txt='❌';clr=RED}
+      row.push({text:txt,options:{fontSize:8,align:'center',fill:bg,color:clr,bold:true}});
+    });
+    dRows.push(row);
+  });
+
+  const colWidths=[0.4,2.8];AG_DEPTS.forEach(()=>colWidths.push(1.1));
+  s5.addTable(dRows,{x:0.3,y:0.65,w:9.4,colW:colWidths,border:{type:'solid',pt:0.3,color:'CBD5E1'},rowH:0.18,fontSize:7});
+
+  // ===== SLIDE 6: EMPRESAS PRIORITARIAS =====
+  const s6=pres.addSlide();
+  s6.background={fill:DK};
+  s6.addText('EMPRESAS PRIORITARIAS',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
+  s6.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:RED}});
+  s6.addText('Empresas con 2 o más áreas sin agendar',{x:0.5,y:0.95,w:9,h:0.4,fontSize:12,fontFace:'Calibri',color:GY});
+
+  const prios=allCos.filter(co=>{let p=0;AG_DEPTS.forEach(d=>{if(agGetVal(co.id,d.id,'ag')==='NO')p++});return p>=2});
+  if(prios.length>0){
+    prios.forEach((co,i)=>{
+      if(i>=8)return;
+      const areas=AG_DEPTS.filter(d=>agGetVal(co.id,d.id,'ag')==='NO').map(d=>d.icon+' '+d.label).join('  ');
+      const y=1.5+i*0.5;
+      s6.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:0.5,y,w:9,h:0.4,fill:{color:'1E293B'},rectRadius:0.05});
+      s6.addText('⚠️ '+co.name,{x:0.7,y,w:4,h:0.4,fontSize:11,fontFace:'Calibri',color:RED,bold:true,valign:'middle'});
+      s6.addText(areas,{x:5,y,w:4.3,h:0.4,fontSize:10,fontFace:'Calibri',color:GY,valign:'middle',align:'right'});
+    });
+  }else{
+    s6.addText('✅ No hay empresas con más de 2 áreas pendientes',{x:1,y:2,w:8,h:1,fontSize:18,fontFace:'Calibri',color:GRN,align:'center'});
+  }
+
+  // ===== SLIDE 7: CIERRE =====
+  const s7=pres.addSlide();
+  s7.background={fill:DK};
+  s7.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.08,fill:{color:TEAL}});
+  s7.addShape(pres.shapes.RECTANGLE,{x:0,y:5.545,w:'100%',h:0.08,fill:{color:TEAL}});
+  s7.addText('CONSULTORES EMPRESARIALES',{x:0.5,y:1.5,w:9,h:0.8,fontSize:32,fontFace:'Georgia',color:WH,bold:true,align:'center'});
+  s7.addText('ALTAIR',{x:0.5,y:2.2,w:9,h:0.8,fontSize:40,fontFace:'Georgia',color:TEAL,bold:true,align:'center'});
+  s7.addShape(pres.shapes.RECTANGLE,{x:4,y:3.1,w:2,h:0.04,fill:{color:TEAL}});
+  s7.addText(mesLabel,{x:0.5,y:3.3,w:9,h:0.5,fontSize:16,fontFace:'Calibri',color:GY,align:'center'});
+  s7.addText('Sistema Integral SST — Informe generado automáticamente',{x:0.5,y:4.5,w:9,h:0.4,fontSize:10,fontFace:'Calibri',color:GY,align:'center'});
+
+  await pres.writeFile({fileName:'Presentacion_Cumplimiento_'+mNames[LOG.month]+'_'+LOG.year+'.pptx'});
+  ss("ok");
+  }catch(e){alert("Error: "+e.message);ss("er");console.error(e)}
+}
+
 async function agLoad(){
   if(!sb)return;
   try{
@@ -5058,7 +5258,8 @@ function logRenderAgendamiento(){
 
   // INFORME BUTTON
   h+=`<div style="margin-top:16px;display:flex;gap:10px;justify-content:center">`;
-  h+=`<button onclick="genAgInformeDocx()" style="background:linear-gradient(135deg,#2dd4bf,#818cf8);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(45,212,191,0.3)">📊 Generar Informe Ejecutivo de Cumplimiento (.docx)</button>`;
+  h+=`<button onclick="genAgInformeDocx()" style="background:linear-gradient(135deg,#2dd4bf,#818cf8);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(45,212,191,0.3)">📊 Informe Word (.docx)</button>`;
+  h+=`<button onclick="genAgInformePptx()" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(245,158,11,0.3)">📽️ Presentación (.pptx)</button>`;
   h+=`</div>`;
   
   // SQL helper
