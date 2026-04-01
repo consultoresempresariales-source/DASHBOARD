@@ -412,8 +412,8 @@ async function showPostLoginNotifications(){
     const{data:trips}=await sb.from("logistics_trips").select("*").in("id",tids).gte("trip_date",today).order("trip_date");
     if(!trips||trips.length===0)return;
     // Get companies for these trips
-    const{data:tCos}=await sb.from("logistics_trip_companies").select("trip_id,companies(name)").in("trip_id",tids);
-    const coMap={};(tCos||[]).forEach(tc=>{if(!coMap[tc.trip_id])coMap[tc.trip_id]=[];coMap[tc.trip_id].push(tc.companies?.name||'')});
+    const{data:tCos}=await sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,companies(name)").in("trip_id",tids);
+    const coMap={};(tCos||[]).forEach(tc=>{if(!coMap[tc.trip_id])coMap[tc.trip_id]=[];coMap[tc.trip_id].push(tc.custom_name||tc.companies?.name||'')});
     // Get unread notifications
     const{data:notifs}=await sb.from("logistics_notifications").select("*").eq("user_id",uid).eq("read",false).order("created_at",{ascending:false}).limit(10);
     // Build popup
@@ -3970,7 +3970,7 @@ async function logLoad(){
       const loads=[
         sb.from("logistics_trip_members").select("*,app_users(name,role)").in("trip_id",tids),
         sb.from("logistics_trip_activities").select("*").in("trip_id",tids),
-        sb.from("logistics_trip_companies").select("*,companies(name,location)").in("trip_id",tids)
+        sb.from("logistics_trip_companies").select("*,companies(name,location),custom_name").in("trip_id",tids)
       ];
       // Admin loads ALL notifications for these trips to see who read
       if(isAdmin)loads.push(sb.from("logistics_notifications").select("*,app_users(name)").in("trip_id",tids));
@@ -4048,7 +4048,7 @@ function logRender(){
       h+=`</div>`;
       h+=`<div style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:6px">📍 ${next.destination_city}</div>`;
       const nextCos=LOG.tripCompanies?.filter(tc=>tc.trip_id===next.id)||[];
-      if(nextCos.length>0)h+=`<div style="font-size:12px;color:${LOG_COLOR};font-weight:700;margin-bottom:4px">🏢 ${nextCos.map(c=>c.companies?.name||'').join(' · ')}</div>`;
+      if(nextCos.length>0)h+=`<div style="font-size:12px;color:${LOG_COLOR};font-weight:700;margin-bottom:4px">🏢 ${nextCos.map(c=>c.custom_name||c.companies?.name||'').join(' · ')}</div>`;
       h+=`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">📅 ${dd.toLocaleDateString('es-EC',{weekday:'long',day:'numeric',month:'long'})} · ⏰ Salida: ${next.departure_time||'07:00'}</div>`;
       h+=`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">🚗 ${next.transport_type==='car'?'Vehículo':next.transport_type==='bus'?'Bus':'Mixto'} · ${next.days||1} día${(next.days||1)>1?'s':''}</div>`;
       h+=`<div style="font-size:11px;font-weight:700;color:var(--t2);margin-bottom:4px">👥 Equipo:</div>`;
@@ -4215,7 +4215,11 @@ function logRenderWeek(isAdmin,visibleTrips){
       if(t.socializacion)h+=`<div style="background:linear-gradient(135deg,rgba(244,114,182,0.25),rgba(251,191,36,0.25));border:2px solid rgba(244,114,182,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#f472b6;letter-spacing:1px">📋 SOCIALIZACIÓN DE INFORME MENSUAL</div></div>`;
       h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
       if(tcs.length>0){
-        h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">🏢 ${tcs.map(c=>c.companies?.name||'').join(' · ')}</div>`;
+        const coNames=tcs.map(c=>{
+          if(c.custom_name)return'<span style="color:#fb923c">⭐ '+c.custom_name+'</span>';
+          return c.companies?.name||'';
+        }).filter(Boolean);
+        h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">🏢 ${coNames.join(' · ')}</div>`;
       }
       h+=`<div style="font-size:${tcs.length>0?'11':'14'}px;font-weight:${tcs.length>0?'600':'800'};color:${tcs.length>0?'var(--t2)':'var(--t1)'}">📍 ${t.destination_city}</div>`;
       h+=`<span style="background:${st.color}20;color:${st.color};font-size:9px;font-weight:700;padding:3px 8px;border-radius:12px">${st.icon} ${st.label}</span>`;
@@ -4328,8 +4332,8 @@ function logRenderCalendar(isAdmin,visibleTrips){
       h+=`<div style="font-size:10px;color:var(--t3)">⏰ ${t.departure_time||'07:00'} · 🚗 ${t.transport_type==='car'?'Vehículo':t.transport_type==='bus'?'Bus':'Mixto'} · ${t.days||1}d</div>`;
       h+=`<div style="font-size:10px;color:var(--t3);margin-top:2px">👥 ${members.map(m=>m.app_users?.name||m.department).join(', ')||'Sin asignar'}</div>`;
       if(tcs.length>0){
-        h+=`<div style="font-size:9px;color:var(--t3);margin-top:2px">🏢 ${tcs.map(c=>c.companies?.name||'').join(', ')}</div>`;
-        const tcC=tcs.map(tc=>{const co=cos.find(c=>c.id===tc.company_id);return co&&co.whatsapp?'📱 '+(co.whatsapp_contact||'')+' '+co.whatsapp:''}).filter(Boolean);
+        h+=`<div style="font-size:9px;color:var(--t3);margin-top:2px">🏢 ${tcs.map(c=>c.custom_name?'⭐ '+c.custom_name:c.companies?.name||'').join(', ')}</div>`;
+        const tcC=tcs.filter(tc=>tc.company_id).map(tc=>{const co=cos.find(c=>c.id===tc.company_id);return co&&co.whatsapp?'📱 '+(co.whatsapp_contact||'')+' '+co.whatsapp:''}).filter(Boolean);
         if(tcC.length>0)h+=`<div style="font-size:9px;color:#2dd4bf;margin-top:1px">${tcC.join(' · ')}</div>`;
       }
       h+=`</div>`;
@@ -4544,7 +4548,7 @@ async function agLoad(){
     if(LOG._agTrips.length>0){
       const tids=LOG._agTrips.map(t=>t.id);
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id").in("trip_id",tids),
+        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name").in("trip_id",tids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",tids)
       ]);
       LOG._agTripCos=tcR.data||[];
@@ -4952,7 +4956,7 @@ async function resLoadTrips(){
     const allTids=[...LOG._resTrips,...LOG._resPrevTrips].map(t=>t.id);
     if(allTids.length>0){
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id").in("trip_id",allTids),
+        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name").in("trip_id",allTids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",allTids)
       ]);
       const allTc=tcR.data||[];
@@ -5421,6 +5425,10 @@ function logViewTrip(tripId){
   }else if(isAdmin){
     const members=LOG.members.filter(m=>m.trip_id===tripId);
     LOG.editTrip={...t,num_people:members.length||1};
+    // Load custom companies from tripCompanies
+    const tcAll=LOG.tripCompanies?.filter(tc=>tc.trip_id===tripId)||[];
+    LOG.editTrip._selectedCompanies=tcAll.filter(tc=>tc.company_id).map(tc=>tc.company_id);
+    LOG.editTrip._customCompanies=tcAll.filter(tc=>tc.custom_name&&!tc.company_id).map(tc=>tc.custom_name);
     LOG.tab='form';logRender();
   }else{
     LOG.viewTripId=tripId;
@@ -5801,7 +5809,7 @@ async function syncTripActivityToCharla(actId,opts){
     const nameLower=rawName.toLowerCase();
     
     // Query trip companies DIRECTLY from DB (don't rely on cached LOG.tripCompanies)
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id").eq("trip_id",act.trip_id);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name").eq("trip_id",act.trip_id);
     const companyIds=(tcs||[]).map(tc=>tc.company_id).filter(Boolean);
     if(companyIds.length===0)return;
     
@@ -5864,7 +5872,7 @@ async function logDiagSync(tripId){
   let msg="=== DIAGNÓSTICO DE SINCRONIZACIÓN ===\n\n";
   try{
     // 1. Check trip companies
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,companies(name)").eq("trip_id",tripId);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,companies(name)").eq("trip_id",tripId);
     msg+="📌 EMPRESAS DEL VIAJE:\n";
     if(!tcs||tcs.length===0){
       msg+="  ❌ NO HAY EMPRESAS ASIGNADAS AL VIAJE!\n  Este es el problema.\n";
@@ -6054,6 +6062,16 @@ function logRenderForm(){
     const cities=[...new Set(selCos.map(c=>c.location).filter(Boolean))];
     if(cities.length>0)h+=`<div style="font-size:10px;color:#34d399;margin-top:4px">📍 Destino: ${cities.join(', ')}</div>`;
   }
+  // CUSTOM/PUNTUAL COMPANIES
+  if(!e._customCompanies)e._customCompanies=[];
+  if(e._customCompanies.length>0){
+    h+=`<div style="margin-top:8px">`;
+    e._customCompanies.forEach((cc,i)=>{
+      h+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:12px;color:#fb923c;font-weight:700">⭐ ${cc}</span><button onclick="LOG.editTrip._customCompanies.splice(${i},1);logRender()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px">✕</button></div>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`<button onclick="logAddCustomCo()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px dashed #fb923c;background:rgba(251,146,60,0.06);color:#fb923c;font-size:11px;font-weight:700;cursor:pointer">⭐ + Empresa Puntual</button>`;
   h+=`</div>`;
 
   // JORNADA TYPE CHECKBOXES
@@ -6263,6 +6281,14 @@ function logFormRecalcTransport(){
   if(dest){e.transport_cost=e.transport_type==='bus'?(dest.cost_bus_per_person*(e.num_people||1)*2):dest.cost_car}
 }
 
+function logAddCustomCo(){
+  const name=prompt("Nombre de la empresa puntual:");
+  if(!name||!name.trim())return;
+  if(!LOG.editTrip._customCompanies)LOG.editTrip._customCompanies=[];
+  LOG.editTrip._customCompanies.push(name.trim());
+  logRender();
+}
+
 async function logSaveTrip(){
   const e=LOG.editTrip;if(!e)return;
   if(!e.destination_city){alert("⚠️ Selecciona una ciudad destino");return}
@@ -6281,9 +6307,14 @@ async function logSaveTrip(){
       // Save companies
       if(e._selectedCompanies){
         await sb.from("logistics_trip_companies").delete().eq("trip_id",e.id);
+        const rows=[];
         if(e._selectedCompanies.length>0){
-          await sb.from("logistics_trip_companies").insert(e._selectedCompanies.map(cid=>({trip_id:e.id,company_id:cid})));
+          e._selectedCompanies.forEach(cid=>rows.push({trip_id:e.id,company_id:cid}));
         }
+        if(e._customCompanies&&e._customCompanies.length>0){
+          e._customCompanies.forEach(cn=>rows.push({trip_id:e.id,company_id:null,custom_name:cn}));
+        }
+        if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
       // Auto-notify members of update
       const members=LOG.members.filter(m=>m.trip_id===e.id);
@@ -6297,8 +6328,15 @@ async function logSaveTrip(){
       const{data,error}=await sb.from("logistics_trips").insert(payload).select().single();
       if(error)throw error;
       // Save companies for new trip
-      if(e._selectedCompanies&&e._selectedCompanies.length>0&&data){
-        await sb.from("logistics_trip_companies").insert(e._selectedCompanies.map(cid=>({trip_id:data.id,company_id:cid})));
+      if(data){
+        const rows=[];
+        if(e._selectedCompanies&&e._selectedCompanies.length>0){
+          e._selectedCompanies.forEach(cid=>rows.push({trip_id:data.id,company_id:cid}));
+        }
+        if(e._customCompanies&&e._customCompanies.length>0){
+          e._customCompanies.forEach(cn=>rows.push({trip_id:data.id,company_id:null,custom_name:cn}));
+        }
+        if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
     }
     LOG.tab='calendar';
