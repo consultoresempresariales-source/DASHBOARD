@@ -2215,7 +2215,7 @@ function updateSidebar(){
   // Only for admin: show/hide based on which companies have which modules enabled
   const mods=[{k:"mod_salud",sb:"sb-salud",m:"salud"},{k:"mod_seguridad",sb:"sb-seguridad",m:"seguridad"},{k:"mod_tthh",sb:"sb-talento",m:"talento"},{k:"mod_datos",sb:"sb-datos",m:"datos"},{k:"mod_ambiente",sb:"sb-ambiente",m:"ambiente"}];
   mods.forEach(md=>{
-    const has=cos.some(c=>c[md.k]===true||(c[md.k]==null&&md.k==="mod_salud"));
+    const has=isAdm||cos.some(c=>c[md.k]===true||(c[md.k]==null&&md.k==="mod_salud"));
     const el=document.getElementById(md.sb);
     if(!el)return;
     el.style.display=has?"block":"none";
