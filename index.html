@@ -4631,8 +4631,12 @@ async function genAgInformeDocx(){
       visPct:totalCos>0?Math.round(visSi/totalCos*100):0,
       infPct:totalCos>0?Math.round(infSi/totalCos*100):0};
   });
-  let gT=0,gA=0,gV=0,gI=0;
-  AG_DEPTS.forEach(d=>{const s=stats[d.id];gT+=s.total;gA+=s.ag;gV+=s.vis;gI+=s.inf});
+  const numEmpresas=allCos.length;
+  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].total>0);
+  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agPct,0)/depsWithData.length):0;
+  const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visPct,0)/depsWithData.length):0;
+  const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infPct,0)/depsWithData.length):0;
+  let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
 
   ss("ld");
   try{
@@ -4672,21 +4676,21 @@ async function genAgInformeDocx(){
   // KPI Table
   const kpiH=TR(
     TC('INDICADOR',{bg:'0F172A',c:'FFFFFF',b:true,w:3000})+
-    TC('CUMPLIDAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
-    TC('TOTAL',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
-    TC('PORCENTAJE',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})
+    TC('PROMEDIO',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
+    TC('EMPRESAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
+    TC('NOTA',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})
   );
-  const kpiR=(label,done,total,color)=>TR(
+  const kpiR=(label,pct,empresas,color)=>TR(
     TC(label,{b:true,al:'left',w:3000})+
-    TC(String(done),{w:1500})+
-    TC(String(total),{w:1500})+
-    TC((total>0?Math.round(done/total*100):0)+'%',{b:true,c:color,w:1500,sz:22})
+    TC(String(pct),{b:true,c:color,w:1500,sz:22})+
+    TC(String(empresas),{w:1500})+
+    TC('Promedio por área',{w:1500,sz:16,c:'94A3B8'})
   );
   body+=`<w:tbl><w:tblPr><w:tblW w:w="7500" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="4" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
   body+=kpiH;
-  body+=kpiR('📋 AGENDAMIENTO',gA,gT,'2DD4BF');
-  body+=kpiR('🏢 VISITAS REALIZADAS',gV,gT,'0F5132');
-  body+=kpiR('📄 INFORMES ENTREGADOS',gI,gT,'7C3AED');
+  body+=kpiR('📋 AGENDAMIENTO',gA+'%',numEmpresas+' empresas','2DD4BF');
+  body+=kpiR('🏢 VISITAS REALIZADAS',gV+'%',numEmpresas+' empresas','0F5132');
+  body+=kpiR('📄 INFORMES ENTREGADOS',gI+'%',numEmpresas+' empresas','7C3AED');
   body+=`</w:tbl>`;
   body+=P('',{spc:300});
 
@@ -4720,14 +4724,14 @@ async function genAgInformeDocx(){
   });
   // Total row
   body+=TR(
-    TC('TOTAL',{b:true,bg:'2DD4BF',c:'FFFFFF',w:2000})+
-    TC(String(gT),{b:true,bg:'2DD4BF',c:'FFFFFF',w:1100})+
-    TC(String(gA),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC((gT>0?Math.round(gA/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
-    TC(String(gV),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC((gT>0?Math.round(gV/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
-    TC(String(gI),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC((gT>0?Math.round(gI/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})
+    TC('TOTAL ('+numEmpresas+' empresas)',{b:true,bg:'2DD4BF',c:'FFFFFF',w:2000})+
+    TC(String(numEmpresas),{b:true,bg:'2DD4BF',c:'FFFFFF',w:1100})+
+    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC(gA+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
+    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC(gV+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
+    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC(gI+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})
   );
   body+=`</w:tbl>`;
   body+=P('',{spc:300});
@@ -4861,8 +4865,12 @@ async function genAgInformePptx(){
     });
     stats[d.id]={tot,ag,vis,inf,agP:tot?Math.round(ag/tot*100):0,visP:tot?Math.round(vis/tot*100):0,infP:tot?Math.round(inf/tot*100):0};
   });
-  let gT=0,gA=0,gV=0,gI=0;
-  AG_DEPTS.forEach(d=>{const s=stats[d.id];gT+=s.tot;gA+=s.ag;gV+=s.vis;gI+=s.inf});
+  const numEmpresas=allCos.length;
+  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].tot>0);
+  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agP,0)/depsWithData.length):0;
+  const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visP,0)/depsWithData.length):0;
+  const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infP,0)/depsWithData.length):0;
+  let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
 
   ss("ld");
   try{
@@ -4898,9 +4906,9 @@ async function genAgInformePptx(){
   s2.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
 
   const kpis=[
-    {label:'AGENDAMIENTO',val:gT?Math.round(gA/gT*100):0,det:gA+' de '+gT,color:TEAL},
-    {label:'VISITAS',val:gT?Math.round(gV/gT*100):0,det:gV+' de '+gT,color:GRN},
-    {label:'INFORMES',val:gT?Math.round(gI/gT*100):0,det:gI+' de '+gT,color:PURP}
+    {label:'AGENDAMIENTO',val:gA,det:numEmpresas+' empresas',color:TEAL},
+    {label:'VISITAS',val:gV,det:numEmpresas+' empresas',color:GRN},
+    {label:'INFORMES',val:gI,det:numEmpresas+' empresas',color:PURP}
   ];
   kpis.forEach((k,i)=>{
     const x=0.5+i*3.2;
@@ -4911,7 +4919,7 @@ async function genAgInformePptx(){
   });
 
   // Semáforo
-  const globalPct=gT?Math.round(gA/gT*100):0;
+  const globalPct=gA;
   const semColor=globalPct>=80?GRN:globalPct>=50?YEL:RED;
   const semLabel=globalPct>=80?'BUENO':globalPct>=50?'EN PROGRESO':'CRÍTICO';
   s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:3.5,y:3.8,w:3,h:1.2,fill:{color:semColor},shadow:shd(),rectRadius:0.1});
@@ -4944,13 +4952,13 @@ async function genAgInformePptx(){
   // Total row
   rows.push([
     {text:'TOTAL',options:{fontSize:11,bold:true,fill:TEAL,color:WH}},
-    {text:String(gT),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:String(gA),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:(gT?Math.round(gA/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:String(gV),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:(gT?Math.round(gV/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:String(gI),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:(gT?Math.round(gI/gT*100):0)+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
+    {text:String(numEmpresas),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gA+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gV+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gI+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
   ]);
   s3.addTable(rows,{x:0.5,y:1.2,w:9,colW:[2.2,0.9,0.9,0.8,0.9,0.8,0.9,0.8],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.4});
 
@@ -5053,6 +5061,17 @@ async function agLoad(){
     }else{
       LOG.agData=data||[];
     }
+    // Also load frequency records (dept='_freq') from any month this year
+    try{
+      const{data:freqData}=await sb.from("agendamiento").select("*").eq("year",LOG.year).eq("dept","_freq");
+      if(freqData){
+        freqData.forEach(fd=>{
+          if(!LOG.agData.find(x=>x.company_id===fd.company_id&&x.dept==='_freq')){
+            LOG.agData.push(fd);
+          }
+        });
+      }
+    }catch(e){}
     // Also load trips for this month to auto-detect agendamiento
     const yr=LOG.year;const mo=LOG.month;
     const startD=`${yr}-${String(mo+1).padStart(2,'0')}-01`;
@@ -5074,7 +5093,45 @@ async function agLoad(){
   }catch(e){console.error("agLoad:",e);LOG.agData=[];LOG._agTrips=[];LOG._agTripCos=[];LOG._agTripMembers=[]}
 }
 
+const AG_FREQS={1:'Mensual',2:'Bimensual',3:'Trimestral',4:'Cuatrimestral',6:'Semestral',12:'Anual'};
+const AG_FREQ_COLORS={1:'#2dd4bf',2:'#60a5fa',3:'#fbbf24',4:'#fb923c',6:'#a78bfa',12:'#94a3b8'};
+
+// Check if company is active this month based on frequency
+// startMonth=0 means Jan is first active month
+function agIsActiveMonth(freq,month,startMonth){
+  if(!freq||freq<=1)return true; // mensual = always active
+  // Active months: startMonth, startMonth+freq, startMonth+2*freq, ...
+  const diff=(month-startMonth+12)%12;
+  return diff%freq===0;
+}
+
+function agGetFreq(companyId){
+  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept==='_freq');
+  return r&&r.ag?parseInt(r.ag)||1:1;
+}
+function agGetFreqStart(companyId){
+  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept==='_freq');
+  return r&&r.vis?parseInt(r.vis)||0:0;
+}
+async function agSetFreq(companyId,freq){
+  let r=LOG.agData.find(x=>x.company_id===companyId&&x.dept==='_freq');
+  if(r){r.ag=String(freq)}
+  else{r={company_id:companyId,dept:'_freq',year:LOG.year,month:LOG.month,ag:String(freq),vis:'0'};LOG.agData.push(r)}
+  dbs("ag-freq-"+companyId,()=>sb.from("agendamiento").upsert({company_id:companyId,dept:'_freq',year:LOG.year,month:LOG.month,ag:String(freq),vis:r.vis||'0'},{onConflict:"company_id,dept,year,month"}));
+  const agTable=document.getElementById('agTableWrap');
+  const st=agTable?agTable.scrollTop:0;const sl=agTable?agTable.scrollLeft:0;
+  logRender();
+  requestAnimationFrame(()=>{const t=document.getElementById('agTableWrap');if(t){t.scrollTop=st;t.scrollLeft=sl}});
+}
+
 function agGetVal(companyId,deptId,field){
+  // Check frequency - if not active this month, return N/A for ag/vis/inf
+  if(deptId!=='_global'&&deptId!=='_freq'&&(field==='ag'||field==='vis'||field==='inf')){
+    const freq=agGetFreq(companyId);
+    if(freq>1&&!agIsActiveMonth(freq,LOG.month,agGetFreqStart(companyId))){
+      return 'N/A';
+    }
+  }
   const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
   // If there is a manual record, ALWAYS return its value (user's choice wins)
   if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
@@ -5171,8 +5228,9 @@ function logRenderAgendamiento(){
   h+='<table>';
   // Header row 1: dept groups
   h+='<thead><tr>';
-  h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px;background:#0f172a">N°</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:30px;background:#0f172a">N°</th>';
   h+='<th rowspan="2" style="padding:8px;text-align:left;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--t2);min-width:140px;background:#0f172a">EMPRESA</th>';
+  h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:9px;color:#60a5fa;min-width:40px;background:#0f172a" title="Frecuencia de visita">🔄</th>';
   h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#f472b6;min-width:36px;background:#0f172a" title="Informes enviados">📨</th>';
   h+='<th rowspan="2" style="padding:8px;text-align:center;border:1px solid rgba(255,255,255,0.08);font-size:10px;color:#a78bfa;min-width:36px;background:#0f172a" title="Socializado">🤝</th>';
   AG_DEPTS.forEach(d=>{
@@ -5193,6 +5251,18 @@ function logRenderAgendamiento(){
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
     h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap">${co.name}</td>`;
+    // Frequency selector
+    const coFreq=agGetFreq(co.id);
+    const freqActive=agIsActiveMonth(coFreq,LOG.month,agGetFreqStart(co.id));
+    const fColor=AG_FREQ_COLORS[coFreq]||'#94a3b8';
+    const isInactiveByFreq=!freqActive;
+    if(canEditEnv){
+      h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04)"><select onchange="agSetFreq('${co.id}',+this.value)" style="padding:2px;border-radius:4px;border:1px solid ${fColor}40;background:${fColor}15;color:${fColor};font-size:8px;font-weight:700;cursor:pointer;width:55px">`;
+      Object.entries(AG_FREQS).forEach(([k,v])=>{h+=`<option value="${k}" ${coFreq==k?'selected':''}>${v}</option>`});
+      h+=`</select>${isInactiveByFreq?'<div style="font-size:7px;color:#94a3b8">No toca</div>':''}</td>`;
+    }else{
+      h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);font-size:8px;color:${fColor};font-weight:700">${AG_FREQS[coFreq]||'M'}${isInactiveByFreq?'<br><span style="color:#94a3b8;font-size:7px">No toca</span>':''}</td>`;
+    }
     // Enviado check
     const envVal=agGetVal(co.id,'_global','enviado');
     const envChecked=envVal==='SÍ';
@@ -5426,7 +5496,7 @@ function logRenderResumen(){
 
   // Totals row
   h+='<tr style="background:rgba(255,255,255,0.04);border-top:2px solid rgba(255,255,255,0.1)">';
-  h+='<td colspan="2" style="padding:8px;font-weight:800;font-size:11px;border:1px solid rgba(255,255,255,0.06);color:var(--t1)">TOTALES</td>';
+  h+='<td colspan="3" style="padding:8px;font-weight:800;font-size:11px;border:1px solid rgba(255,255,255,0.06);color:var(--t1)">TOTALES</td>';
   AG_DEPTS.forEach(d=>{
     const s=deptStats[d.id];
     const pct=s.si+s.no>0?Math.round(s.si/(s.si+s.no)*100):0;
