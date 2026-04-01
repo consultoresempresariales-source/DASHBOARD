@@ -6065,13 +6065,15 @@ function logRenderForm(){
   // CUSTOM/PUNTUAL COMPANIES
   if(!e._customCompanies)e._customCompanies=[];
   if(e._customCompanies.length>0){
-    h+=`<div style="margin-top:8px">`;
+    h+=`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">`;
     e._customCompanies.forEach((cc,i)=>{
-      h+=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><span style="font-size:12px;color:#fb923c;font-weight:700">⭐ ${cc}</span><button onclick="LOG.editTrip._customCompanies.splice(${i},1);logRender()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px">✕</button></div>`;
+      const ccName=typeof cc==='string'?cc:cc.name;
+      const ccCity=typeof cc==='string'?'':cc.city;
+      h+=`<button onclick="LOG.editTrip._customCompanies.splice(${i},1);logRender()" style="padding:8px 14px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;border:2px solid #fb923c;background:rgba(251,146,60,0.15);color:#fb923c;transition:all 0.15s;margin:2px" title="Clic para quitar">✅ ⭐ ${ccName}${ccCity?' 📍'+ccCity:''} <span style="font-size:9px;opacity:0.7">(puntual)</span></button>`;
     });
     h+=`</div>`;
   }
-  h+=`<button onclick="logAddCustomCo()" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px dashed #fb923c;background:rgba(251,146,60,0.06);color:#fb923c;font-size:11px;font-weight:700;cursor:pointer">⭐ + Empresa Puntual</button>`;
+  h+=`<button onclick="logAddCustomCo()" style="margin-top:8px;padding:8px 16px;border-radius:10px;border:2px dashed #fb923c;background:rgba(251,146,60,0.06);color:#fb923c;font-size:12px;font-weight:700;cursor:pointer">⭐ + Empresa Puntual</button>`;
   h+=`</div>`;
 
   // JORNADA TYPE CHECKBOXES
@@ -6284,8 +6286,22 @@ function logFormRecalcTransport(){
 function logAddCustomCo(){
   const name=prompt("Nombre de la empresa puntual:");
   if(!name||!name.trim())return;
+  // Ask city
+  const dests=LOG.dests.map(d=>d.city);
+  let city='';
+  if(dests.length>0){
+    city=prompt("Ciudad de la empresa:\n\nDestinos disponibles: "+dests.join(', ')+"\n\n(Escribe el nombre o deja vacío)");
+  }
   if(!LOG.editTrip._customCompanies)LOG.editTrip._customCompanies=[];
-  LOG.editTrip._customCompanies.push(name.trim());
+  LOG.editTrip._customCompanies.push({name:name.trim(),city:(city||'').trim()});
+  // Auto-set destination city if not set yet
+  if(!LOG.editTrip.destination_city&&city){
+    const match=LOG.dests.find(d=>d.city.toLowerCase()===(city||'').toLowerCase());
+    if(match){
+      LOG.editTrip.destination_city=match.city;
+      logFormRecalcTransport();
+    }
+  }
   logRender();
 }
 
@@ -6312,7 +6328,7 @@ async function logSaveTrip(){
           e._selectedCompanies.forEach(cid=>rows.push({trip_id:e.id,company_id:cid}));
         }
         if(e._customCompanies&&e._customCompanies.length>0){
-          e._customCompanies.forEach(cn=>rows.push({trip_id:e.id,company_id:null,custom_name:cn}));
+          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;rows.push({trip_id:e.id,company_id:null,custom_name:nm})});
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
@@ -6334,7 +6350,7 @@ async function logSaveTrip(){
           e._selectedCompanies.forEach(cid=>rows.push({trip_id:data.id,company_id:cid}));
         }
         if(e._customCompanies&&e._customCompanies.length>0){
-          e._customCompanies.forEach(cn=>rows.push({trip_id:data.id,company_id:null,custom_name:cn}));
+          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;rows.push({trip_id:data.id,company_id:null,custom_name:nm})});
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
