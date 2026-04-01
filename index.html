@@ -5251,6 +5251,7 @@ function logRenderAgendamiento(){
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
     h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap">${co.name}</td>`;
+    const canEditEnv=CURRENT_USER&&(CURRENT_USER.role==='admin'||IS_JEFE());
     // Frequency selector
     const coFreq=agGetFreq(co.id);
     const freqActive=agIsActiveMonth(coFreq,LOG.month,agGetFreqStart(co.id));
@@ -5266,7 +5267,6 @@ function logRenderAgendamiento(){
     // Enviado check
     const envVal=agGetVal(co.id,'_global','enviado');
     const envChecked=envVal==='SÍ';
-    const canEditEnv=CURRENT_USER&&(CURRENT_USER.role==='admin'||IS_JEFE());
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${envChecked?'rgba(244,114,182,0.15)':'transparent'}">`;
     if(canEditEnv){
       h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="agSetVal('${co.id}','_global','enviado',${envChecked}?'NO':'SÍ')">${envChecked?'✓':''}</div>`;
