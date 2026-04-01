@@ -6307,7 +6307,22 @@ function logAddCustomCo(){
 
 async function logSaveTrip(){
   const e=LOG.editTrip;if(!e)return;
-  if(!e.destination_city){alert("⚠️ Selecciona una ciudad destino");return}
+  const hasCustom=e._customCompanies&&e._customCompanies.length>0;
+  const hasRegular=e._selectedCompanies&&e._selectedCompanies.length>0;
+  if(!e.destination_city){
+    // If has custom companies, ask for city
+    if(hasCustom&&!hasRegular){
+      const dests=LOG.dests.map(d=>d.city);
+      if(dests.length>0){
+        const city=prompt("📍 Selecciona la ciudad destino:\n\n"+dests.map((d,i)=>(i+1)+". "+d).join("\n")+"\n\nEscribe el nombre de la ciudad:");
+        if(city){
+          const match=LOG.dests.find(d=>d.city.toLowerCase()===city.toLowerCase());
+          if(match){e.destination_city=match.city;logFormRecalcTransport()}
+          else{alert("⚠️ Ciudad no encontrada en destinos configurados");return}
+        }else{return}
+      }else{alert("⚠️ No hay destinos configurados. Ve a ⚙️ Destinos primero.");return}
+    }else{alert("⚠️ Selecciona una ciudad destino");return}
+  }
   if(!e.trip_date){alert("⚠️ Selecciona una fecha");return}
   const np=e.num_people||1;const days=e.days||1;
   const tCost=e.transport_cost||0;
