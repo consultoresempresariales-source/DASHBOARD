@@ -4606,188 +4606,227 @@ async function genAgInformeDocx(){
   AG_DEPTS.forEach(d=>{
     let totalCos=0,agSi=0,visSi=0,infSi=0;
     allCos.forEach(co=>{
-      const est=agGetVal(co.id,d.id,'est');
-      if(est==='INACTIVO')return;
       const ag=agGetVal(co.id,d.id,'ag');
-      const vis=agGetVal(co.id,d.id,'vis');
-      const inf=agGetVal(co.id,d.id,'inf');
-      if(ag==='N/A')return; // skip N/A
+      if(ag==='N/A')return;
       totalCos++;
       if(ag==='SÍ')agSi++;
-      if(vis==='SÍ')visSi++;
-      if(inf==='SÍ')infSi++;
+      if(agGetVal(co.id,d.id,'vis')==='SÍ')visSi++;
+      if(agGetVal(co.id,d.id,'inf')==='SÍ')infSi++;
     });
     stats[d.id]={total:totalCos,ag:agSi,vis:visSi,inf:infSi,
       agPct:totalCos>0?Math.round(agSi/totalCos*100):0,
       visPct:totalCos>0?Math.round(visSi/totalCos*100):0,
-      infPct:totalCos>0?Math.round(infSi/totalCos*100):0
-    };
+      infPct:totalCos>0?Math.round(infSi/totalCos*100):0};
+  });
+  let gT=0,gA=0,gV=0,gI=0;
+  AG_DEPTS.forEach(d=>{const s=stats[d.id];gT+=s.total;gA+=s.ag;gV+=s.vis;gI+=s.inf});
+
+  ss("ld");
+  try{
+  if(typeof JSZip==="undefined"){
+    await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+  }
+
+  // DOCX XML helpers
+  const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const P=(txt,opts={})=>{
+    const sz=opts.sz||22;const b=opts.b?'<w:b/>':'';const c=opts.c?`<w:color w:val="${opts.c}"/>`:'';
+    const al=opts.al?`<w:jc w:val="${opts.al}"/>`:''
+    const spc=opts.spc?`<w:spacing w:after="${opts.spc}"/>`:'<w:spacing w:after="120"/>';
+    return `<w:p><w:pPr>${al}${spc}</w:pPr><w:r><w:rPr><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${b}${c}<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/></w:rPr><w:t xml:space="preserve">${esc(txt)}</w:t></w:r></w:p>`;
+  };
+  const TC=(txt,opts={})=>{
+    const w=opts.w?`<w:tcW w:w="${opts.w}" w:type="dxa"/>`:'';
+    const sh=opts.bg?`<w:shd w:val="clear" w:fill="${opts.bg}"/>`:''
+    const bdr=opts.bdr||'';
+    return `<w:tc><w:tcPr>${w}${sh}${bdr}</w:tcPr>${P(txt,{sz:opts.sz||18,b:opts.b,c:opts.c,al:opts.al||'center'})}</w:tc>`;
+  };
+  const TR=cells=>`<w:tr>${cells}</w:tr>`;
+
+  // Build document body
+  let body='';
+
+  // === COVER / TITLE ===
+  body+=P('','spc','400');
+  body+=P('INFORME EJECUTIVO DE CUMPLIMIENTO',{sz:36,b:true,al:'center',c:'0F172A',spc:100});
+  body+=P('AGENDAMIENTO Y GESTIÓN MENSUAL',{sz:28,b:true,al:'center',c:'2DD4BF',spc:80});
+  body+=P(mesLabel.toUpperCase(),{sz:24,b:true,al:'center',c:'64748B',spc:200});
+  body+=P('CONSULTORES EMPRESARIALES ALTAIR',{sz:20,al:'center',c:'94A3B8',spc:400});
+
+  // === CUADRO 1: KPIs GLOBALES ===
+  body+=P('1. INDICADORES GLOBALES DE CUMPLIMIENTO',{sz:26,b:true,c:'0F172A',spc:200});
+  
+  // KPI Table
+  const kpiH=TR(
+    TC('INDICADOR',{bg:'0F172A',c:'FFFFFF',b:true,w:3000})+
+    TC('CUMPLIDAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
+    TC('TOTAL',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
+    TC('PORCENTAJE',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})
+  );
+  const kpiR=(label,done,total,color)=>TR(
+    TC(label,{b:true,al:'left',w:3000})+
+    TC(String(done),{w:1500})+
+    TC(String(total),{w:1500})+
+    TC((total>0?Math.round(done/total*100):0)+'%',{b:true,c:color,w:1500,sz:22})
+  );
+  body+=`<w:tbl><w:tblPr><w:tblW w:w="7500" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="4" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
+  body+=kpiH;
+  body+=kpiR('📋 AGENDAMIENTO',gA,gT,'2DD4BF');
+  body+=kpiR('🏢 VISITAS REALIZADAS',gV,gT,'0F5132');
+  body+=kpiR('📄 INFORMES ENTREGADOS',gI,gT,'7C3AED');
+  body+=`</w:tbl>`;
+  body+=P('',{spc:300});
+
+  // === CUADRO 2: POR ÁREA ===
+  body+=P('2. CUMPLIMIENTO POR ÁREA',{sz:26,b:true,c:'0F172A',spc:200});
+  
+  const areaH=TR(
+    TC('ÁREA',{bg:'0F172A',c:'FFFFFF',b:true,w:2000})+
+    TC('EMPRESAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1100})+
+    TC('AGEND.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
+    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})+
+    TC('VISIT.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
+    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})+
+    TC('INFORM.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
+    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})
+  );
+  body+=`<w:tbl><w:tblPr><w:tblW w:w="7900" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="4" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
+  body+=areaH;
+  AG_DEPTS.forEach((d,i)=>{
+    const s=stats[d.id];const bg=i%2?'F1F5F9':'FFFFFF';
+    body+=TR(
+      TC(d.icon+' '+d.label,{b:true,al:'left',bg,w:2000})+
+      TC(String(s.total),{bg,w:1100})+
+      TC(String(s.ag),{bg,w:900})+
+      TC(s.agPct+'%',{b:true,c:s.agPct>=80?'22C55E':s.agPct>=50?'F59E0B':'EF4444',bg,w:700})+
+      TC(String(s.vis),{bg,w:900})+
+      TC(s.visPct+'%',{b:true,c:s.visPct>=80?'22C55E':s.visPct>=50?'F59E0B':'EF4444',bg,w:700})+
+      TC(String(s.inf),{bg,w:900})+
+      TC(s.infPct+'%',{b:true,c:s.infPct>=80?'22C55E':s.infPct>=50?'F59E0B':'EF4444',bg,w:700})
+    );
+  });
+  // Total row
+  body+=TR(
+    TC('TOTAL',{b:true,bg:'2DD4BF',c:'FFFFFF',w:2000})+
+    TC(String(gT),{b:true,bg:'2DD4BF',c:'FFFFFF',w:1100})+
+    TC(String(gA),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC((gT>0?Math.round(gA/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
+    TC(String(gV),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC((gT>0?Math.round(gV/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
+    TC(String(gI),{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
+    TC((gT>0?Math.round(gI/gT*100):0)+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})
+  );
+  body+=`</w:tbl>`;
+  body+=P('',{spc:300});
+
+  // === CUADRO 3: ANÁLISIS POR ÁREA ===
+  body+=P('3. ANÁLISIS POR ÁREA',{sz:26,b:true,c:'0F172A',spc:200});
+  AG_DEPTS.forEach(d=>{
+    const s=stats[d.id];
+    body+=P(d.icon+' '+d.label+' — Agend: '+s.agPct+'% · Visitas: '+s.visPct+'% · Informes: '+s.infPct+'%',{sz:22,b:true,c:'0F172A',spc:80});
+    const pending=allCos.filter(co=>agGetVal(co.id,d.id,'ag')==='NO').map(c=>c.name);
+    const withInf=allCos.filter(co=>agGetVal(co.id,d.id,'inf')==='SÍ').map(c=>c.name);
+    if(s.total>0){
+      body+=P('Empresas evaluadas: '+s.total+' | Con informe: '+s.inf+' | Pendientes agendar: '+pending.length,{sz:20,c:'334155'});
+      if(pending.length>0)body+=P('Sin agendar: '+pending.join(', '),{sz:18,c:'EF4444'});
+      if(withInf.length>0)body+=P('Con informe entregado: '+withInf.join(', '),{sz:18,c:'22C55E'});
+    }else{
+      body+=P('Sin empresas evaluadas en esta área.',{sz:20,c:'94A3B8'});
+    }
+    body+=P('',{spc:150});
   });
 
-  // Global totals
-  let gTotal=0,gAg=0,gVis=0,gInf=0;
-  AG_DEPTS.forEach(d=>{const s=stats[d.id];gTotal+=s.total;gAg+=s.ag;gVis+=s.vis;gInf+=s.inf});
-  const gAgPct=gTotal>0?Math.round(gAg/gTotal*100):0;
-  const gVisPct=gTotal>0?Math.round(gVis/gTotal*100):0;
-  const gInfPct=gTotal>0?Math.round(gInf/gTotal*100):0;
-
-  // Build detail rows per company
-  const detailRows=[];
+  // === CUADRO 4: DETALLE POR EMPRESA ===  
+  body+=`<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
+  body+=P('4. DETALLE DE GESTIÓN POR EMPRESA',{sz:26,b:true,c:'0F172A',spc:200});
+  body+=P('Estado de agendamiento (Ag), visita (Vis) e informe (Inf) por empresa y departamento.',{sz:18,c:'64748B',spc:150});
+  
+  // Detail table header
+  let dH=TC('N°',{bg:'0F172A',c:'FFFFFF',b:true,w:400,sz:14})+TC('EMPRESA',{bg:'0F172A',c:'FFFFFF',b:true,w:2200,sz:14});
+  AG_DEPTS.forEach(d=>{
+    dH+=TC(d.label,{bg:'0F172A',c:'FFFFFF',b:true,w:800,sz:14});
+  });
+  body+=`<w:tbl><w:tblPr><w:tblW w:w="8000" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="2" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="2" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="2" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="2" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
+  body+=TR(dH);
+  
   allCos.forEach((co,i)=>{
-    const row={n:i+1,name:co.name,depts:{}};
+    const bg=i%2?'F8FAFC':'FFFFFF';
+    let row=TC(String(i+1),{bg,w:400,sz:14})+TC(co.name,{bg,al:'left',w:2200,sz:14});
     AG_DEPTS.forEach(d=>{
       const ag=agGetVal(co.id,d.id,'ag');
       const vis=agGetVal(co.id,d.id,'vis');
       const inf=agGetVal(co.id,d.id,'inf');
-      const obs=agGetVal(co.id,d.id,'obs');
-      row.depts[d.id]={ag,vis,inf,obs};
+      let status='—';let color='94A3B8';
+      if(ag==='N/A'){status='N/A';color='94A3B8'}
+      else if(inf==='SÍ'){status='✅ Inf';color='22C55E'}
+      else if(vis==='SÍ'){status='🏢 Vis';color='3B82F6'}
+      else if(ag==='SÍ'){status='📋 Ag';color='F59E0B'}
+      else{status='❌ NO';color='EF4444'}
+      row+=TC(status,{bg,w:800,sz:14,c:color,b:true});
     });
-    detailRows.push(row);
+    body+=TR(row);
   });
+  body+=`</w:tbl>`;
+  body+=P('',{spc:200});
 
-  // Use jsPDF for quick generation
-  if(typeof jspdf==='undefined'){
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    document.head.appendChild(s);
-    await new Promise(r=>{s.onload=r;setTimeout(r,3000)});
-  }
-  if(typeof jspdf==='undefined'&&typeof window.jspdf==='undefined'){alert("Error cargando jsPDF");return}
-  const{jsPDF}=window.jspdf||jspdf;
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const W=doc.internal.pageSize.getWidth();
-  const H=doc.internal.pageSize.getHeight();
-  let y=15;
-
-  function addPage(){doc.addPage('a4','landscape');y=15}
-  function title(t,sz,c){doc.setFontSize(sz||16);doc.setTextColor(c||'#1e293b');doc.setFont('helvetica','bold');doc.text(t,W/2,y,{align:'center'});y+=sz*0.5}
-  function subtitle(t){doc.setFontSize(10);doc.setTextColor('#64748b');doc.setFont('helvetica','normal');doc.text(t,W/2,y,{align:'center'});y+=6}
-  function sectionTitle(t){doc.setFontSize(13);doc.setTextColor('#0f172a');doc.setFont('helvetica','bold');doc.text(t,14,y);y+=7}
-
-  // PAGE 1: Cover + KPIs
-  title('INFORME EJECUTIVO DE CUMPLIMIENTO',18,'#0f172a');y+=2;
-  title('AGENDAMIENTO Y GESTIÓN MENSUAL',14,'#2dd4bf');y+=2;
-  subtitle(mesLabel.toUpperCase());y+=2;
-  subtitle('CONSULTORES EMPRESARIALES ALTAIR');y+=10;
-
-  // KPI boxes
-  const kpis=[
-    {label:'AGENDAMIENTO',value:gAgPct+'%',detail:gAg+'/'+gTotal,color:[45,212,191]},
-    {label:'VISITAS',value:gVisPct+'%',detail:gVis+'/'+gTotal,color:[15,81,50]},
-    {label:'INFORMES',value:gInfPct+'%',detail:gInf+'/'+gTotal,color:[124,58,237]}
-  ];
-  const bw=70,bh=30,bx=(W-bw*3-20)/2;
-  kpis.forEach((k,i)=>{
-    const x=bx+i*(bw+10);
-    doc.setFillColor(k.color[0],k.color[1],k.color[2]);doc.roundedRect(x,y,bw,bh,3,3,'F');
-    doc.setTextColor('#ffffff');doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text(k.label,x+bw/2,y+8,{align:'center'});
-    doc.setFontSize(22);doc.text(k.value,x+bw/2,y+20,{align:'center'});
-    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(k.detail,x+bw/2,y+27,{align:'center'});
+  // === CUADRO 5: EMPRESAS PRIORITARIAS ===
+  body+=P('5. EMPRESAS DE ATENCIÓN PRIORITARIA',{sz:26,b:true,c:'0F172A',spc:200});
+  const prioritarias=allCos.filter(co=>{
+    let pendCount=0;
+    AG_DEPTS.forEach(d=>{if(agGetVal(co.id,d.id,'ag')==='NO')pendCount++});
+    return pendCount>=2;
   });
-  y+=bh+15;
-
-  // Per-dept table
-  sectionTitle('Cumplimiento por Área');
-  const cols=['Área','Empresas','Agendadas','%','Visitas','%','Informes','%'];
-  const cw=[45,22,22,18,22,18,22,18];
-  const tx=14;
-  // Header
-  doc.setFillColor(15,23,42);doc.rect(tx,y,cw.reduce((a,v)=>a+v,0),7,'F');
-  doc.setTextColor('#ffffff');doc.setFontSize(8);doc.setFont('helvetica','bold');
-  let cx=tx;cols.forEach((c,i)=>{doc.text(c,cx+cw[i]/2,y+5,{align:'center'});cx+=cw[i]});y+=7;
-  // Rows
-  AG_DEPTS.forEach((d,di)=>{
-    const s=stats[d.id];
-    const vals=[d.icon+' '+d.label,s.total,s.ag,s.agPct+'%',s.vis,s.visPct+'%',s.inf,s.infPct+'%'];
-    if(di%2)doc.setFillColor(241,245,249);else doc.setFillColor(255,255,255);
-    doc.rect(tx,y,cw.reduce((a,v)=>a+v,0),6,'F');
-    doc.setTextColor('#1e293b');doc.setFontSize(8);doc.setFont('helvetica','normal');
-    cx=tx;vals.forEach((v,i)=>{doc.text(String(v),cx+cw[i]/2,y+4.5,{align:'center'});cx+=cw[i]});
-    y+=6;
-  });
-  // Total row
-  doc.setFillColor(45,212,191);doc.rect(tx,y,cw.reduce((a,v)=>a+v,0),7,'F');
-  doc.setTextColor('#ffffff');doc.setFontSize(9);doc.setFont('helvetica','bold');
-  cx=tx;['TOTAL',gTotal,gAg,gAgPct+'%',gVis,gVisPct+'%',gInf,gInfPct+'%'].forEach((v,i)=>{doc.text(String(v),cx+cw[i]/2,y+5,{align:'center'});cx+=cw[i]});
-  y+=15;
-
-  // PAGE 2: Detail per company
-  addPage();
-  sectionTitle('Detalle por Empresa — '+mesLabel);y+=3;
-
-  // Table header
-  const dCols=['N°','EMPRESA'];
-  const dCw=[8,50];
-  AG_DEPTS.forEach(d=>{dCols.push(d.label+' Ag',d.label+' Vis',d.label+' Inf');dCw.push(14,14,14)});
-  const totalW=dCw.reduce((a,v)=>a+v,0);
-
-  doc.setFillColor(15,23,42);doc.rect(14,y,totalW,6,'F');
-  doc.setTextColor('#ffffff');doc.setFontSize(6);doc.setFont('helvetica','bold');
-  cx=14;dCols.forEach((c,i)=>{doc.text(c,cx+dCw[i]/2,y+4.5,{align:'center'});cx+=dCw[i]});y+=6;
-
-  // Rows
-  doc.setFontSize(6);doc.setFont('helvetica','normal');
-  detailRows.forEach((r,ri)=>{
-    if(y>H-15){addPage();y=15;
-      doc.setFillColor(15,23,42);doc.rect(14,y,totalW,6,'F');
-      doc.setTextColor('#ffffff');doc.setFontSize(6);doc.setFont('helvetica','bold');
-      cx=14;dCols.forEach((c,i)=>{doc.text(c,cx+dCw[i]/2,y+4.5,{align:'center'});cx+=dCw[i]});y+=6;
-      doc.setFontSize(6);doc.setFont('helvetica','normal');
-    }
-    if(ri%2)doc.setFillColor(241,245,249);else doc.setFillColor(255,255,255);
-    doc.rect(14,y,totalW,5,'F');
-    doc.setTextColor('#1e293b');
-    cx=14;
-    doc.text(String(r.n),cx+dCw[0]/2,y+3.8,{align:'center'});cx+=dCw[0];
-    doc.text((r.name||'').substring(0,30),cx+1,y+3.8);cx+=dCw[1];
-    AG_DEPTS.forEach(d=>{
-      const dd=r.depts[d.id];
-      ['ag','vis','inf'].forEach(f=>{
-        const v=dd[f];
-        if(v==='SÍ'){doc.setTextColor(34,197,94);doc.text('SÍ',cx+7,y+3.8,{align:'center'})}
-        else if(v==='NO'){doc.setTextColor(239,68,68);doc.text('NO',cx+7,y+3.8,{align:'center'})}
-        else{doc.setTextColor(148,163,184);doc.text('—',cx+7,y+3.8,{align:'center'})}
-        doc.setTextColor('#1e293b');
-        cx+=14;
-      });
+  if(prioritarias.length>0){
+    prioritarias.forEach(co=>{
+      const areas=AG_DEPTS.filter(d=>agGetVal(co.id,d.id,'ag')==='NO').map(d=>d.label);
+      body+=P('⚠️ '+co.name+' — Pendiente en: '+areas.join(', '),{sz:20,c:'EF4444'});
     });
-    y+=5;
-  });
-
-  // PAGE 3: Analysis per area
-  addPage();
-  sectionTitle('Análisis por Área');y+=3;
-  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor('#334155');
-  AG_DEPTS.forEach(d=>{
-    if(y>H-30){addPage();y=15}
-    const s=stats[d.id];
-    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor('#0f172a');
-    doc.text(d.icon+' '+d.label+' — Agend: '+s.agPct+'% · Visitas: '+s.visPct+'% · Informes: '+s.infPct+'%',14,y);y+=6;
-    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor('#334155');
-    // List pending companies
-    const pending=allCos.filter(co=>{const ag=agGetVal(co.id,d.id,'ag');return ag==='NO'}).map(c=>c.name);
-    const done=allCos.filter(co=>{const inf=agGetVal(co.id,d.id,'inf');return inf==='SÍ'}).map(c=>c.name);
-    if(s.total>0){
-      doc.text('Empresas evaluadas: '+s.total+' | Completadas (informe): '+s.inf+' | Pendientes agendamiento: '+pending.length,14,y);y+=5;
-      if(pending.length>0&&pending.length<=10){doc.text('Sin agendar: '+pending.join(', '),14,y,{maxWidth:W-28});y+=5}
-      if(done.length>0&&done.length<=10){doc.text('Con informe: '+done.join(', '),14,y,{maxWidth:W-28});y+=5}
-    }else{
-      doc.text('Sin empresas evaluadas en esta área.',14,y);y+=5;
-    }
-    y+=5;
-  });
-
-  // Footer on each page
-  const totalPages=doc.internal.getNumberOfPages();
-  for(let i=1;i<=totalPages;i++){
-    doc.setPage(i);
-    doc.setFontSize(7);doc.setTextColor('#94a3b8');doc.setFont('helvetica','normal');
-    doc.text('Consultores Empresariales ALTAIR — Informe Ejecutivo — '+mesLabel,14,H-5);
-    doc.text('Página '+i+' de '+totalPages,W-14,H-5,{align:'right'});
-    doc.setDrawColor(45,212,191);doc.setLineWidth(0.5);doc.line(14,H-8,W-14,H-8);
+  }else{
+    body+=P('No hay empresas con más de 2 áreas pendientes.',{sz:20,c:'22C55E'});
   }
+  body+=P('',{spc:300});
 
-  doc.save('Informe_Cumplimiento_'+mNames[LOG.month]+'_'+LOG.year+'.pdf');
+  // === FOOTER ===
+  body+=P('Consultores Empresariales ALTAIR — '+mesLabel,{sz:16,al:'center',c:'94A3B8'});
+  body+=P('Documento generado automáticamente desde el Sistema Integral SST',{sz:14,al:'center',c:'CBD5E1'});
+
+  // Assemble DOCX
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>${body}
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1080" w:bottom="1440" w:left="1080"/></w:sectPr>
+</w:body></w:document>`;
+
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  const wordRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`;
+
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+  const zip=new JSZip();
+  zip.file("[Content_Types].xml",contentTypes);
+  zip.file("_rels/.rels",rels);
+  zip.file("word/_rels/document.xml.rels",wordRels);
+  zip.file("word/document.xml",docXml);
+
+  const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download='Informe_Cumplimiento_'+mNames[LOG.month]+'_'+LOG.year+'.docx';
+  a.click();URL.revokeObjectURL(a.href);
+  ss("ok");
+  }catch(e){alert("Error generando informe: "+e.message);ss("er");console.error(e)}
 }
 
 async function agLoad(){
