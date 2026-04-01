@@ -2457,7 +2457,7 @@ function sstRender(){
         h+=`<td style="text-align:center;background:rgba(100,116,139,0.05)"><span style="font-size:9px;color:#64748b">—</span></td>`;
         h+=`<td style="text-align:center;background:rgba(100,116,139,0.05)"><span style="font-size:9px;color:#64748b">—</span></td>`;
       }else{
-        h+=`<td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><select onchange="sstUpdAct(${act.id},'doc_aplica',this.value==='si')" style="padding:2px;border-radius:4px;border:1px solid rgba(52,211,153,0.3);background:rgba(52,211,153,0.08);color:#34d399;font-size:7px;font-weight:700;cursor:pointer;margin-bottom:1px"><option value="si" selected>APLICA</option><option value="no">N/A</option></select><input class="cdt" type="date" value="${actDate}" onchange="sstUpdAct(${act.id},'doc_date',this.value)" style="width:90px;font-size:9px;padding:3px"></div></td>`;
+        h+=`<td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:2px"><select onchange="sstUpdAct(${act.id},'doc_aplica',this.value==='si')" style="padding:2px;border-radius:4px;border:1px solid rgba(52,211,153,0.3);background:rgba(52,211,153,0.08);color:#34d399;font-size:7px;font-weight:700;cursor:pointer;margin-bottom:1px"><option value="si" selected>APLICA</option><option value="no">N/A</option></select><input class="cdt" type="date" value="${actDate}" onchange="sstUpdActDate(${act.id},this.value)" style="width:110px;font-size:10px;padding:4px" min="2020-01-01" max="2035-12-31"></div></td>`;
         h+=`<td style="text-align:center"><select onchange="sstUpdAct(${act.id},'doc_duration',+this.value)" style="padding:3px;border-radius:5px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:9px;cursor:pointer"><option value="0" ${actDur===0?'selected':''}>—</option><option value="1" ${actDur===1?'selected':''}>1 año</option><option value="2" ${actDur===2?'selected':''}>2 años</option><option value="3" ${actDur===3?'selected':''}>3 años</option><option value="4" ${actDur===4?'selected':''}>4 años</option><option value="5" ${actDur===5?'selected':''}>5 años</option></select></td>`;
         h+=`<td style="text-align:center;background:${alertBg}" title="${alertTitle}">${alertIcon?`<span style="font-size:14px;cursor:help" title="${alertTitle}">${alertIcon}</span>`:''}</td>`;
       }
@@ -2607,8 +2607,7 @@ function sstRender(){
   }
 }
 function sstUpdAct(id,field,val){const a=SST.acts.find(x=>x.id===id);if(!a)return;a[field]=val;sstRender();
-  // For doc fields, ask if apply to all companies
-  if(field==='doc_aplica'||field==='doc_date'||field==='doc_duration'){
+  if(field==='doc_aplica'){
     const allCos=confirm("¿Aplicar a TODAS las empresas?\n\n✅ Aceptar = Todas las empresas\n❌ Cancelar = Solo esta empresa");
     if(allCos){
       dbs("sua-all-"+id+field,async()=>{
@@ -2623,6 +2622,9 @@ function sstUpdAct(id,field,val){const a=SST.acts.find(x=>x.id===id);if(!a)retur
   }else{
     dbs("sua-"+id+field,()=>sb.from("sst_poa_activities").update({[field]:val}).eq("id",id));
   }
+}
+function sstUpdActDate(id,val){const a=SST.acts.find(x=>x.id===id);if(!a)return;a.doc_date=val;sstRender();
+  dbs("sua-date-"+id,()=>sb.from("sst_poa_activities").update({doc_date:val}).eq("id",id));
 }
 function sstTogAct(id,mi){
   const a=SST.acts.find(x=>x.id===id);if(!a)return;
