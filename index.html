@@ -708,6 +708,14 @@ function saveCIIU(v){
   clearTimeout(window._ciiuTimer);
   window._ciiuTimer=setTimeout(()=>{if(MOD==='seguridad'){sstRender()}else{render()}},1500);
 }
+function saveTWFromPerfil(v){
+  const tw=Math.max(1,+v||1);
+  const c=cos.find(x=>x.id===CID);if(c)c.total_workers=tw;
+  D.tw=tw;
+  dbs("tw-perfil",()=>sb.from("companies").update({total_workers:tw}).eq("id",CID));
+  clearTimeout(window._twTimer);
+  window._twTimer=setTimeout(()=>{if(MOD==='seguridad'){sstRender()}else{render()}},1500);
+}
 function saveField(f,v){D.comp[f]=v;dbs("f-"+f,()=>sb.from("companies").update({[f]:v}).eq("id",CID))}
 function saveRepLegal(v){D.comp.rep_legal=v;const co=cos.find(c=>c.id===CID);if(co)co.rep_legal=v;dbs("rl",()=>sb.from("companies").update({rep_legal:v}).eq("id",CID))}
 function saveCoName(v){v=v.trim();if(!v)return;D.comp.name=v;const co=cos.find(c=>c.id===CID);if(co)co.name=v;render();dbs("cn",()=>sb.from("companies").update({name:v}).eq("id",CID))}
@@ -1759,7 +1767,11 @@ function renderPerfilSST(c){
   } else {
     h+=`<div style="color:var(--t3)">📋 CIIU: <b style="color:var(--t1);font-family:var(--mn)">${ciiu||'—'}</b></div>`;
   }
-  h+=`<div style="color:var(--t3)">🏢 <b style="color:var(--t1)">${clasificacion}</b> (${tw} trab.)</div>`;
+  if(canEdit){
+    h+=`<div style="color:var(--t3)">🏢 <b style="color:var(--t1)">${clasificacion}</b> (<input type="number" min="1" value="${tw}" onchange="saveTWFromPerfil(this.value)" style="width:45px;padding:1px 4px;border-radius:4px;border:1px solid ${rc}40;background:${rc}10;color:var(--t1);font-size:11px;font-family:var(--mn);font-weight:700;outline:none;text-align:center"> trab.)</div>`;
+  }else{
+    h+=`<div style="color:var(--t3)">🏢 <b style="color:var(--t1)">${clasificacion}</b> (${tw} trab.)</div>`;
+  }
   h+=`<div style="color:var(--t3)">⏰ Horas: <b style="color:#fbbf24">${horas.horas}</b></div>`;
   h+=`<div style="color:var(--t3)">🏭 ${seccion||'<span style="color:#fb923c">Sin CIIU</span>'}</div>`;
   h+=`<div style="color:var(--t3)">👷 <b style="color:var(--t1)">${perfil.tecnico?'Técnico SST':'Monitor SST'}</b></div>`;
