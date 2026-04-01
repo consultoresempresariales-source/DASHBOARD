@@ -412,7 +412,7 @@ async function showPostLoginNotifications(){
     const{data:trips}=await sb.from("logistics_trips").select("*").in("id",tids).gte("trip_date",today).order("trip_date");
     if(!trips||trips.length===0)return;
     // Get companies for these trips
-    const{data:tCos}=await sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,companies(name)").in("trip_id",tids);
+    const{data:tCos}=await sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone,companies(name)").in("trip_id",tids);
     const coMap={};(tCos||[]).forEach(tc=>{if(!coMap[tc.trip_id])coMap[tc.trip_id]=[];coMap[tc.trip_id].push(tc.custom_name||tc.companies?.name||'')});
     // Get unread notifications
     const{data:notifs}=await sb.from("logistics_notifications").select("*").eq("user_id",uid).eq("read",false).order("created_at",{ascending:false}).limit(10);
@@ -3970,7 +3970,7 @@ async function logLoad(){
       const loads=[
         sb.from("logistics_trip_members").select("*,app_users(name,role)").in("trip_id",tids),
         sb.from("logistics_trip_activities").select("*").in("trip_id",tids),
-        sb.from("logistics_trip_companies").select("*,companies(name,location),custom_name").in("trip_id",tids)
+        sb.from("logistics_trip_companies").select("*,companies(name,location)").in("trip_id",tids)
       ];
       // Admin loads ALL notifications for these trips to see who read
       if(isAdmin)loads.push(sb.from("logistics_notifications").select("*,app_users(name)").in("trip_id",tids));
@@ -4253,17 +4253,28 @@ function logRenderWeek(isAdmin,visibleTrips){
         h+=`<div style="min-width:160px;max-width:200px;border-left:1px solid rgba(255,255,255,0.06);padding-left:12px;display:flex;flex-direction:column;justify-content:center;gap:6px">`;
         h+=`<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">Contactos</div>`;
         tcs.forEach(tc=>{
-          const co=cos.find(c=>c.id===tc.company_id);
-          if(!co)return;
-          const name=co.whatsapp_contact||'';
-          const phone=co.whatsapp||'';
-          if(name||phone){
-            h+=`<div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px;padding:6px 8px">`;
-            if(name)h+=`<div style="font-size:10px;font-weight:700;color:#2dd4bf">${name}</div>`;
-            if(phone)h+=`<div style="font-size:9px;color:var(--t3)">${phone}</div>`;
+          if(tc.custom_name){
+            // Custom/puntual company
+            const cName=tc.custom_contact||tc.custom_name;
+            const cPhone=tc.custom_phone||'';
+            h+=`<div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:8px;padding:6px 8px">`;
+            h+=`<div style="font-size:10px;font-weight:700;color:#fb923c">⭐ ${cName}</div>`;
+            if(cPhone)h+=`<div style="font-size:9px;color:var(--t3)">${cPhone}</div>`;
+            else h+=`<div style="font-size:9px;color:var(--t3);opacity:0.5">Sin teléfono</div>`;
             h+=`</div>`;
           }else{
-            h+=`<div style="font-size:9px;color:var(--t3);opacity:0.5">Sin contacto</div>`;
+            const co=cos.find(c=>c.id===tc.company_id);
+            if(!co)return;
+            const name=co.whatsapp_contact||'';
+            const phone=co.whatsapp||'';
+            if(name||phone){
+              h+=`<div style="background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.2);border-radius:8px;padding:6px 8px">`;
+              if(name)h+=`<div style="font-size:10px;font-weight:700;color:#2dd4bf">${name}</div>`;
+              if(phone)h+=`<div style="font-size:9px;color:var(--t3)">${phone}</div>`;
+              h+=`</div>`;
+            }else{
+              h+=`<div style="font-size:9px;color:var(--t3);opacity:0.5">Sin contacto</div>`;
+            }
           }
         });
         if(t.status!=='cancelled'){
@@ -4333,7 +4344,11 @@ function logRenderCalendar(isAdmin,visibleTrips){
       h+=`<div style="font-size:10px;color:var(--t3);margin-top:2px">👥 ${members.map(m=>m.app_users?.name||m.department).join(', ')||'Sin asignar'}</div>`;
       if(tcs.length>0){
         h+=`<div style="font-size:9px;color:var(--t3);margin-top:2px">🏢 ${tcs.map(c=>c.custom_name?'⭐ '+c.custom_name:c.companies?.name||'').join(', ')}</div>`;
-        const tcC=tcs.filter(tc=>tc.company_id).map(tc=>{const co=cos.find(c=>c.id===tc.company_id);return co&&co.whatsapp?'📱 '+(co.whatsapp_contact||'')+' '+co.whatsapp:''}).filter(Boolean);
+        const tcC=tcs.map(tc=>{
+          if(tc.custom_name&&tc.custom_phone)return'📱 '+(tc.custom_contact||tc.custom_name)+' '+tc.custom_phone;
+          if(tc.company_id){const co=cos.find(c=>c.id===tc.company_id);return co&&co.whatsapp?'📱 '+(co.whatsapp_contact||'')+' '+co.whatsapp:''}
+          return '';
+        }).filter(Boolean);
         if(tcC.length>0)h+=`<div style="font-size:9px;color:#2dd4bf;margin-top:1px">${tcC.join(' · ')}</div>`;
       }
       h+=`</div>`;
@@ -4548,7 +4563,7 @@ async function agLoad(){
     if(LOG._agTrips.length>0){
       const tids=LOG._agTrips.map(t=>t.id);
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name").in("trip_id",tids),
+        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone").in("trip_id",tids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",tids)
       ]);
       LOG._agTripCos=tcR.data||[];
@@ -4956,7 +4971,7 @@ async function resLoadTrips(){
     const allTids=[...LOG._resTrips,...LOG._resPrevTrips].map(t=>t.id);
     if(allTids.length>0){
       const[tcR,tmR]=await Promise.all([
-        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name").in("trip_id",allTids),
+        sb.from("logistics_trip_companies").select("trip_id,company_id,custom_name,custom_contact,custom_phone").in("trip_id",allTids),
         sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",allTids)
       ]);
       const allTc=tcR.data||[];
@@ -5326,25 +5341,40 @@ async function logSendWA(tripId){
 
   // For each company, send message
   for(const tc of tcs){
-    const co=cos.find(c=>c.id===tc.company_id);
-    if(!co)continue;
-    const coName=co.name||'';
-
-    // Check if company has saved WhatsApp number
-    let phone=co.whatsapp||'';
-    if(!phone){
-      const contactName=prompt('Nombre del contacto de '+coName+'\n\nEjemplo: Juan Pérez');
-      if(contactName===null)continue;
-      phone=prompt('Numero de WhatsApp de '+(contactName||coName)+'\n\nEjemplo: 0991234567 o +593991234567');
-      if(!phone||!phone.trim())continue;
-      phone=phone.trim();
-      co.whatsapp=phone;
-      co.whatsapp_contact=(contactName||'').trim();
-      const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=phone;cos[ci].whatsapp_contact=(contactName||'').trim()}
-      const{error}=await sb.from("companies").update({whatsapp:phone,whatsapp_contact:(contactName||'').trim()}).eq("id",co.id);
-      if(error)console.error("Error guardando WhatsApp:",error.message);
-      else console.log("WhatsApp guardado OK:",coName,contactName,phone);
-      logRender(); // Refresh to show contact in card
+    let coName='',phone='',contactGreet='';
+    if(tc.custom_name){
+      // Custom/puntual company
+      coName=tc.custom_name;
+      phone=tc.custom_phone||'';
+      if(!phone){
+        phone=prompt('Número de WhatsApp de '+coName+'\n\nEjemplo: 0991234567 o +593991234567');
+        if(!phone||!phone.trim())continue;
+        phone=phone.trim();
+        // Save to DB
+        await sb.from("logistics_trip_companies").update({custom_phone:phone}).eq("trip_id",t.id).eq("custom_name",tc.custom_name);
+        tc.custom_phone=phone;
+        logRender();
+      }
+      contactGreet=tc.custom_contact||coName;
+    }else{
+      const co=cos.find(c=>c.id===tc.company_id);
+      if(!co)continue;
+      coName=co.name||'';
+      phone=co.whatsapp||'';
+      if(!phone){
+        const contactName=prompt('Nombre del contacto de '+coName+'\n\nEjemplo: Juan Pérez');
+        if(contactName===null)continue;
+        phone=prompt('Numero de WhatsApp de '+(contactName||coName)+'\n\nEjemplo: 0991234567 o +593991234567');
+        if(!phone||!phone.trim())continue;
+        phone=phone.trim();
+        co.whatsapp=phone;
+        co.whatsapp_contact=(contactName||'').trim();
+        const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=phone;cos[ci].whatsapp_contact=(contactName||'').trim()}
+        const{error}=await sb.from("companies").update({whatsapp:phone,whatsapp_contact:(contactName||'').trim()}).eq("id",co.id);
+        if(error)console.error("Error guardando WhatsApp:",error.message);
+        logRender();
+      }
+      contactGreet=co.whatsapp_contact||'representante de *'+coName+'*';
     }
 
     // Clean phone number
@@ -5354,7 +5384,6 @@ async function logSendWA(tripId){
     cleanPhone=cleanPhone.replace('+','');
 
     // Build message
-    var contactGreet=co.whatsapp_contact?co.whatsapp_contact:'representante de *'+coName+'*';
     var msg='Estimado/a '+contactGreet+',\n\n';
     msg+='Se recuerda que:\n';
     msg+=urgText+' a su empresa.\n\n';
@@ -5387,20 +5416,29 @@ async function logEditWA(tripId){
   const t=LOG.trips.find(x=>x.id===tripId);if(!t)return;
   const tcs=LOG.tripCompanies?.filter(tc=>tc.trip_id===t.id)||[];
   for(const tc of tcs){
-    const co=cos.find(c=>c.id===tc.company_id);if(!co)continue;
-    const newContact=prompt('Nombre del contacto de '+co.name+'\n\nActual: '+(co.whatsapp_contact||'sin nombre'),co.whatsapp_contact||'');
-    if(newContact===null)continue;
-    const newPhone=prompt('Numero de WhatsApp de '+(newContact||co.name)+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
-    if(newPhone===null)continue;
-    const cleaned=newPhone.trim();
-    const cleanedName=newContact.trim();
-    co.whatsapp=cleaned;co.whatsapp_contact=cleanedName;
-    const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=cleaned;cos[ci].whatsapp_contact=cleanedName}
-    const{error}=await sb.from("companies").update({whatsapp:cleaned,whatsapp_contact:cleanedName}).eq("id",co.id);
-    if(error){console.error("Error guardando WhatsApp:",error.message);alert('Error: '+error.message)}
-    else{console.log("WhatsApp guardado OK:",co.name,cleanedName,cleaned);alert('Contacto actualizado: '+cleanedName+' - '+cleaned)}
+    if(tc.custom_name){
+      // Custom company
+      const newContact=prompt('Nombre del contacto de ⭐ '+tc.custom_name+'\n\nActual: '+(tc.custom_contact||'sin nombre'),tc.custom_contact||'');
+      if(newContact===null)continue;
+      const newPhone=prompt('Número WhatsApp de '+(newContact||tc.custom_name)+'\n\nActual: '+(tc.custom_phone||'sin número'),tc.custom_phone||'');
+      if(newPhone===null)continue;
+      tc.custom_contact=newContact.trim();
+      tc.custom_phone=newPhone.trim();
+      const{error}=await sb.from("logistics_trip_companies").update({custom_contact:newContact.trim(),custom_phone:newPhone.trim()}).eq("trip_id",t.id).eq("custom_name",tc.custom_name);
+      if(error)alert('Error: '+error.message);
+    }else{
+      const co=cos.find(c=>c.id===tc.company_id);if(!co)continue;
+      const newContact=prompt('Nombre del contacto de '+co.name+'\n\nActual: '+(co.whatsapp_contact||'sin nombre'),co.whatsapp_contact||'');
+      if(newContact===null)continue;
+      const newPhone=prompt('Numero de WhatsApp de '+(newContact||co.name)+'\n\nActual: '+(co.whatsapp||'sin numero'),co.whatsapp||'');
+      if(newPhone===null)continue;
+      co.whatsapp=newPhone.trim();co.whatsapp_contact=newContact.trim();
+      const ci=cos.findIndex(c=>c.id===co.id);if(ci>=0){cos[ci].whatsapp=newPhone.trim();cos[ci].whatsapp_contact=newContact.trim()}
+      const{error}=await sb.from("companies").update({whatsapp:newPhone.trim(),whatsapp_contact:newContact.trim()}).eq("id",co.id);
+      if(error)alert('Error: '+error.message);
+    }
   }
-  logRender(); // Refresh to show updated contacts
+  logRender();
 }
 
 // ===== TRIP FORM (CREATE / EDIT) =====
@@ -5809,7 +5847,7 @@ async function syncTripActivityToCharla(actId,opts){
     const nameLower=rawName.toLowerCase();
     
     // Query trip companies DIRECTLY from DB (don't rely on cached LOG.tripCompanies)
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name").eq("trip_id",act.trip_id);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,custom_contact,custom_phone").eq("trip_id",act.trip_id);
     const companyIds=(tcs||[]).map(tc=>tc.company_id).filter(Boolean);
     if(companyIds.length===0)return;
     
@@ -5872,7 +5910,7 @@ async function logDiagSync(tripId){
   let msg="=== DIAGNÓSTICO DE SINCRONIZACIÓN ===\n\n";
   try{
     // 1. Check trip companies
-    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,companies(name)").eq("trip_id",tripId);
+    const{data:tcs}=await sb.from("logistics_trip_companies").select("company_id,custom_name,custom_contact,custom_phone,companies(name)").eq("trip_id",tripId);
     msg+="📌 EMPRESAS DEL VIAJE:\n";
     if(!tcs||tcs.length===0){
       msg+="  ❌ NO HAY EMPRESAS ASIGNADAS AL VIAJE!\n  Este es el problema.\n";
@@ -6286,15 +6324,15 @@ function logFormRecalcTransport(){
 function logAddCustomCo(){
   const name=prompt("Nombre de la empresa puntual:");
   if(!name||!name.trim())return;
-  // Ask city
   const dests=LOG.dests.map(d=>d.city);
   let city='';
   if(dests.length>0){
     city=prompt("Ciudad de la empresa:\n\nDestinos disponibles: "+dests.join(', ')+"\n\n(Escribe el nombre o deja vacío)");
   }
+  const contact=prompt("Nombre del contacto (opcional):")||'';
+  const phone=prompt("Número WhatsApp del contacto (con código país, ej: 593999999999):")||'';
   if(!LOG.editTrip._customCompanies)LOG.editTrip._customCompanies=[];
-  LOG.editTrip._customCompanies.push({name:name.trim(),city:(city||'').trim()});
-  // Auto-set destination city if not set yet
+  LOG.editTrip._customCompanies.push({name:name.trim(),city:(city||'').trim(),contact:contact.trim(),phone:phone.trim().replace(/\D/g,'')});
   if(!LOG.editTrip.destination_city&&city){
     const match=LOG.dests.find(d=>d.city.toLowerCase()===(city||'').toLowerCase());
     if(match){
@@ -6343,7 +6381,7 @@ async function logSaveTrip(){
           e._selectedCompanies.forEach(cid=>rows.push({trip_id:e.id,company_id:cid}));
         }
         if(e._customCompanies&&e._customCompanies.length>0){
-          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;rows.push({trip_id:e.id,company_id:null,custom_name:nm})});
+          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;const ct=typeof cn==='object'?cn.contact||'':'';const ph=typeof cn==='object'?cn.phone||'':'';rows.push({trip_id:e.id,company_id:null,custom_name:nm,custom_contact:ct,custom_phone:ph})});
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
@@ -6365,7 +6403,7 @@ async function logSaveTrip(){
           e._selectedCompanies.forEach(cid=>rows.push({trip_id:data.id,company_id:cid}));
         }
         if(e._customCompanies&&e._customCompanies.length>0){
-          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;rows.push({trip_id:data.id,company_id:null,custom_name:nm})});
+          e._customCompanies.forEach(cn=>{const nm=typeof cn==='string'?cn:cn.name;const ct=typeof cn==='object'?cn.contact||'':'';const ph=typeof cn==='object'?cn.phone||'':'';rows.push({trip_id:data.id,company_id:null,custom_name:nm,custom_contact:ct,custom_phone:ph})});
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
