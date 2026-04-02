@@ -4321,20 +4321,33 @@ function logRenderWeek(isAdmin,visibleTrips){
         h+=`<span style="display:inline-block;background:${isMe?LOG_COLOR+'25':'rgba(255,255,255,0.06)'};border:1px solid ${isMe?LOG_COLOR+'50':'transparent'};border-radius:12px;padding:3px 10px;font-size:10px;color:${isMe?LOG_COLOR:'var(--t2)'};margin:2px 4px 2px 0;font-weight:${isMe?'700':'400'}">${DEPT_ICONS[m.department]||'👤'} ${m.app_users?.name||DEPT_LABELS[m.department]||m.department}${isMe?' (tú)':''}</span>`;
       });
       h+=`</div>`;
-      // Activities
-      if(acts.length>0){
-        h+=`<div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-top:4px">`;
-        h+=`<div style="font-size:10px;font-weight:700;color:var(--t2);margin-bottom:4px">📋 Actividades:</div>`;
-        acts.slice(0,5).forEach(a=>{h+=`<div style="font-size:10px;color:var(--t3);padding:1px 0">${a.completed?'✅':'⬜'} ${DEPT_ICONS[a.department]||''} ${a.activity_name}</div>`});
-        if(acts.length>5)h+=`<div style="font-size:9px;color:var(--t3)">... y ${acts.length-5} más</div>`;
-        h+=`</div>`;
-      }
+      // Activities grouped by department (in LEFT panel - remove from here)
       if(isAdmin){
         h+=`<div style="font-size:11px;font-weight:700;color:${LOG_COLOR};text-align:right;margin-top:4px">💰 $${(t.total_cost||0).toFixed(2)}</div>`;
         const tNotifs=LOG.allNotifs.filter(n=>n.trip_id===t.id);
         if(tNotifs.length>0){const readC=tNotifs.filter(n=>n.read).length;const totalC=tNotifs.length;const allRead=readC===totalC;
           h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:${allRead?'#34d399':'#fbbf24'};font-weight:600">${allRead?'👁️ Todos confirmaron':'⚠️ '+readC+'/'+totalC+' vieron'}</div>`;
         }else if(members.length>0){h+=`<div style="font-size:9px;text-align:right;margin-top:2px;color:var(--t3)">📩 Notif. sin enviar</div>`}
+      }
+      h+=`</div>`;
+      // CENTER: Activities grouped by department
+      h+=`<div style="min-width:180px;max-width:250px;border-left:1px solid rgba(255,255,255,0.06);padding-left:12px;display:flex;flex-direction:column;gap:4px">`;
+      h+=`<div style="font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px">📋 Actividades</div>`;
+      if(acts.length>0){
+        const deptGroups={};
+        acts.forEach(a=>{const d=a.department||'general';if(!deptGroups[d])deptGroups[d]=[];deptGroups[d].push(a)});
+        Object.entries(deptGroups).forEach(([dept,deptActs])=>{
+          const icon=DEPT_ICONS[dept]||'📌';
+          const dColor=dept==='seguridad'?'#f59e0b':dept==='salud'?'#2dd4bf':dept==='datos'?'#818cf8':dept==='tthh'||dept==='talento'?'#f472b6':dept==='ambiente'?'#22c55e':dept==='psicologo'?'#c084fc':'var(--t2)';
+          h+=`<div>`;
+          h+=`<div style="font-size:8px;font-weight:800;color:${dColor};text-transform:uppercase">${icon} ${DEPT_LABELS[dept]||dept}</div>`;
+          deptActs.forEach(a=>{
+            h+=`<div style="font-size:9px;color:var(--t3);padding:1px 0 1px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.completed?'✅':'⬜'} ${a.activity_name}</div>`;
+          });
+          h+=`</div>`;
+        });
+      }else{
+        h+=`<div style="font-size:9px;color:var(--t3);opacity:0.4;padding:8px 0">Sin actividades</div>`;
       }
       h+=`</div>`;
       // RIGHT: contacts + WhatsApp buttons
