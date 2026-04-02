@@ -5168,16 +5168,25 @@ function agGetVal(companyId,deptId,field){
   }
   // No manual record - auto-detect from trips for ag and vis fields only
   if(field==='ag'||field==='vis'){
+    const deptRoleMap={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
     const trips=LOG._agTrips||[];
     const tripCos=LOG._agTripCos||[];
+    const tripMembers=LOG._agTripMembers||[];
     const coTripIds=tripCos.filter(tc=>tc.company_id===companyId).map(tc=>tc.trip_id);
     if(coTripIds.length>0){
-      if(field==='ag')return 'SÍ'; // Company has a trip this month = agendado for ALL depts
-      if(field==='vis'){
-        // Check if any trip is completed
-        for(const tid of coTripIds){
-          const trip=trips.find(t=>t.id===tid);
-          if(trip&&trip.status==='completed')return 'SÍ';
+      const roleMatch=deptRoleMap[deptId];
+      const roles=Array.isArray(roleMatch)?roleMatch:[roleMatch];
+      for(const tid of coTripIds){
+        const trip=trips.find(t=>t.id===tid);
+        const members=tripMembers.filter(m=>m.trip_id===tid);
+        if(members.length>0){
+          // Has members: only mark departments whose members are assigned
+          if(field==='ag'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
+          if(field==='vis'&&trip&&trip.status==='completed'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
+        }else{
+          // No members: mark ALL departments (can't know which ones go)
+          if(field==='ag')return 'SÍ';
+          if(field==='vis'&&trip&&trip.status==='completed')return 'SÍ';
         }
       }
     }
@@ -5390,10 +5399,17 @@ function logRenderResumen(){
   const curMap={};
   curMonthTrips.forEach(t=>{
     const tCos=curTripCos.filter(tc=>tc.trip_id===t.id);
+    const tMembers=curMembers.filter(m=>m.trip_id===t.id);
+    const depts=new Set();
+    if(tMembers.length>0){
+      tMembers.forEach(m=>{const d=deptRoleMap[m.department];if(d)depts.add(d)});
+    }else{
+      AG_DEPTS.forEach(d=>depts.add(d.id));
+    }
     tCos.forEach(tc=>{
       const cid=tc.company_id;
       if(!curMap[cid])curMap[cid]=new Set();
-      AG_DEPTS.forEach(d=>curMap[cid].add(d.id));
+      depts.forEach(d=>curMap[cid].add(d));
     });
   });
 
@@ -5401,10 +5417,17 @@ function logRenderResumen(){
   const prevMap={};
   prevMonthTrips.forEach(t=>{
     const tCos=prevTripCos.filter(tc=>tc.trip_id===t.id);
+    const tMembers=prevMembers.filter(m=>m.trip_id===t.id);
+    const depts=new Set();
+    if(tMembers.length>0){
+      tMembers.forEach(m=>{const d=deptRoleMap[m.department];if(d)depts.add(d)});
+    }else{
+      AG_DEPTS.forEach(d=>depts.add(d.id));
+    }
     tCos.forEach(tc=>{
       const cid=tc.company_id;
       if(!prevMap[cid])prevMap[cid]=new Set();
-      AG_DEPTS.forEach(d=>prevMap[cid].add(d.id));
+      depts.forEach(d=>prevMap[cid].add(d));
     });
   });
 
