@@ -7167,16 +7167,31 @@ function contDashboard(){
 function contInvoices(){
   const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
   let h='';
-  if(isAdmin)h+=`<button onclick="contNewInvoice()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px">+ Nueva Factura</button>`;
+  if(isAdmin){
+    h+=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">`;
+    h+=`<button onclick="contNewInvoice()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">+ Nueva Factura</button>`;
+    h+=`<button onclick="document.getElementById('sriXmlInput').click()" style="background:linear-gradient(135deg,#2dd4bf,#818cf8);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📥 Importar XML del SRI</button>`;
+    h+=`<input type="file" id="sriXmlInput" accept=".xml,.zip" multiple style="display:none" onchange="contImportSRIXml(this.files)">`;
+    h+=`</div>`;
+  }
 
-  // Filter
-  h+=`<div class="c"><div class="st">📄 Facturas Emitidas (${CONT.invoices.length})</div>`;
+  // Tabs Ventas / Compras
+  const vTab=CONT._invTab||'ventas';
+  h+=`<div style="display:flex;gap:6px;margin-bottom:10px">`;
+  h+=`<button onclick="CONT._invTab='ventas';contRender()" style="padding:6px 16px;border-radius:8px;border:2px solid ${vTab==='ventas'?CONT_COLOR:'rgba(255,255,255,0.1)'};background:${vTab==='ventas'?CONT_COLOR+'20':'transparent'};color:${vTab==='ventas'?CONT_COLOR:'var(--t2)'};font-size:12px;font-weight:700;cursor:pointer">📤 Ventas (Emitidas)</button>`;
+  h+=`<button onclick="CONT._invTab='compras';contRender()" style="padding:6px 16px;border-radius:8px;border:2px solid ${vTab==='compras'?'#60a5fa':'rgba(255,255,255,0.1)'};background:${vTab==='compras'?'rgba(96,165,250,0.15)':'transparent'};color:${vTab==='compras'?'#60a5fa':'var(--t2)'};font-size:12px;font-weight:700;cursor:pointer">📥 Compras (Recibidas)</button>`;
+  h+=`</div>`;
+
+  const filtered=CONT.invoices.filter(i=>vTab==='compras'?(i.type==='compra'):(i.type!=='compra'));
+  const tabColor=vTab==='compras'?'#60a5fa':CONT_COLOR;
+
+  h+=`<div class="c"><div class="st">${vTab==='compras'?'📥 Compras Recibidas':'📤 Facturas Emitidas'} (${filtered.length})</div>`;
   h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
-  h+=`<th style="padding:8px;text-align:left">N° Factura</th><th style="padding:8px;text-align:left">Empresa</th><th style="padding:8px;text-align:left">Concepto</th><th style="padding:8px;text-align:center">Fecha</th><th style="padding:8px;text-align:right">Subtotal</th><th style="padding:8px;text-align:right">IVA</th><th style="padding:8px;text-align:right">Total</th><th style="padding:8px;text-align:center">Estado</th>`;
+  h+=`<th style="padding:8px;text-align:left">N° Factura</th><th style="padding:8px;text-align:left">${vTab==='compras'?'Proveedor':'Empresa'}</th><th style="padding:8px;text-align:left">Concepto</th><th style="padding:8px;text-align:center">Fecha</th><th style="padding:8px;text-align:right">Subtotal</th><th style="padding:8px;text-align:right">IVA</th><th style="padding:8px;text-align:right">Total</th><th style="padding:8px;text-align:center">Estado</th>`;
   if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acción</th>`;
   h+=`</tr></thead><tbody>`;
 
-  CONT.invoices.forEach(inv=>{
+  filtered.forEach(inv=>{
     const st=CONT_INV_STATUS.find(s=>s.id===inv.status)||CONT_INV_STATUS[0];
     const coName=inv.company_name||cos.find(c=>c.id===inv.company_id)?.name||'—';
     h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
@@ -7349,6 +7364,168 @@ async function contNewExpense(){
 async function contDelInv(id){if(!confirm("¿Eliminar factura?"))return;await sb.from("cont_invoices").delete().eq("id",id);await contLoad()}
 async function contDelPay(id){if(!confirm("¿Eliminar cobro?"))return;await sb.from("cont_payments").delete().eq("id",id);await contLoad()}
 async function contDelExp(id){if(!confirm("¿Eliminar gasto?"))return;await sb.from("cont_expenses").delete().eq("id",id);await contLoad()}
+
+// === SRI XML IMPORT ===
+async function contImportSRIXml(files){
+  if(!files||files.length===0)return;
+  let imported=0,errors=0,duplicates=0;
+  const existingNums=new Set(CONT.invoices.map(i=>i.invoice_number));
+
+  for(const file of files){
+    try{
+      let xmlTexts=[];
+      if(file.name.endsWith('.zip')){
+        // ZIP file with multiple XMLs
+        if(typeof JSZip==='undefined'){
+          await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+        }
+        const zip=await JSZip.loadAsync(file);
+        for(const[name,entry] of Object.entries(zip.files)){
+          if(name.endsWith('.xml')&&!entry.dir){
+            xmlTexts.push(await entry.async('text'));
+          }
+        }
+      }else{
+        xmlTexts.push(await file.text());
+      }
+
+      for(const xmlText of xmlTexts){
+        try{
+          const parser=new DOMParser();
+          const doc=parser.parseFromString(xmlText,'text/xml');
+          
+          // Detect document type
+          const factura=doc.querySelector('factura');
+          const notaCredito=doc.querySelector('notaCredito');
+          const retencion=doc.querySelector('comprobanteRetencion');
+          const root=factura||notaCredito||retencion;
+          if(!root){errors++;continue}
+
+          // Extract infoTributaria
+          const infoTrib=root.querySelector('infoTributaria');
+          if(!infoTrib){errors++;continue}
+          
+          const getTag=(parent,tag)=>{const el=parent.querySelector(tag);return el?el.textContent.trim():''};
+          
+          const ruc=getTag(infoTrib,'ruc');
+          const razonSocial=getTag(infoTrib,'razonSocial');
+          const estab=getTag(infoTrib,'estab');
+          const ptoEmi=getTag(infoTrib,'ptoEmi');
+          const secuencial=getTag(infoTrib,'secuencial');
+          const numFact=estab+'-'+ptoEmi+'-'+secuencial;
+          const claveAcceso=getTag(infoTrib,'claveAcceso');
+          const codDoc=getTag(infoTrib,'codDoc'); // 01=factura, 04=NC, 07=retencion
+
+          // Check duplicate
+          if(existingNums.has(numFact)){duplicates++;continue}
+
+          let tipo='compra'; // default: it's a purchase (received)
+          let companyName='',companyRuc='',concept='',subtotal=0,iva=0,total=0,fecha='';
+
+          if(factura){
+            const infoFact=factura.querySelector('infoFactura');
+            if(infoFact){
+              // Parse date (DD/MM/YYYY -> YYYY-MM-DD)
+              const fechaRaw=getTag(infoFact,'fechaEmision');
+              if(fechaRaw.includes('/')){
+                const p=fechaRaw.split('/');
+                fecha=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+              }else fecha=fechaRaw;
+
+              subtotal=parseFloat(getTag(infoFact,'totalSinImpuestos'))||0;
+              total=parseFloat(getTag(infoFact,'importeTotal'))||0;
+              iva=total-subtotal;
+
+              // Check IVA from totalConImpuestos
+              const impuestos=infoFact.querySelectorAll('totalImpuesto');
+              let ivaSum=0;
+              impuestos.forEach(imp=>{
+                const cod=getTag(imp,'codigo');
+                if(cod==='2')ivaSum+=parseFloat(getTag(imp,'valor'))||0;
+              });
+              if(ivaSum>0)iva=ivaSum;
+
+              // Determine if we emitted or received
+              const rucComprador=getTag(infoFact,'identificacionComprador');
+              const nombreComprador=getTag(infoFact,'razonSocialComprador');
+              
+              // If the emisor RUC is our company, it's a SALE (venta)
+              // If the comprador RUC is our company, it's a PURCHASE (compra)
+              // Default: treat as compra (received invoice)
+              companyName=razonSocial; // The emisor
+              companyRuc=ruc;
+              tipo='compra';
+            }
+
+            // Get concept from first detail
+            const det=factura.querySelector('detalle');
+            if(det)concept=getTag(det,'descripcion');
+            if(!concept){
+              const dets=factura.querySelectorAll('detalle');
+              if(dets.length>0)concept=Array.from(dets).map(d=>getTag(d,'descripcion')).filter(Boolean).join(', ');
+            }
+          }else if(notaCredito){
+            tipo='nota_credito';
+            const infoNC=notaCredito.querySelector('infoNotaCredito');
+            if(infoNC){
+              const fechaRaw=getTag(infoNC,'fechaEmision');
+              if(fechaRaw.includes('/')){const p=fechaRaw.split('/');fecha=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0')}else fecha=fechaRaw;
+              subtotal=parseFloat(getTag(infoNC,'totalSinImpuestos'))||0;
+              total=parseFloat(getTag(infoNC,'valorModificacion'))||0;
+              iva=total-subtotal;
+              companyName=razonSocial;companyRuc=ruc;
+            }
+            concept='Nota de Crédito';
+          }else if(retencion){
+            tipo='retencion';
+            const infoRet=retencion.querySelector('infoCompRetencion');
+            if(infoRet){
+              const fechaRaw=getTag(infoRet,'fechaEmision');
+              if(fechaRaw.includes('/')){const p=fechaRaw.split('/');fecha=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0')}else fecha=fechaRaw;
+              companyName=razonSocial;companyRuc=ruc;
+            }
+            const impuestos=retencion.querySelectorAll('impuesto');
+            let retTotal=0;
+            impuestos.forEach(imp=>{retTotal+=parseFloat(getTag(imp,'valorRetenido'))||0});
+            total=retTotal;subtotal=retTotal;
+            concept='Retención en la fuente';
+          }
+
+          // Match company
+          const matchCo=cos.find(c=>c.ruc===companyRuc);
+
+          const ivaRate=subtotal>0?Math.round(iva/subtotal*100):15;
+
+          // Insert
+          const{error}=await sb.from("cont_invoices").insert({
+            company_id:matchCo?.id||null,
+            company_name:companyName,
+            invoice_number:numFact,
+            concept:concept.substring(0,200),
+            subtotal,iva,iva_rate:ivaRate,total,
+            invoice_date:fecha,
+            status:'emitida',
+            type:tipo,
+            sri_clave_acceso:claveAcceso,
+            sri_ruc_emisor:ruc,
+            sri_cod_doc:codDoc,
+            year:fecha?parseInt(fecha.split('-')[0]):new Date().getFullYear(),
+            created_by:CURRENT_USER?.id
+          });
+          if(error){console.error("Import error:",error.message);errors++}
+          else{imported++;existingNums.add(numFact)}
+        }catch(e){console.error("XML parse error:",e);errors++}
+      }
+    }catch(e){console.error("File error:",e);errors++}
+  }
+
+  let msg=`✅ Importación completada:\n\n📄 ${imported} comprobantes importados`;
+  if(duplicates>0)msg+=`\n⚠️ ${duplicates} duplicados (ya existían)`;
+  if(errors>0)msg+=`\n❌ ${errors} errores`;
+  alert(msg);
+  document.getElementById('sriXmlInput').value='';
+  await contLoad();
+}
 
 async function contEditInv(id){
   const inv=CONT.invoices.find(i=>i.id===id);if(!inv)return;
