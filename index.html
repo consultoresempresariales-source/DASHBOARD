@@ -98,6 +98,7 @@ canvas{width:100%!important;max-height:220px}
   <div class="sb-item" onclick="switchModule('datos')" id="sb-datos" style="display:none"><span class="sb-icon">🛡</span><span class="sb-label">DATOS</span></div>
   <div class="sb-item" onclick="switchModule('ambiente')" id="sb-ambiente" style="display:none"><span class="sb-icon">🌿</span><span class="sb-label">AMBIENT.</span></div>
   <div class="sb-item" onclick="switchModule('logistica')" id="sb-logistica" style="display:none"><span class="sb-icon">🚐</span><span class="sb-label">LOGÍST.</span></div>
+  <div class="sb-item" onclick="switchModule('contable')" id="sb-contable" style="display:none"><span class="sb-icon">💰</span><span class="sb-label">CONTAB.</span></div>
   <div style="flex:1"></div>
   <div class="sb-item" onclick="switchModule('pendientes')" id="sb-pendientes" style="display:none"><span class="sb-icon">📋</span><span class="sb-label">TAREAS</span></div>
   <div class="sb-item" onclick="switchModule('config')" id="sb-config"><span class="sb-icon">⚙️</span><span class="sb-label">CONFIG</span></div>
@@ -214,6 +215,13 @@ canvas{width:100%!important;max-height:220px}
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div id="logSySt" class="si ok">✓</div></div>
 </div>
 <div class="mn" id="logMc"></div>
+</div>
+<div id="contableModule" style="display:none">
+<div class="hd" id="contHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+<div style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:linear-gradient(135deg,#eab308,#f59e0b)">💰</div><div class="bn"><h1 id="contBN">Contabilidad</h1><p id="contBS" style="color:var(--t3)">Facturación, Cobros y Gastos</p></div><div class="mod-badge" style="background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.3)">💰 Contabilidad</div></div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div id="contSySt" class="si ok">✓</div><div class="nv" id="contNv"></div></div>
+</div>
+<div class="mn" id="contMc"></div>
 </div>
 <div id="saludModule">
 <div class="hd" id="saludHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -360,13 +368,13 @@ function applyUserRole(){
       'datos':['datos'],
       'ambiente':['ambiente'],
       'psicologo':['salud'],
-      'contador':['logistica']
+      'contador':['contable','logistica']
     };
     if(u.role&&u.role!=='multi'&&roleModMap[u.role]){
       effectiveMods=roleModMap[u.role];
     }else{
       // For 'multi' role or unmapped roles: map each module to its sidebar equivalent
-      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'ambiente','psicologo':'salud','contador':'logistica'};
+      const modToSidebar={'salud':'salud','seguridad':'seguridad','tthh':'talento','talento':'talento','datos':'datos','ambiente':'ambiente','psicologo':'salud','contador':'contable'};
       const filtered=rawMods.filter(m=>m!=="jefe"&&m!=="admin");
       const mapped=filtered.map(m=>modToSidebar[m]||m).filter(Boolean);
       effectiveMods=[...new Set(mapped)];
@@ -387,7 +395,7 @@ function applyUserRole(){
     const pendEl=document.getElementById("sb-pendientes");if(pendEl)pendEl.style.display="block";
   }
   // Logística: show for all users
-  const logEl=document.getElementById("sb-logistica");
+  const logEl=document.getElementById("sb-logistica");const contEl=document.getElementById("sb-contable");if(contEl)contEl.style.display="block";
   if(logEl)logEl.style.display="block";
   // User info in sidebar
   const ui=document.getElementById("sb-user");
@@ -561,7 +569,7 @@ async function forgotPassword(){
   await sb.from("app_users").update({password_reset_requested:true}).eq("id",data[0].id);
   errEl.style.color="#34d399";errEl.textContent="✅ Solicitud enviada. El administrador restablecerá su contraseña pronto."
 }
-function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","talentoModule","datosModule","ambienteModule","logisticaModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}}
+function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","talentoModule","datosModule","ambienteModule","logisticaModule","contableModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule",contable:"contableModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}else if(m==="contable"){contLoad()}}
 const MO=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"],MF=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS=[{id:"admin",name:"G. Administrativa",color:"#2dd4bf",icon:"🏛"},{id:"tecnica",name:"G. Técnica",color:"#818cf8",icon:"⚙️"},{id:"talento",name:"G. Talento Humano",color:"#f472b6",icon:"👥"},{id:"operativos",name:"Proc. Operativos",color:"#fb923c",icon:"📋"},{id:"psicosocial",name:"R. Psicosociales",color:"#a78bfa",icon:"🧠"},{id:"drogas",name:"Prev. Drogas",color:"#34d399",icon:"🛡"},{id:"servicios",name:"Serv. Permanentes",color:"#fbbf24",icon:"🔧"}];
 const EXT=[{id:"ingreso",label:"Ex. Ingreso",color:"#2dd4bf"},{id:"periodico",label:"Ex. Periódico",color:"#818cf8"},{id:"reintegro",label:"Ex. Reintegro",color:"#f472b6"},{id:"egreso",label:"Ex. Egreso",color:"#fb923c"}];
@@ -2233,7 +2241,7 @@ function updateSidebar(){
     if(!el)return;
     el.style.display=has?"block":"none";
   });
-  const logEl=document.getElementById("sb-logistica");
+  const logEl=document.getElementById("sb-logistica");const contEl=document.getElementById("sb-contable");if(contEl)contEl.style.display="block";
   if(logEl)logEl.style.display="block";
 }
 
@@ -7050,6 +7058,303 @@ async function _getTripData(tripId){
   // Tema
   const tema='Visita técnica a '+(companies[0]||comp.name||'')+' — '+depts.join(', ');
   return{t,members,acts,tcs,dd,dateStr,comp,companies,logoB64,pvLogoB64,completed,notCompleted,pending,pctDone,byDept,devItems,objGeneral,objEspecificos,conclusion,tema,depts};
+}
+
+// ===== MÓDULO CONTABLE =====
+const CONT={invoices:[],payments:[],expenses:[],tab:'dashboard',editInv:null,editExp:null};
+const CONT_COLOR='#eab308';
+const CONT_CATS_EXP=[
+  {id:'viatico',label:'Viáticos',icon:'🚐',color:'#f97316'},
+  {id:'alimentacion',label:'Alimentación',icon:'🍽️',color:'#fb923c'},
+  {id:'hospedaje',label:'Hospedaje',icon:'🏨',color:'#a78bfa'},
+  {id:'transporte',label:'Transporte',icon:'🚗',color:'#60a5fa'},
+  {id:'insumos',label:'Insumos/Material',icon:'📦',color:'#34d399'},
+  {id:'servicios',label:'Servicios',icon:'🔧',color:'#f472b6'},
+  {id:'otro',label:'Otro',icon:'📋',color:'#94a3b8'}
+];
+const CONT_PAY_METHODS=[{id:'transferencia',label:'Transferencia'},{id:'efectivo',label:'Efectivo'},{id:'cheque',label:'Cheque'},{id:'tarjeta',label:'Tarjeta'}];
+const CONT_INV_STATUS=[{id:'emitida',label:'Emitida',color:'#60a5fa'},{id:'pagada',label:'Pagada',color:'#34d399'},{id:'parcial',label:'Parcial',color:'#fbbf24'},{id:'vencida',label:'Vencida',color:'#ef4444'},{id:'anulada',label:'Anulada',color:'#94a3b8'}];
+
+async function contLoad(){
+  if(!sb)return;
+  const mc=document.getElementById("contMc");
+  if(mc)mc.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';
+  try{
+    const yr=new Date().getFullYear();
+    const[inv,pay,exp]=await Promise.all([
+      sb.from("cont_invoices").select("*").eq("year",yr).order("invoice_date",{ascending:false}),
+      sb.from("cont_payments").select("*").eq("year",yr).order("payment_date",{ascending:false}),
+      sb.from("cont_expenses").select("*").eq("year",yr).order("expense_date",{ascending:false})
+    ]);
+    CONT.invoices=inv.data||[];
+    CONT.payments=pay.data||[];
+    CONT.expenses=exp.data||[];
+  }catch(e){
+    console.error("contLoad:",e);
+    CONT.invoices=[];CONT.payments=[];CONT.expenses=[];
+  }
+  contRender();
+}
+
+function contRender(){
+  const mc=document.getElementById("contMc");if(!mc)return;
+  // Nav
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'reports',l:'📈 Reportes'}];
+  const nv=document.getElementById("contNv");
+  if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
+
+  let h='';
+  if(CONT.tab==='dashboard'){h=contDashboard()}
+  else if(CONT.tab==='invoices'){h=contInvoices()}
+  else if(CONT.tab==='payments'){h=contPayments()}
+  else if(CONT.tab==='expenses'){h=contExpenses()}
+  else if(CONT.tab==='reports'){h=contReports()}
+  mc.innerHTML=h;
+}
+
+function contDashboard(){
+  const totalFact=CONT.invoices.filter(i=>i.status!=='anulada').reduce((a,i)=>a+(i.total||0),0);
+  const totalCobrado=CONT.payments.reduce((a,p)=>a+(p.amount||0),0);
+  const totalGastos=CONT.expenses.reduce((a,e)=>a+(e.amount||0),0);
+  const porCobrar=totalFact-totalCobrado;
+  const utilidad=totalCobrado-totalGastos;
+
+  let h=`<div class="gr" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">`;
+  const kpis=[
+    {l:'Facturado',v:'$'+totalFact.toFixed(2),c:'#60a5fa',i:'📄'},
+    {l:'Cobrado',v:'$'+totalCobrado.toFixed(2),c:'#34d399',i:'💵'},
+    {l:'Por Cobrar',v:'$'+porCobrar.toFixed(2),c:porCobrar>0?'#fbbf24':'#34d399',i:'⏳'},
+    {l:'Gastos',v:'$'+totalGastos.toFixed(2),c:'#ef4444',i:'📤'},
+    {l:'Utilidad',v:'$'+utilidad.toFixed(2),c:utilidad>=0?'#34d399':'#ef4444',i:'📊'}
+  ];
+  kpis.forEach(k=>{h+=`<div class="c"><div class="ib">${k.i}</div><div class="kl">${k.l}</div><div class="kv" style="color:${k.c}">${k.v}</div></div>`});
+  h+=`</div>`;
+
+  // Recent invoices
+  h+=`<div class="c" style="margin-top:16px"><div class="st">📄 Últimas Facturas</div>`;
+  const recent=CONT.invoices.slice(0,5);
+  if(recent.length===0)h+=`<div style="color:var(--t3);font-size:12px;padding:20px;text-align:center">No hay facturas registradas</div>`;
+  else{
+    recent.forEach(inv=>{
+      const st=CONT_INV_STATUS.find(s=>s.id===inv.status)||CONT_INV_STATUS[0];
+      const coName=inv.company_name||cos.find(c=>c.id===inv.company_id)?.name||'—';
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04)">`;
+      h+=`<div><div style="font-weight:700;font-size:12px">${inv.invoice_number||'S/N'} — ${coName}</div><div style="font-size:10px;color:var(--t3)">${inv.concept||''} · ${inv.invoice_date||''}</div></div>`;
+      h+=`<div style="text-align:right"><div style="font-weight:800;font-family:var(--mn);color:${CONT_COLOR}">$${(inv.total||0).toFixed(2)}</div><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:${st.color}20;color:${st.color};font-weight:700">${st.label}</span></div>`;
+      h+=`</div>`;
+    });
+  }
+  h+=`</div>`;
+
+  // Recent expenses
+  h+=`<div class="c" style="margin-top:12px"><div class="st">📤 Últimos Gastos</div>`;
+  const recentExp=CONT.expenses.slice(0,5);
+  if(recentExp.length===0)h+=`<div style="color:var(--t3);font-size:12px;padding:20px;text-align:center">No hay gastos registrados</div>`;
+  else{
+    recentExp.forEach(exp=>{
+      const cat=CONT_CATS_EXP.find(c=>c.id===exp.category)||CONT_CATS_EXP[6];
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04)">`;
+      h+=`<div><div style="font-weight:700;font-size:12px">${cat.icon} ${exp.description||''}</div><div style="font-size:10px;color:var(--t3)">${exp.provider||''} · ${exp.expense_date||''}</div></div>`;
+      h+=`<div style="font-weight:800;font-family:var(--mn);color:#ef4444">-$${(exp.amount||0).toFixed(2)}</div>`;
+      h+=`</div>`;
+    });
+  }
+  h+=`</div>`;
+  return h;
+}
+
+function contInvoices(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  let h='';
+  if(isAdmin)h+=`<button onclick="contNewInvoice()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px">+ Nueva Factura</button>`;
+
+  // Filter
+  h+=`<div class="c"><div class="st">📄 Facturas Emitidas (${CONT.invoices.length})</div>`;
+  h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+  h+=`<th style="padding:8px;text-align:left">N° Factura</th><th style="padding:8px;text-align:left">Empresa</th><th style="padding:8px;text-align:left">Concepto</th><th style="padding:8px;text-align:center">Fecha</th><th style="padding:8px;text-align:right">Subtotal</th><th style="padding:8px;text-align:right">IVA</th><th style="padding:8px;text-align:right">Total</th><th style="padding:8px;text-align:center">Estado</th>`;
+  if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acción</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  CONT.invoices.forEach(inv=>{
+    const st=CONT_INV_STATUS.find(s=>s.id===inv.status)||CONT_INV_STATUS[0];
+    const coName=inv.company_name||cos.find(c=>c.id===inv.company_id)?.name||'—';
+    h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+    h+=`<td style="padding:6px 8px;font-weight:700;font-family:var(--mn)">${inv.invoice_number||'—'}</td>`;
+    h+=`<td style="padding:6px 8px">${coName}</td>`;
+    h+=`<td style="padding:6px 8px">${inv.concept||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center">${inv.invoice_date||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mn)">$${(inv.subtotal||0).toFixed(2)}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mn)">$${(inv.iva||0).toFixed(2)}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:right;font-weight:800;font-family:var(--mn);color:${CONT_COLOR}">$${(inv.total||0).toFixed(2)}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;padding:2px 8px;border-radius:4px;background:${st.color}20;color:${st.color};font-weight:700">${st.label}</span></td>`;
+    if(isAdmin)h+=`<td style="padding:6px 8px;text-align:center"><button onclick="contEditInv('${inv.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">✏️</button><button onclick="contDelInv('${inv.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">🗑</button></td>`;
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  return h;
+}
+
+function contPayments(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  let h='';
+  if(isAdmin)h+=`<button onclick="contNewPayment()" style="background:#34d399;color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px">+ Registrar Cobro</button>`;
+
+  h+=`<div class="c"><div class="st">💵 Cobros Registrados (${CONT.payments.length})</div>`;
+  h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+  h+=`<th style="padding:8px;text-align:left">Empresa</th><th style="padding:8px;text-align:left">N° Factura</th><th style="padding:8px;text-align:center">Fecha</th><th style="padding:8px;text-align:center">Método</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px;text-align:left">Nota</th>`;
+  if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acción</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  CONT.payments.forEach(p=>{
+    const coName=p.company_name||cos.find(c=>c.id===p.company_id)?.name||'—';
+    h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+    h+=`<td style="padding:6px 8px">${coName}</td>`;
+    h+=`<td style="padding:6px 8px;font-family:var(--mn)">${p.invoice_number||'—'}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center">${p.payment_date||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center">${p.method||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:right;font-weight:800;font-family:var(--mn);color:#34d399">$${(p.amount||0).toFixed(2)}</td>`;
+    h+=`<td style="padding:6px 8px;font-size:10px;color:var(--t3)">${p.notes||''}</td>`;
+    if(isAdmin)h+=`<td style="padding:6px 8px;text-align:center"><button onclick="contDelPay('${p.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">🗑</button></td>`;
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  return h;
+}
+
+function contExpenses(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  let h='';
+  if(isAdmin)h+=`<button onclick="contNewExpense()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px">+ Registrar Gasto</button>`;
+
+  h+=`<div class="c"><div class="st">📤 Gastos Registrados (${CONT.expenses.length})</div>`;
+  h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+  h+=`<th style="padding:8px;text-align:left">Descripción</th><th style="padding:8px;text-align:left">Proveedor</th><th style="padding:8px;text-align:center">Categoría</th><th style="padding:8px;text-align:center">Fecha</th><th style="padding:8px;text-align:center">Comprobante</th><th style="padding:8px;text-align:right">Monto</th>`;
+  if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acción</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  CONT.expenses.forEach(e=>{
+    const cat=CONT_CATS_EXP.find(c=>c.id===e.category)||CONT_CATS_EXP[6];
+    h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+    h+=`<td style="padding:6px 8px">${e.description||''}</td>`;
+    h+=`<td style="padding:6px 8px">${e.provider||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;padding:2px 8px;border-radius:4px;background:${cat.color}20;color:${cat.color};font-weight:700">${cat.icon} ${cat.label}</span></td>`;
+    h+=`<td style="padding:6px 8px;text-align:center">${e.expense_date||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center;font-family:var(--mn);font-size:10px">${e.voucher_number||'—'}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:right;font-weight:800;font-family:var(--mn);color:#ef4444">$${(e.amount||0).toFixed(2)}</td>`;
+    if(isAdmin)h+=`<td style="padding:6px 8px;text-align:center"><button onclick="contDelExp('${e.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">🗑</button></td>`;
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  return h;
+}
+
+function contReports(){
+  const MO=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  let h='<div class="c"><div class="st">📈 Estado de Resultados Mensual</div>';
+  h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)"><th style="padding:8px">Mes</th><th style="padding:8px;text-align:right;color:#60a5fa">Facturado</th><th style="padding:8px;text-align:right;color:#34d399">Cobrado</th><th style="padding:8px;text-align:right;color:#ef4444">Gastos</th><th style="padding:8px;text-align:right;color:${CONT_COLOR}">Utilidad</th></tr></thead><tbody>`;
+  let tFact=0,tCob=0,tGast=0;
+  MO.forEach((m,mi)=>{
+    const mInv=CONT.invoices.filter(i=>i.status!=='anulada'&&i.invoice_date&&parseInt(i.invoice_date.split('-')[1])===mi+1);
+    const mPay=CONT.payments.filter(p=>p.payment_date&&parseInt(p.payment_date.split('-')[1])===mi+1);
+    const mExp=CONT.expenses.filter(e=>e.expense_date&&parseInt(e.expense_date.split('-')[1])===mi+1);
+    const fact=mInv.reduce((a,i)=>a+(i.total||0),0);
+    const cob=mPay.reduce((a,p)=>a+(p.amount||0),0);
+    const gast=mExp.reduce((a,e)=>a+(e.amount||0),0);
+    const util=cob-gast;
+    tFact+=fact;tCob+=cob;tGast+=gast;
+    h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)"><td style="padding:6px 8px;font-weight:700">${m}</td><td style="padding:6px 8px;text-align:right;font-family:var(--mn)">$${fact.toFixed(2)}</td><td style="padding:6px 8px;text-align:right;font-family:var(--mn);color:#34d399">$${cob.toFixed(2)}</td><td style="padding:6px 8px;text-align:right;font-family:var(--mn);color:#ef4444">$${gast.toFixed(2)}</td><td style="padding:6px 8px;text-align:right;font-weight:800;font-family:var(--mn);color:${util>=0?'#34d399':'#ef4444'}">$${util.toFixed(2)}</td></tr>`;
+  });
+  h+=`<tr style="background:rgba(234,179,8,0.1);border-top:2px solid ${CONT_COLOR}"><td style="padding:8px;font-weight:800">TOTAL</td><td style="padding:8px;text-align:right;font-weight:800;font-family:var(--mn)">$${tFact.toFixed(2)}</td><td style="padding:8px;text-align:right;font-weight:800;font-family:var(--mn);color:#34d399">$${tCob.toFixed(2)}</td><td style="padding:8px;text-align:right;font-weight:800;font-family:var(--mn);color:#ef4444">$${tGast.toFixed(2)}</td><td style="padding:8px;text-align:right;font-weight:800;font-family:var(--mn);color:${(tCob-tGast)>=0?'#34d399':'#ef4444'}">$${(tCob-tGast).toFixed(2)}</td></tr>`;
+  h+=`</tbody></table></div></div>`;
+
+  // Cuentas por cobrar
+  h+=`<div class="c" style="margin-top:16px"><div class="st">⏳ Cuentas por Cobrar</div>`;
+  const pending=CONT.invoices.filter(i=>i.status==='emitida'||i.status==='parcial'||i.status==='vencida');
+  if(pending.length===0)h+=`<div style="color:#34d399;text-align:center;padding:20px;font-size:13px">✅ No hay cuentas pendientes</div>`;
+  else{
+    let totalPend=0;
+    pending.forEach(inv=>{
+      const paid=CONT.payments.filter(p=>p.invoice_id===inv.id).reduce((a,p)=>a+(p.amount||0),0);
+      const remaining=(inv.total||0)-paid;
+      totalPend+=remaining;
+      const coName=inv.company_name||cos.find(c=>c.id===inv.company_id)?.name||'—';
+      const st=CONT_INV_STATUS.find(s=>s.id===inv.status);
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04)">`;
+      h+=`<div><span style="font-weight:700">${inv.invoice_number||'S/N'}</span> — ${coName}<div style="font-size:10px;color:var(--t3)">${inv.concept||''} · ${inv.invoice_date||''}</div></div>`;
+      h+=`<div style="text-align:right"><div style="font-weight:800;font-family:var(--mn);color:#fbbf24">$${remaining.toFixed(2)}</div><span style="font-size:9px;color:${st?.color||'#94a3b8'}">${st?.label||''}</span></div></div>`;
+    });
+    h+=`<div style="text-align:right;padding:10px;font-weight:800;color:#fbbf24;font-family:var(--mn);font-size:14px;border-top:2px solid rgba(251,191,36,0.3)">Total por cobrar: $${totalPend.toFixed(2)}</div>`;
+  }
+  h+=`</div>`;
+  return h;
+}
+
+// CRUD functions
+async function contNewInvoice(){
+  const coId=prompt("ID o nombre de la empresa:");if(!coId)return;
+  const co=cos.find(c=>c.name.toLowerCase().includes(coId.toLowerCase()))||{id:null,name:coId};
+  const num=prompt("Número de factura:");if(!num)return;
+  const concept=prompt("Concepto:");if(!concept)return;
+  const subtotal=parseFloat(prompt("Subtotal (sin IVA):")||0);
+  const ivaRate=parseFloat(prompt("% IVA (15, 0, etc):")||15);
+  const iva=subtotal*ivaRate/100;
+  const total=subtotal+iva;
+  const date=prompt("Fecha (YYYY-MM-DD):",new Date().toISOString().split('T')[0]);
+  try{
+    const{error}=await sb.from("cont_invoices").insert({company_id:co.id,company_name:co.name||coId,invoice_number:num,concept,subtotal,iva,iva_rate:ivaRate,total,invoice_date:date,status:'emitida',year:parseInt(date.split('-')[0]),created_by:CURRENT_USER?.id});
+    if(error)throw error;
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function contNewPayment(){
+  const coId=prompt("Nombre de la empresa:");if(!coId)return;
+  const co=cos.find(c=>c.name.toLowerCase().includes(coId.toLowerCase()));
+  const invNum=prompt("N° Factura (opcional):")||'';
+  const inv=invNum?CONT.invoices.find(i=>i.invoice_number===invNum):null;
+  const amount=parseFloat(prompt("Monto cobrado:")||0);if(!amount)return;
+  const method=prompt("Método (transferencia/efectivo/cheque/tarjeta):","transferencia");
+  const date=prompt("Fecha (YYYY-MM-DD):",new Date().toISOString().split('T')[0]);
+  const notes=prompt("Nota (opcional):")||'';
+  try{
+    const{error}=await sb.from("cont_payments").insert({company_id:co?.id||null,company_name:co?.name||coId,invoice_id:inv?.id||null,invoice_number:invNum,amount,method,payment_date:date,notes,year:parseInt(date.split('-')[0]),created_by:CURRENT_USER?.id});
+    if(error)throw error;
+    // Update invoice status if fully paid
+    if(inv){
+      const totalPaid=CONT.payments.filter(p=>p.invoice_id===inv.id).reduce((a,p)=>a+(p.amount||0),0)+amount;
+      const newSt=totalPaid>=inv.total?'pagada':'parcial';
+      await sb.from("cont_invoices").update({status:newSt}).eq("id",inv.id);
+    }
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function contNewExpense(){
+  const desc=prompt("Descripción del gasto:");if(!desc)return;
+  const provider=prompt("Proveedor/Beneficiario:")||'';
+  const catOpts=CONT_CATS_EXP.map((c,i)=>(i+1)+'. '+c.label).join('\n');
+  const catIdx=parseInt(prompt("Categoría:\n"+catOpts)||1)-1;
+  const cat=CONT_CATS_EXP[catIdx]?.id||'otro';
+  const amount=parseFloat(prompt("Monto:")||0);if(!amount)return;
+  const voucher=prompt("N° Comprobante (opcional):")||'';
+  const date=prompt("Fecha (YYYY-MM-DD):",new Date().toISOString().split('T')[0]);
+  try{
+    const{error}=await sb.from("cont_expenses").insert({description:desc,provider,category:cat,amount,voucher_number:voucher,expense_date:date,year:parseInt(date.split('-')[0]),created_by:CURRENT_USER?.id});
+    if(error)throw error;
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function contDelInv(id){if(!confirm("¿Eliminar factura?"))return;await sb.from("cont_invoices").delete().eq("id",id);await contLoad()}
+async function contDelPay(id){if(!confirm("¿Eliminar cobro?"))return;await sb.from("cont_payments").delete().eq("id",id);await contLoad()}
+async function contDelExp(id){if(!confirm("¿Eliminar gasto?"))return;await sb.from("cont_expenses").delete().eq("id",id);await contLoad()}
+
+async function contEditInv(id){
+  const inv=CONT.invoices.find(i=>i.id===id);if(!inv)return;
+  const newSt=prompt("Nuevo estado (emitida/pagada/parcial/vencida/anulada):",inv.status);
+  if(!newSt||newSt===inv.status)return;
+  await sb.from("cont_invoices").update({status:newSt}).eq("id",id);
+  await contLoad();
 }
 
 // === Word Report - follows model INFORME_MENSUAL_MEDICO.docx exactly ===
