@@ -219,8 +219,8 @@ canvas{width:100%!important;max-height:220px}
 </div>
 <div id="contableModule" style="display:none">
 <div class="hd" id="contHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-<div style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:linear-gradient(135deg,#eab308,#f59e0b)">💰</div><div class="bn"><h1 id="contBN">Contabilidad</h1><p id="contBS" style="color:var(--t3)">Facturación, Cobros y Gastos</p></div><div class="mod-badge" style="background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.3)">💰 Contabilidad</div></div>
-<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div id="contSySt" class="si ok">✓</div><div class="nv" id="contNv"></div></div>
+<div style="display:flex;align-items:center;gap:12px"><div class="lg" id="contCoLogo" style="background:linear-gradient(135deg,#eab308,#f59e0b)">💰</div><div class="bn"><h1 id="contBN">Contabilidad</h1><p id="contBS" style="color:var(--t3)">Facturación, Cobros y Gastos</p></div><div class="mod-badge" style="background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.3)">💰 Contabilidad</div></div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div class="cs" id="contCSel"></div><button class="add-btn" style="padding:5px 10px;font-size:11px" onclick="contNewCompany()">+ Empresa</button><div id="contSySt" class="si ok">✓</div><div class="nv" id="contNv"></div></div>
 </div>
 <div class="mn" id="contMc"></div>
 </div>
@@ -7062,7 +7062,7 @@ async function _getTripData(tripId){
 }
 
 // ===== MÓDULO CONTABLE =====
-const CONT={invoices:[],payments:[],expenses:[],tab:'dashboard',editInv:null,editExp:null};
+const CONT={invoices:[],payments:[],expenses:[],companies:[],tab:'dashboard',editInv:null,editExp:null,companyId:null,_invTab:'ventas'};
 const CONT_COLOR='#eab308';
 const CONT_CATS_EXP=[
   {id:'viatico',label:'Viáticos',icon:'🚐',color:'#f97316'},
@@ -7081,35 +7081,256 @@ async function contLoad(){
   const mc=document.getElementById("contMc");
   if(mc)mc.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';
   try{
-    const yr=new Date().getFullYear();
-    const[inv,pay,exp]=await Promise.all([
-      sb.from("cont_invoices").select("*").eq("year",yr).order("invoice_date",{ascending:false}),
-      sb.from("cont_payments").select("*").eq("year",yr).order("payment_date",{ascending:false}),
-      sb.from("cont_expenses").select("*").eq("year",yr).order("expense_date",{ascending:false})
-    ]);
-    CONT.invoices=inv.data||[];
-    CONT.payments=pay.data||[];
-    CONT.expenses=exp.data||[];
+    // Load cont_companies
+    const{data:contCos}=await sb.from("cont_companies").select("*").eq("active",true).order("name");
+    CONT.companies=contCos||[];
+    if(CONT.companies.length>0&&!CONT.companyId){
+      CONT.companyId=CONT.companies[0].id;
+    }
+    if(CONT.companyId){
+      const yr=new Date().getFullYear();
+      const[inv,pay,exp]=await Promise.all([
+        sb.from("cont_invoices").select("*").eq("cont_company_id",CONT.companyId).eq("year",yr).order("invoice_date",{ascending:false}),
+        sb.from("cont_payments").select("*").eq("cont_company_id",CONT.companyId).eq("year",yr).order("payment_date",{ascending:false}),
+        sb.from("cont_expenses").select("*").eq("cont_company_id",CONT.companyId).eq("year",yr).order("expense_date",{ascending:false})
+      ]);
+      CONT.invoices=inv.data||[];
+      CONT.payments=pay.data||[];
+      CONT.expenses=exp.data||[];
+      // Load clients
+      try{
+        const{data:cl}=await sb.from("cont_clients").select("*").eq("cont_company_id",CONT.companyId).order("name");
+        CONT.clients=cl||[];
+      }catch(e){CONT.clients=[]}
+    }else{
+      CONT.invoices=[];CONT.payments=[];CONT.expenses=[];CONT.clients=[];
+    }
   }catch(e){
     console.error("contLoad:",e);
-    CONT.invoices=[];CONT.payments=[];CONT.expenses=[];
+    // Fallback: try without cont_company_id (old schema)
+    try{
+      const yr=new Date().getFullYear();
+      const[inv,pay,exp]=await Promise.all([
+        sb.from("cont_invoices").select("*").eq("year",yr).order("invoice_date",{ascending:false}),
+        sb.from("cont_payments").select("*").eq("year",yr).order("payment_date",{ascending:false}),
+        sb.from("cont_expenses").select("*").eq("year",yr).order("expense_date",{ascending:false})
+      ]);
+      CONT.invoices=inv.data||[];CONT.payments=pay.data||[];CONT.expenses=exp.data||[];
+    }catch(e2){CONT.invoices=[];CONT.payments=[];CONT.expenses=[]}
   }
+  contUpdateHeader();
   contRender();
+}
+
+function contUpdateHeader(){
+  const co=CONT.companies.find(c=>c.id===CONT.companyId);
+  const bn=document.getElementById("contBN");
+  const bs=document.getElementById("contBS");
+  if(bn)bn.textContent=co?co.name:'Contabilidad';
+  if(bs)bs.textContent=co?`RUC: ${co.ruc||'—'} · ${co.address||''} · ${co.iva_exempt?'IVA 0% (Exento)':'IVA '+(co.iva_rate||15)+'%'} · ${co.activity||''}`:'Selecciona o crea una empresa';
+  
+  // Company selector
+  const csel=document.getElementById("contCSel");
+  if(csel&&CONT.companies.length>0){
+    let cs=`<select onchange="CONT.companyId=this.value;contLoad()" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(234,179,8,0.3);background:rgba(234,179,8,0.08);color:var(--t1);font-size:13px;font-weight:700">`;
+    CONT.companies.forEach(c=>{cs+=`<option value="${c.id}"${c.id===CONT.companyId?' selected':''}>${c.name}${c.iva_exempt?' (IVA 0%)':''}</option>`});
+    cs+='</select>';csel.innerHTML=cs;
+  }else if(csel){
+    csel.innerHTML='<span style="font-size:11px;color:var(--t3)">Sin empresas — crea una</span>';
+  }
+
+  // Logo
+  const el=document.getElementById("contCoLogo");
+  if(el&&co){
+    if(co.logo_url){el.innerHTML=`<img src="${co.logo_url}" style="width:100%;height:100%;object-fit:contain">`;el.style.background="transparent"}
+    else{el.innerHTML=(co.name||'💰').charAt(0);el.style.background="linear-gradient(135deg,#eab308,#f59e0b)"}
+  }
+}
+
+function contNewCompany(){
+  CONT.tab='co_form';CONT._coForm={name:'',ruc:'',commercial_name:'',address:'',phone:'',email:'',activity:'',iva_exempt:false,iva_rate:15,estab:'001',pto_emi:'001',secuencial_start:1,obligado_contab:true,contribuyente_especial:'',ambiente:'2'};
+  contRender();
+}
+
+function contRenderCoForm(){
+  const f=CONT._coForm;const isEdit=!!CONT._editCo;
+  let h=`<div class="c" style="max-width:700px;margin:0 auto">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:18px;font-weight:800;color:${CONT_COLOR}">${isEdit?'✏️ Editar Empresa':'🏢 Nueva Empresa Contable'}</div>`;
+  h+=`<button onclick="CONT.tab='dashboard';contRender()" style="background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t2);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← Volver</button></div>`;
+
+  // Basic info
+  h+=`<div style="font-size:12px;font-weight:800;color:${CONT_COLOR};margin-bottom:10px;border-bottom:1px solid ${CONT_COLOR}40;padding-bottom:6px">📋 INFORMACIÓN TRIBUTARIA</div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Razón Social *</label><input value="${f.name||''}" onchange="CONT._coForm.name=this.value" placeholder="Nombre legal de la empresa" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Nombre Comercial</label><input value="${f.commercial_name||''}" onchange="CONT._coForm.commercial_name=this.value" placeholder="Nombre comercial (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">RUC *</label><input value="${f.ruc||''}" onchange="CONT._coForm.ruc=this.value" placeholder="0702999999001" maxlength="13" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Actividad Económica</label><input value="${f.activity||''}" onchange="CONT._coForm.activity=this.value" placeholder="Servicios de consultoría" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`<div style="grid-column:span 2"><label style="font-size:10px;color:var(--t3);font-weight:700">Dirección</label><input value="${f.address||''}" onchange="CONT._coForm.address=this.value" placeholder="Av. Principal y Calle Secundaria" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Teléfono</label><input value="${f.phone||''}" onchange="CONT._coForm.phone=this.value" placeholder="07-2999999" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Correo Electrónico</label><input type="email" value="${f.email||''}" onchange="CONT._coForm.email=this.value" placeholder="contabilidad@empresa.com" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`</div>`;
+
+  // IVA & Facturación
+  h+=`<div style="font-size:12px;font-weight:800;color:${CONT_COLOR};margin:20px 0 10px;border-bottom:1px solid ${CONT_COLOR}40;padding-bottom:6px">💰 CONFIGURACIÓN TRIBUTARIA</div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">IVA</label><div style="display:flex;gap:6px;margin-top:4px">`;
+  h+=`<button onclick="CONT._coForm.iva_exempt=false;CONT._coForm.iva_rate=15;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid ${!f.iva_exempt?'#34d399':'rgba(255,255,255,0.1)'};background:${!f.iva_exempt?'rgba(52,211,153,0.15)':'transparent'};color:${!f.iva_exempt?'#34d399':'var(--t2)'}">15%</button>`;
+  h+=`<button onclick="CONT._coForm.iva_exempt=true;CONT._coForm.iva_rate=0;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid ${f.iva_exempt?'#fbbf24':'rgba(255,255,255,0.1)'};background:${f.iva_exempt?'rgba(251,191,36,0.15)':'transparent'};color:${f.iva_exempt?'#fbbf24':'var(--t2)'}">0% Exento</button>`;
+  h+=`</div></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Obligado a llevar contabilidad</label><div style="display:flex;gap:6px;margin-top:4px">`;
+  h+=`<button onclick="CONT._coForm.obligado_contab=true;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid ${f.obligado_contab?'#34d399':'rgba(255,255,255,0.1)'};background:${f.obligado_contab?'rgba(52,211,153,0.15)':'transparent'};color:${f.obligado_contab?'#34d399':'var(--t2)'}">SÍ</button>`;
+  h+=`<button onclick="CONT._coForm.obligado_contab=false;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:2px solid ${!f.obligado_contab?'#fbbf24':'rgba(255,255,255,0.1)'};background:${!f.obligado_contab?'rgba(251,191,36,0.15)':'transparent'};color:${!f.obligado_contab?'#fbbf24':'var(--t2)'}">NO</button>`;
+  h+=`</div></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Contribuyente Especial N°</label><input value="${f.contribuyente_especial||''}" onchange="CONT._coForm.contribuyente_especial=this.value" placeholder="Dejar vacío si no aplica" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;margin-top:4px"></div>`;
+  h+=`</div>`;
+
+  // Numeración
+  h+=`<div style="font-size:12px;font-weight:800;color:${CONT_COLOR};margin:20px 0 10px;border-bottom:1px solid ${CONT_COLOR}40;padding-bottom:6px">🔢 NUMERACIÓN DE FACTURAS</div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Establecimiento</label><input value="${f.estab||'001'}" onchange="CONT._coForm.estab=this.value" maxlength="3" placeholder="001" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:13px;font-family:var(--mn);text-align:center;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Punto de Emisión</label><input value="${f.pto_emi||'001'}" onchange="CONT._coForm.pto_emi=this.value" maxlength="3" placeholder="001" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:13px;font-family:var(--mn);text-align:center;margin-top:4px"></div>`;
+  h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700">Secuencial inicial</label><input type="number" min="1" value="${f.secuencial_start||1}" onchange="CONT._coForm.secuencial_start=+this.value" placeholder="1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:13px;font-family:var(--mn);text-align:center;margin-top:4px"></div>`;
+  h+=`</div>`;
+  const previewNum=(f.estab||'001')+'-'+(f.pto_emi||'001')+'-'+String(f.secuencial_start||1).padStart(9,'0');
+  h+=`<div style="font-size:11px;color:var(--t3);margin-bottom:16px">Vista previa: <b style="color:${CONT_COLOR};font-family:var(--mn)">${previewNum}</b></div>`;
+
+  // Save
+  h+=`<button onclick="contSaveCoForm()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;width:100%">💾 ${isEdit?'Actualizar':'Crear'} Empresa</button>`;
+  h+=`</div>`;
+  return h;
+}
+
+async function contSaveCoForm(){
+  const f=CONT._coForm;
+  if(!f.name||!f.name.trim()){alert("⚠️ La razón social es obligatoria");return}
+  if(!f.ruc||!f.ruc.trim()){alert("⚠️ El RUC es obligatorio");return}
+  const payload={name:f.name.trim(),commercial_name:f.commercial_name||'',ruc:f.ruc.trim(),address:f.address||'',phone:f.phone||'',email:f.email||'',activity:f.activity||'',iva_exempt:f.iva_exempt||false,iva_rate:f.iva_rate||15,obligado_contab:f.obligado_contab!==false,contribuyente_especial:f.contribuyente_especial||'',estab:f.estab||'001',pto_emi:f.pto_emi||'001',secuencial_start:f.secuencial_start||1,next_secuencial:f.secuencial_start||1,active:true};
+  try{
+    if(CONT._editCo){
+      const{error}=await sb.from("cont_companies").update(payload).eq("id",CONT._editCo);
+      if(error)throw error;
+    }else{
+      const{data,error}=await sb.from("cont_companies").insert(payload).select().single();
+      if(error)throw error;
+      CONT.companyId=data.id;
+    }
+    CONT._editCo=null;CONT._coForm=null;
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+function contEditCompany(){
+  const co=CONT.companies.find(c=>c.id===CONT.companyId);if(!co)return;
+  CONT._editCo=co.id;
+  CONT._coForm={...co};
+  CONT.tab='co_form';
+  contRender();
+}
+
+// === CLIENTS DIRECTORY ===
+function contRenderClients(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  let h='';
+  if(isAdmin)h+=`<button onclick="contNewClient()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px">+ Nuevo Cliente/Proveedor</button>`;
+
+  // Search
+  h+=`<input id="contClientSearch" type="text" value="${CONT._clientSearch||''}" placeholder="🔍 Buscar por nombre o RUC..." oninput="CONT._clientSearch=this.value;contRender()" style="width:100%;padding:10px;border-radius:8px;border:1px solid ${CONT_COLOR}40;background:${CONT_COLOR}08;color:var(--t1);font-size:13px;margin-bottom:12px">`;
+
+  const clients=CONT.clients||[];
+  const search=(CONT._clientSearch||'').toLowerCase();
+  const filtered=search?clients.filter(c=>(c.name||'').toLowerCase().includes(search)||(c.ruc||'').includes(search)):clients;
+
+  h+=`<div class="c"><div class="st">👥 Directorio de Clientes/Proveedores (${filtered.length})</div>`;
+  h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+  h+=`<th style="padding:8px;text-align:left">Nombre/Razón Social</th><th style="padding:8px;text-align:left">RUC/Cédula</th><th style="padding:8px;text-align:left">Dirección</th><th style="padding:8px;text-align:left">Teléfono</th><th style="padding:8px;text-align:left">Email</th><th style="padding:8px;text-align:center">Tipo</th>`;
+  if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acción</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  filtered.forEach(cl=>{
+    h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+    h+=`<td style="padding:6px 8px;font-weight:700">${cl.name||''}</td>`;
+    h+=`<td style="padding:6px 8px;font-family:var(--mn)">${cl.ruc||'—'}</td>`;
+    h+=`<td style="padding:6px 8px;font-size:10px">${cl.address||''}</td>`;
+    h+=`<td style="padding:6px 8px;font-size:10px">${cl.phone||''}</td>`;
+    h+=`<td style="padding:6px 8px;font-size:10px">${cl.email||''}</td>`;
+    h+=`<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:${cl.type==='proveedor'?'rgba(96,165,250,0.15)':'rgba(52,211,153,0.15)'};color:${cl.type==='proveedor'?'#60a5fa':'#34d399'};font-weight:700">${cl.type==='proveedor'?'Proveedor':'Cliente'}</span></td>`;
+    if(isAdmin)h+=`<td style="padding:6px 8px;text-align:center"><button onclick="contEditClient('${cl.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">✏️</button><button onclick="contDelClient('${cl.id}')" style="background:none;border:none;cursor:pointer;font-size:12px">🗑</button></td>`;
+    h+=`</tr>`;
+  });
+  if(filtered.length===0)h+=`<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--t3)">No hay clientes registrados</td></tr>`;
+  h+=`</tbody></table></div></div>`;
+  return h;
+}
+
+async function contNewClient(){
+  const name=prompt("Nombre/Razón Social:");if(!name)return;
+  const ruc=prompt("RUC/Cédula:")||'';
+  const address=prompt("Dirección:")||'';
+  const phone=prompt("Teléfono:")||'';
+  const email=prompt("Correo electrónico:")||'';
+  const tipo=confirm("¿Es CLIENTE?\n\n✅ Sí = Cliente\n❌ No = Proveedor")?'cliente':'proveedor';
+  try{
+    const{error}=await sb.from("cont_clients").insert({cont_company_id:CONT.companyId,name:name.trim(),ruc:ruc.trim(),address:address.trim(),phone:phone.trim(),email:email.trim(),type:tipo});
+    if(error)throw error;
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function contEditClient(id){
+  const cl=(CONT.clients||[]).find(c=>c.id===id);if(!cl)return;
+  const name=prompt("Nombre:",cl.name);if(name===null)return;
+  const ruc=prompt("RUC/Cédula:",cl.ruc);if(ruc===null)return;
+  const address=prompt("Dirección:",cl.address);if(address===null)return;
+  const phone=prompt("Teléfono:",cl.phone);if(phone===null)return;
+  const email=prompt("Email:",cl.email);if(email===null)return;
+  try{
+    await sb.from("cont_clients").update({name:name.trim(),ruc:ruc.trim(),address:address.trim(),phone:phone.trim(),email:email.trim()}).eq("id",id);
+    await contLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function contDelClient(id){if(!confirm("¿Eliminar?"))return;await sb.from("cont_clients").delete().eq("id",id);await contLoad()}
+
+// === CONFIG ===
+function contRenderConfig(){
+  const co=CONT.companies.find(c=>c.id===CONT.companyId);
+  if(!co)return '<div style="text-align:center;padding:40px;color:var(--t3)">Selecciona una empresa primero</div>';
+  let h=`<div class="c" style="max-width:700px;margin:0 auto">`;
+  h+=`<div style="font-size:18px;font-weight:800;color:${CONT_COLOR};margin-bottom:16px">⚙️ Configuración — ${co.name}</div>`;
+
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Razón Social</div><div style="font-size:13px;font-weight:700;margin-top:4px">${co.name}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">RUC</div><div style="font-size:13px;font-weight:700;font-family:var(--mn);margin-top:4px">${co.ruc||'—'}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">IVA</div><div style="font-size:13px;font-weight:700;color:${co.iva_exempt?'#fbbf24':'#34d399'};margin-top:4px">${co.iva_exempt?'0% Exento':co.iva_rate+'%'}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Numeración</div><div style="font-size:13px;font-weight:700;font-family:var(--mn);color:${CONT_COLOR};margin-top:4px">${co.estab||'001'}-${co.pto_emi||'001'}-${String(co.next_secuencial||1).padStart(9,'0')}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Dirección</div><div style="font-size:11px;margin-top:4px">${co.address||'—'}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Email</div><div style="font-size:11px;margin-top:4px">${co.email||'—'}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Teléfono</div><div style="font-size:11px;margin-top:4px">${co.phone||'—'}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Obligado Contabilidad</div><div style="font-size:13px;font-weight:700;color:${co.obligado_contab?'#34d399':'#fbbf24'};margin-top:4px">${co.obligado_contab!==false?'SÍ':'NO'}</div></div>`;
+  h+=`</div>`;
+
+  h+=`<button onclick="contEditCompany()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;width:100%">✏️ Editar Configuración</button>`;
+  h+=`</div>`;
+  return h;
 }
 
 function contRender(){
   const mc=document.getElementById("contMc");if(!mc)return;
   // Nav
-  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'reports',l:'📈 Reportes'}];
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
   const nv=document.getElementById("contNv");
   if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
 
   let h='';
   if(CONT.tab==='dashboard'){h=contDashboard()}
   else if(CONT.tab==='invoices'){h=contInvoices()}
+  else if(CONT.tab==='inv_form'){h=contRenderInvForm()}
   else if(CONT.tab==='payments'){h=contPayments()}
   else if(CONT.tab==='expenses'){h=contExpenses()}
+  else if(CONT.tab==='clients'){h=contRenderClients()}
   else if(CONT.tab==='reports'){h=contReports()}
+  else if(CONT.tab==='config'){h=contRenderConfig()}
+  else if(CONT.tab==='co_form'){h=contRenderCoForm()}
   mc.innerHTML=h;
 }
 
@@ -7306,19 +7527,186 @@ function contReports(){
 }
 
 // CRUD functions
-async function contNewInvoice(){
-  const coId=prompt("ID o nombre de la empresa:");if(!coId)return;
-  const co=cos.find(c=>c.name.toLowerCase().includes(coId.toLowerCase()))||{id:null,name:coId};
-  const num=prompt("Número de factura:");if(!num)return;
-  const concept=prompt("Concepto:");if(!concept)return;
-  const subtotal=parseFloat(prompt("Subtotal (sin IVA):")||0);
-  const ivaRate=parseFloat(prompt("% IVA (15, 0, etc):")||15);
-  const iva=subtotal*ivaRate/100;
+function contNewInvoice(){
+  CONT._editInv=null;
+  const contCo=CONT.companies.find(c=>c.id===CONT.companyId);
+  const defaultIva=contCo?.iva_exempt?0:(contCo?.iva_rate||15);
+  const estab=contCo?.estab||'001';
+  const ptoEmi=contCo?.pto_emi||'001';
+  const nextSeq=contCo?.next_secuencial||1;
+  const autoNum=estab+'-'+ptoEmi+'-'+String(nextSeq).padStart(9,'0');
+  CONT._invForm={
+    company_id:null,company_name:'',ruc:'',_coSearch:'',
+    invoice_number:autoNum,concept:'',
+    subtotal:0,iva_rate:defaultIva,registra_iva:defaultIva>0,
+    type:'venta',
+    invoice_date:new Date().toISOString().split('T')[0],
+    items:[{desc:'',qty:1,price:0}]
+  };
+  CONT.tab='inv_form';
+  contRender();
+}
+
+function contRenderInvForm(){
+  const f=CONT._invForm;if(!f)return'';
+  const isEdit=!!CONT._editInv;
+  let h=`<div class="c" style="max-width:800px;margin:0 auto">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:18px;font-weight:800;color:${CONT_COLOR}">${isEdit?'✏️ Editar Factura':'📄 Nueva Factura'}</div>`;
+  h+=`<button onclick="CONT.tab='invoices';contRender()" style="background:rgba(255,255,255,0.06);border:1px solid var(--bd);color:var(--t2);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">← Volver</button></div>`;
+
+  // Tipo: Venta o Compra
+  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">TIPO DE COMPROBANTE</div>`;
+  h+=`<div style="display:flex;gap:8px">`;
+  h+=`<button onclick="CONT._invForm.type='venta';contRender()" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid ${f.type==='venta'?CONT_COLOR:'rgba(255,255,255,0.1)'};background:${f.type==='venta'?CONT_COLOR+'20':'transparent'};color:${f.type==='venta'?CONT_COLOR:'var(--t2)'}">📤 Venta (Emitida)</button>`;
+  h+=`<button onclick="CONT._invForm.type='compra';contRender()" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid ${f.type==='compra'?'#60a5fa':'rgba(255,255,255,0.1)'};background:${f.type==='compra'?'rgba(96,165,250,0.15)':'transparent'};color:${f.type==='compra'?'#60a5fa':'var(--t2)'}">📥 Compra (Recibida)</button>`;
+  h+=`</div></div>`;
+
+  // Empresa selector
+  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">${f.type==='venta'?'🏢 CLIENTE':'🏢 PROVEEDOR'}</div>`;
+  h+=`<input id="contInvCoSearch" type="text" value="${f._coSearch||f.company_name||''}" placeholder="🔍 Escriba nombre o RUC para buscar..." oninput="CONT._invForm._coSearch=this.value;contRenderCoSuggestions(this.value)" style="width:100%;padding:10px;border-radius:8px;border:1px solid ${CONT_COLOR}40;background:${CONT_COLOR}08;color:var(--t1);font-size:13px">`;
+  h+=`<div id="contCoSuggestions"></div>`;
+  if(f.company_id&&f.company_id!=='_custom'){
+    const co=cos.find(c=>c.id===f.company_id)||(CONT.clients||[]).find(c=>c.id===f.company_id);
+    if(co)h+=`<div style="font-size:10px;color:#34d399;margin-top:4px;font-weight:700">✅ ${co.name} ${co.ruc?'· RUC: '+co.ruc:''} ${co.address?'· '+co.address:''}</div>`;
+  }else if(f.company_name){
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">`;
+    h+=`<input value="${f.company_name}" onchange="CONT._invForm.company_name=this.value" placeholder="Nombre/Razón Social" style="padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px">`;
+    h+=`<input value="${f.ruc||''}" onchange="CONT._invForm.ruc=this.value" placeholder="RUC / Cédula" style="padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px">`;
+    h+=`</div>`;
+    h+=`<div style="font-size:9px;color:#fbbf24;margin-top:4px">💡 Tip: Si guardas este cliente en 👥 Clientes, la próxima vez se autocompletará</div>`;
+  }
+  h+=`</div>`;
+
+  // IVA Config
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">`;
+  h+=`<div><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">📋 N° FACTURA</div><input value="${f.invoice_number}" onchange="CONT._invForm.invoice_number=this.value" placeholder="001-001-000000001" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:13px;font-family:var(--mn)"></div>`;
+  h+=`<div><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">📅 FECHA</div><input type="date" value="${f.invoice_date}" onchange="CONT._invForm.invoice_date=this.value" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:13px"></div>`;
+  h+=`<div><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">💰 REGISTRA IVA</div><div style="display:flex;gap:6px">`;
+  h+=`<button onclick="CONT._invForm.registra_iva=true;CONT._invForm.iva_rate=15;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${f.registra_iva?'#34d399':'rgba(255,255,255,0.1)'};background:${f.registra_iva?'rgba(52,211,153,0.15)':'transparent'};color:${f.registra_iva?'#34d399':'var(--t2)'}">SÍ 15%</button>`;
+  h+=`<button onclick="CONT._invForm.registra_iva=false;CONT._invForm.iva_rate=0;contRender()" style="flex:1;padding:8px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${!f.registra_iva?'#fbbf24':'rgba(255,255,255,0.1)'};background:${!f.registra_iva?'rgba(251,191,36,0.15)':'transparent'};color:${!f.registra_iva?'#fbbf24':'var(--t2)'}">NO 0%</button>`;
+  h+=`</div></div></div>`;
+
+  // Items
+  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">📦 DETALLE</div>`;
+  h+=`<table style="width:100%;font-size:12px"><thead><tr style="background:rgba(255,255,255,0.04)"><th style="padding:6px;text-align:left">Descripción</th><th style="padding:6px;text-align:center;width:60px">Cant.</th><th style="padding:6px;text-align:right;width:100px">P. Unit.</th><th style="padding:6px;text-align:right;width:100px">Total</th><th style="width:30px"></th></tr></thead><tbody>`;
+  let subtotalCalc=0;
+  f.items.forEach((it,i)=>{
+    const lineTotal=(it.qty||0)*(it.price||0);
+    subtotalCalc+=lineTotal;
+    h+=`<tr><td><input value="${it.desc}" onchange="CONT._invForm.items[${i}].desc=this.value" placeholder="Descripción del servicio/producto" style="width:100%;padding:6px;border:1px solid var(--bd);border-radius:4px;background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px"></td>`;
+    h+=`<td><input type="number" min="1" value="${it.qty}" onchange="CONT._invForm.items[${i}].qty=+this.value;contRender()" style="width:100%;padding:6px;text-align:center;border:1px solid var(--bd);border-radius:4px;background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px"></td>`;
+    h+=`<td><input type="number" step="0.01" min="0" value="${it.price}" onchange="CONT._invForm.items[${i}].price=+this.value;contRender()" style="width:100%;padding:6px;text-align:right;border:1px solid var(--bd);border-radius:4px;background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn)"></td>`;
+    h+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);color:${CONT_COLOR}">$${lineTotal.toFixed(2)}</td>`;
+    h+=`<td>${f.items.length>1?`<button onclick="CONT._invForm.items.splice(${i},1);contRender()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px">✕</button>`:''}</td></tr>`;
+  });
+  h+=`</tbody></table>`;
+  h+=`<button onclick="CONT._invForm.items.push({desc:'',qty:1,price:0});contRender()" style="margin-top:6px;background:rgba(255,255,255,0.06);border:1px dashed var(--bd);color:var(--t2);border-radius:6px;padding:6px 14px;font-size:11px;cursor:pointer;width:100%">+ Agregar ítem</button>`;
+  h+=`</div>`;
+
+  // Concept (auto from items)
+  const autoConc=f.items.map(i=>i.desc).filter(Boolean).join(', ');
+  h+=`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--t3);font-weight:700;margin-bottom:6px">📝 CONCEPTO GENERAL</div>`;
+  h+=`<input value="${f.concept||autoConc}" onchange="CONT._invForm.concept=this.value" placeholder="Se genera automáticamente del detalle" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--bd);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px"></div>`;
+
+  // Totals
+  const ivaCalc=subtotalCalc*(f.iva_rate||0)/100;
+  const totalCalc=subtotalCalc+ivaCalc;
+  h+=`<div style="border:2px solid ${CONT_COLOR}40;border-radius:10px;background:${CONT_COLOR}08;padding:16px;margin-bottom:16px">`;
+  h+=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--t3)">Subtotal (sin IVA)</span><span style="font-weight:700;font-family:var(--mn)">$${subtotalCalc.toFixed(2)}</span></div>`;
+  h+=`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--t3)">IVA ${f.iva_rate}%</span><span style="font-weight:700;font-family:var(--mn)">${f.registra_iva?'$'+ivaCalc.toFixed(2):'$0.00 (Exento)'}</span></div>`;
+  h+=`<div style="display:flex;justify-content:space-between;font-size:18px;font-weight:800;border-top:1px solid ${CONT_COLOR}40;padding-top:8px"><span style="color:${CONT_COLOR}">TOTAL</span><span style="color:${CONT_COLOR};font-family:var(--mn)">$${totalCalc.toFixed(2)}</span></div>`;
+  h+=`</div>`;
+
+  // Save button
+  h+=`<button onclick="contSaveInvForm()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;width:100%">💾 ${isEdit?'Actualizar':'Guardar'} Factura</button>`;
+  h+=`</div>`;
+  return h;
+}
+
+function contInvSelectCo(val){
+  if(val==='_custom'){
+    CONT._invForm.company_id='_custom';CONT._invForm.company_name='';CONT._invForm.ruc='';
+  }else if(val){
+    const co=cos.find(c=>c.id===val)||(CONT.clients||[]).find(c=>c.id===val);
+    CONT._invForm.company_id=val;
+    CONT._invForm.company_name=co?.name||'';
+    CONT._invForm.ruc=co?.ruc||'';
+    CONT._invForm._coSearch=co?.name||'';
+  }else{
+    CONT._invForm.company_id=null;CONT._invForm.company_name='';CONT._invForm.ruc='';
+  }
+  document.getElementById('contCoSuggestions').innerHTML='';
+  contRender();
+}
+
+function contRenderCoSuggestions(search){
+  const box=document.getElementById('contCoSuggestions');if(!box)return;
+  if(!search||search.length<2){box.innerHTML='';return}
+  const s=search.toLowerCase();
+  // Search in clients directory first, then in system companies
+  const clients=(CONT.clients||[]).filter(c=>(c.name||'').toLowerCase().includes(s)||(c.ruc||'').includes(s));
+  const sysCos=cos.filter(c=>(c.name||'').toLowerCase().includes(s)||(c.ruc||'').includes(s));
+  // Merge without duplicates
+  const results=[];
+  clients.forEach(c=>results.push({id:c.id,name:c.name,ruc:c.ruc,source:'client',address:c.address}));
+  sysCos.forEach(c=>{if(!results.find(r=>r.ruc&&r.ruc===c.ruc))results.push({id:c.id,name:c.name,ruc:c.ruc,source:'system',address:c.location})});
+
+  if(results.length===0){
+    box.innerHTML=`<div style="padding:8px;font-size:11px;color:var(--t3);border:1px solid var(--bd);border-radius:6px;margin-top:4px">No se encontraron resultados. Puede escribir los datos manualmente.</div>`;
+    CONT._invForm.company_id=null;
+    CONT._invForm.company_name=search;
+    return;
+  }
+  let h=`<div style="border:1px solid ${CONT_COLOR}40;border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;background:#0f172a">`;
+  results.slice(0,8).forEach(r=>{
+    const badge=r.source==='client'?'👥':'🏢';
+    h+=`<div onclick="contInvSelectCo('${r.id}')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s" onmouseover="this.style.background='rgba(234,179,8,0.1)'" onmouseout="this.style.background='transparent'">`;
+    h+=`<div style="font-weight:700;font-size:12px">${badge} ${r.name}</div>`;
+    h+=`<div style="font-size:10px;color:var(--t3)">${r.ruc?'RUC: '+r.ruc:'Sin RUC'} ${r.address?'· '+r.address:''}</div>`;
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  box.innerHTML=h;
+}
+
+async function contSaveInvForm(){
+  const f=CONT._invForm;if(!f)return;
+  if(!f.company_name&&!f.company_id){alert("⚠️ Selecciona una empresa");return}
+  if(!f.invoice_number){alert("⚠️ Ingresa el número de factura");return}
+  const subtotal=f.items.reduce((a,it)=>a+(it.qty||0)*(it.price||0),0);
+  const iva=subtotal*(f.iva_rate||0)/100;
   const total=subtotal+iva;
-  const date=prompt("Fecha (YYYY-MM-DD):",new Date().toISOString().split('T')[0]);
+  const concept=f.concept||f.items.map(i=>i.desc).filter(Boolean).join(', ');
+  const coId=f.company_id&&f.company_id!=='_custom'?f.company_id:null;
+  const coName=f.company_name||(coId?cos.find(c=>c.id===coId)?.name:'');
+
+  const payload={
+    cont_company_id:CONT.companyId,
+    company_id:coId,company_name:coName,company_ruc:f.ruc||'',
+    invoice_number:f.invoice_number,concept,
+    subtotal,iva,iva_rate:f.iva_rate||0,total,
+    invoice_date:f.invoice_date,
+    status:'emitida',type:f.type||'venta',
+    year:f.invoice_date?parseInt(f.invoice_date.split('-')[0]):new Date().getFullYear(),
+    created_by:CURRENT_USER?.id
+  };
+
   try{
-    const{error}=await sb.from("cont_invoices").insert({company_id:co.id,company_name:co.name||coId,invoice_number:num,concept,subtotal,iva,iva_rate:ivaRate,total,invoice_date:date,status:'emitida',year:parseInt(date.split('-')[0]),created_by:CURRENT_USER?.id});
-    if(error)throw error;
+    if(CONT._editInv){
+      const{error}=await sb.from("cont_invoices").update(payload).eq("id",CONT._editInv);
+      if(error)throw error;
+    }else{
+      const{error}=await sb.from("cont_invoices").insert(payload);
+      if(error)throw error;
+      // Increment secuencial for next invoice
+      const contCo=CONT.companies.find(c=>c.id===CONT.companyId);
+      if(contCo){
+        const nextSeq=(contCo.next_secuencial||1)+1;
+        contCo.next_secuencial=nextSeq;
+        await sb.from("cont_companies").update({next_secuencial:nextSeq}).eq("id",CONT.companyId);
+      }
+    }
+    CONT.tab='invoices';
     await contLoad();
   }catch(e){alert("Error: "+e.message)}
 }
