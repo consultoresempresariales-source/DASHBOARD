@@ -5088,6 +5088,7 @@ async function agLoad(){
     const endD=`${yr}-${String(mo+1).padStart(2,'0')}-${String(endD_d.getDate()).padStart(2,'0')}`;
     const{data:trips}=await sb.from("logistics_trips").select("id,trip_date,status").gte("trip_date",startD).lte("trip_date",endD).neq("status","cancelled");
     LOG._agTrips=trips||[];
+    console.log('[AG] Trips cargados para',startD,'a',endD,':',LOG._agTrips.length);
     if(LOG._agTrips.length>0){
       const tids=LOG._agTrips.map(t=>t.id);
       const[tcR,tmR]=await Promise.all([
@@ -5096,6 +5097,8 @@ async function agLoad(){
       ]);
       LOG._agTripCos=tcR.data||[];
       LOG._agTripMembers=tmR.data||[];
+      console.log('[AG] Trip companies:',LOG._agTripCos.length,'Members:',LOG._agTripMembers.length);
+      console.log('[AG] Company IDs en viajes:',LOG._agTripCos.map(tc=>tc.company_id+' ('+tc.custom_name+')'));
     }else{
       LOG._agTripCos=[];LOG._agTripMembers=[];
     }
@@ -5159,13 +5162,10 @@ function agGetVal(companyId,deptId,field){
       for(const tid of coTripIds){
         const trip=trips.find(t=>t.id===tid);
         const members=tripMembers.filter(m=>m.trip_id===tid);
-        if(field==='ag'){
-          if(members.length===0)return 'SÍ';
-          if(members.some(m=>roles.includes(m.department)))return 'SÍ';
-        }
-        if(field==='vis'&&trip&&trip.status==='completed'){
-          if(members.length===0)return 'SÍ';
-          if(members.some(m=>roles.includes(m.department)))return 'SÍ';
+        // Only auto-detect if there are members assigned to the trip
+        if(members.length>0){
+          if(field==='ag'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
+          if(field==='vis'&&trip&&trip.status==='completed'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
         }
       }
     }
@@ -7298,11 +7298,28 @@ function contRenderConfig(){
   let h=`<div class="c" style="max-width:700px;margin:0 auto">`;
   h+=`<div style="font-size:18px;font-weight:800;color:${CONT_COLOR};margin-bottom:16px">⚙️ Configuración — ${co.name}</div>`;
 
+  // LOGO
+  h+=`<div style="font-size:12px;font-weight:800;color:${CONT_COLOR};margin-bottom:10px;border-bottom:1px solid ${CONT_COLOR}40;padding-bottom:6px">🖼️ LOGO DE LA EMPRESA</div>`;
+  h+=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;padding:16px;border:1px solid var(--bd);border-radius:10px;background:rgba(255,255,255,0.02)">`;
+  if(co.logo_url){
+    h+=`<div style="width:100px;height:100px;border-radius:10px;border:2px solid ${CONT_COLOR}40;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#fff"><img src="${co.logo_url}" style="max-width:100%;max-height:100%;object-fit:contain"></div>`;
+    h+=`<div style="flex:1"><div style="font-size:12px;font-weight:700;color:#34d399;margin-bottom:8px">✅ Logo configurado</div>`;
+    h+=`<div style="display:flex;gap:8px"><button onclick="contUploadLogo()" style="background:${CONT_COLOR}20;border:1px solid ${CONT_COLOR}40;color:${CONT_COLOR};border-radius:8px;padding:6px 14px;font-size:11px;cursor:pointer;font-weight:700">🔄 Cambiar</button>`;
+    h+=`<button onclick="contDelLogo()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:8px;padding:6px 14px;font-size:11px;cursor:pointer;font-weight:700">🗑 Eliminar</button></div></div>`;
+  }else{
+    h+=`<div onclick="contUploadLogo()" style="width:100px;height:100px;border-radius:10px;border:2px dashed ${CONT_COLOR}40;display:flex;align-items:center;justify-content:center;cursor:pointer;background:${CONT_COLOR}08;flex-shrink:0" title="Subir logo"><span style="font-size:32px">📷</span></div>`;
+    h+=`<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--t3);margin-bottom:4px">Sin logo configurado</div><div style="font-size:10px;color:var(--t3)">El logo aparecerá en las facturas enviadas por email y en el encabezado del módulo</div>`;
+    h+=`<button onclick="contUploadLogo()" style="margin-top:8px;background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;font-weight:700">📷 Subir Logo</button></div>`;
+  }
+  h+=`</div>`;
+
+  // INFO
+  h+=`<div style="font-size:12px;font-weight:800;color:${CONT_COLOR};margin-bottom:10px;border-bottom:1px solid ${CONT_COLOR}40;padding-bottom:6px">📋 DATOS DE LA EMPRESA</div>`;
   h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Razón Social</div><div style="font-size:13px;font-weight:700;margin-top:4px">${co.name}</div></div>`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">RUC</div><div style="font-size:13px;font-weight:700;font-family:var(--mn);margin-top:4px">${co.ruc||'—'}</div></div>`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">IVA</div><div style="font-size:13px;font-weight:700;color:${co.iva_exempt?'#fbbf24':'#34d399'};margin-top:4px">${co.iva_exempt?'0% Exento':co.iva_rate+'%'}</div></div>`;
-  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Numeración</div><div style="font-size:13px;font-weight:700;font-family:var(--mn);color:${CONT_COLOR};margin-top:4px">${co.estab||'001'}-${co.pto_emi||'001'}-${String(co.next_secuencial||1).padStart(9,'0')}</div></div>`;
+  h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Numeración Actual</div><div style="font-size:13px;font-weight:700;font-family:var(--mn);color:${CONT_COLOR};margin-top:4px">${co.estab||'001'}-${co.pto_emi||'001'}-${String(co.next_secuencial||1).padStart(9,'0')}</div></div>`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Dirección</div><div style="font-size:11px;margin-top:4px">${co.address||'—'}</div></div>`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Email</div><div style="font-size:11px;margin-top:4px">${co.email||'—'}</div></div>`;
   h+=`<div style="padding:12px;border:1px solid var(--bd);border-radius:8px"><div style="font-size:10px;color:var(--t3);font-weight:700">Teléfono</div><div style="font-size:11px;margin-top:4px">${co.phone||'—'}</div></div>`;
@@ -7312,6 +7329,45 @@ function contRenderConfig(){
   h+=`<button onclick="contEditCompany()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;width:100%">✏️ Editar Configuración</button>`;
   h+=`</div>`;
   return h;
+}
+
+function contUploadLogo(){
+  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";
+  inp.onchange=async()=>{
+    if(!inp.files[0])return;
+    const file=inp.files[0];
+    if(file.size>2*1024*1024){alert("⚠️ La imagen debe pesar menos de 2MB");return}
+    ss("ld");
+    try{
+      // Convert to base64 data URL for storage
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        const dataUrl=reader.result;
+        // Upload to Supabase storage or save as data URL
+        // For simplicity, save as data URL in the company record
+        const{error}=await sb.from("cont_companies").update({logo_url:dataUrl}).eq("id",CONT.companyId);
+        if(error)throw error;
+        const co=CONT.companies.find(c=>c.id===CONT.companyId);
+        if(co)co.logo_url=dataUrl;
+        contUpdateHeader();
+        contRender();
+        ss("ok");
+      };
+      reader.readAsDataURL(file);
+    }catch(e){alert("Error: "+e.message);ss("er")}
+  };
+  inp.click();
+}
+
+async function contDelLogo(){
+  if(!confirm("¿Eliminar el logo?"))return;
+  try{
+    await sb.from("cont_companies").update({logo_url:''}).eq("id",CONT.companyId);
+    const co=CONT.companies.find(c=>c.id===CONT.companyId);
+    if(co)co.logo_url='';
+    contUpdateHeader();
+    contRender();
+  }catch(e){alert("Error: "+e.message)}
 }
 
 function contRender(){
@@ -7832,6 +7888,7 @@ function contBuildInvoiceHTML(inv,co){
 <div style="max-width:650px;margin:20px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1)">
   <!-- Header -->
   <div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:30px;text-align:center">
+    ${co.logo_url&&!co.logo_url.startsWith('data:')?'<img src="'+co.logo_url+'" style="max-height:60px;max-width:200px;object-fit:contain;margin-bottom:12px">':''}
     <h1 style="color:#eab308;font-size:24px;margin:0 0 4px">${co.name||'EMPRESA'}</h1>
     ${co.commercial_name?'<p style="color:#94a3b8;font-size:13px;margin:0">'+co.commercial_name+'</p>':''}
     <p style="color:#64748b;font-size:12px;margin:8px 0 0">RUC: ${co.ruc||'—'} · ${co.address||''}</p>
