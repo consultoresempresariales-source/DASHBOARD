@@ -5106,6 +5106,16 @@ async function agLoad(){
       LOG._agTripMembers=tmR.data||[];
       console.log('[AG] Trip companies:',LOG._agTripCos.length,'Members:',LOG._agTripMembers.length);
       console.log('[AG] Company IDs en viajes:',LOG._agTripCos.map(tc=>tc.company_id+' ('+tc.custom_name+')'));
+      console.log('[AG] Miembros por viaje:',LOG._agTripMembers.map(m=>m.trip_id.substring(0,8)+'→'+m.department));
+      // Show which companies SHOULD be auto-detected
+      const deptRoleMapDebug={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
+      LOG._agTripCos.forEach(tc=>{
+        if(!tc.company_id)return;
+        const co=cos.find(c=>c.id===tc.company_id);
+        const members=LOG._agTripMembers.filter(m=>m.trip_id===tc.trip_id);
+        const depts=members.map(m=>m.department);
+        console.log('[AG] '+( co?.name||tc.company_id.substring(0,8))+' → miembros: ['+depts.join(', ')+']');
+      });
     }else{
       LOG._agTripCos=[];LOG._agTripMembers=[];
     }
@@ -5158,21 +5168,16 @@ function agGetVal(companyId,deptId,field){
   }
   // No manual record - auto-detect from trips for ag and vis fields only
   if(field==='ag'||field==='vis'){
-    const deptRoleMap={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
     const trips=LOG._agTrips||[];
     const tripCos=LOG._agTripCos||[];
-    const tripMembers=LOG._agTripMembers||[];
     const coTripIds=tripCos.filter(tc=>tc.company_id===companyId).map(tc=>tc.trip_id);
     if(coTripIds.length>0){
-      const roleMatch=deptRoleMap[deptId];
-      const roles=Array.isArray(roleMatch)?roleMatch:[roleMatch];
-      for(const tid of coTripIds){
-        const trip=trips.find(t=>t.id===tid);
-        const members=tripMembers.filter(m=>m.trip_id===tid);
-        // Only auto-detect if there are members assigned to the trip
-        if(members.length>0){
-          if(field==='ag'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
-          if(field==='vis'&&trip&&trip.status==='completed'&&members.some(m=>roles.includes(m.department)))return 'SÍ';
+      if(field==='ag')return 'SÍ'; // Company has a trip this month = agendado for ALL depts
+      if(field==='vis'){
+        // Check if any trip is completed
+        for(const tid of coTripIds){
+          const trip=trips.find(t=>t.id===tid);
+          if(trip&&trip.status==='completed')return 'SÍ';
         }
       }
     }
@@ -5226,7 +5231,7 @@ function logRenderAgendamiento(){
     agLoad().then(()=>logRender());
     return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando agendamiento...</div>';
   }
-  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(allCos.length===0)return '<div style="text-align:center;padding:40px;color:var(--t3)">No hay empresas con módulos activos.</div>';
 
   // Filter by search
@@ -5363,7 +5368,7 @@ function logRenderResumen(){
     return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando resumen...</div>';
   }
   const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(allCos.length===0)return '<div style="text-align:center;padding:40px;color:var(--t3)">No hay empresas.</div>';
 
   // Filter by search (shared with agendamiento)
@@ -5385,14 +5390,10 @@ function logRenderResumen(){
   const curMap={};
   curMonthTrips.forEach(t=>{
     const tCos=curTripCos.filter(tc=>tc.trip_id===t.id);
-    const tMembers=curMembers.filter(m=>m.trip_id===t.id);
-    const depts=new Set(tMembers.map(m=>deptRoleMap[m.department]||m.department).filter(Boolean));
-    // If no specific dept members, assume all depts for that trip
-    if(depts.size===0){AG_DEPTS.forEach(d=>depts.add(d.id))}
     tCos.forEach(tc=>{
       const cid=tc.company_id;
       if(!curMap[cid])curMap[cid]=new Set();
-      depts.forEach(d=>curMap[cid].add(d));
+      AG_DEPTS.forEach(d=>curMap[cid].add(d.id));
     });
   });
 
@@ -5400,13 +5401,10 @@ function logRenderResumen(){
   const prevMap={};
   prevMonthTrips.forEach(t=>{
     const tCos=prevTripCos.filter(tc=>tc.trip_id===t.id);
-    const tMembers=prevMembers.filter(m=>m.trip_id===t.id);
-    const depts=new Set(tMembers.map(m=>deptRoleMap[m.department]||m.department).filter(Boolean));
-    if(depts.size===0){AG_DEPTS.forEach(d=>depts.add(d.id))}
     tCos.forEach(tc=>{
       const cid=tc.company_id;
       if(!prevMap[cid])prevMap[cid]=new Set();
-      depts.forEach(d=>prevMap[cid].add(d));
+      AG_DEPTS.forEach(d=>prevMap[cid].add(d.id));
     });
   });
 
@@ -5591,7 +5589,7 @@ function logRenderEnviados(){
     return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';
   }
   const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(allCos.length===0)return '<div style="text-align:center;padding:40px;color:var(--t3)">No hay empresas.</div>';
 
   const searchTerm=(LOG._agSearch||'').toLowerCase();
