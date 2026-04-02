@@ -6331,8 +6331,9 @@ async function logLoadPoaSuggestionsUI(tripId){
         // Filter charlas: psicólogo only sees psico charlas, doctor sees non-psico
         if(isPsico&&!isPCh){console.log("[POA] SKIP - not psico charla");return}
         if(myDept==='salud'&&isPCh){console.log("[POA] SKIP - psico charla for doctor");return}
+        if(c.done)return; // Skip completed charlas
         const pm=c.planned_month!=null?c.planned_month:-1;
-        const urgency=c.done?'available':(pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available');
+        const urgency=pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available';
         suggestions.push({id:c.id,name:'🎓 '+c.name,code:c.charla_key||'',dept:'salud',type:'charla',table:'charlas',monthIdx:pm>=0?pm:mi,urgency});
       });
     }
@@ -6341,8 +6342,9 @@ async function logLoadPoaSuggestionsUI(tripId){
       processPoa(data,'seguridad','sst_poa_activities');
       const{data:chs}=await sb.from("sst_charlas").select("id,name,charla_key,done,planned_month").in("company_id",companyFilter).eq("year",yr);
       (chs||[]).forEach(c=>{
+        if(c.done)return; // Skip completed charlas
         const pm=c.planned_month!=null?c.planned_month:-1;
-        const urgency=c.done?'available':(pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available');
+        const urgency=pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available';
         suggestions.push({id:c.id,name:'🎓 '+c.name,code:c.charla_key||'',dept:'seguridad',type:'charla',table:'sst_charlas',monthIdx:pm>=0?pm:mi,urgency});
       });
     }
@@ -6360,8 +6362,9 @@ async function logLoadPoaSuggestionsUI(tripId){
       try{
         const{data:tCh}=await sb.from("tthh_charlas").select("id,name,charla_key,done,planned_month").in("company_id",companyFilter).eq("year",yr);
         (tCh||[]).forEach(c=>{
+          if(c.done)return; // Skip completed charlas
           const pm=c.planned_month!=null?c.planned_month:-1;
-          const urgency=c.done?'available':(pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available');
+          const urgency=pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available';
           suggestions.push({id:c.id,name:'🎓 '+c.name,code:c.charla_key||'',dept:'tthh',type:'charla',table:'tthh_charlas',monthIdx:pm>=0?pm:mi,urgency});
         });
       }catch(e){}
@@ -6380,16 +6383,17 @@ async function logLoadPoaSuggestionsUI(tripId){
       try{
         const{data:dCh}=await sb.from("datos_charlas").select("id,name,charla_key,done,planned_month").in("company_id",companyFilter).eq("year",yr);
         (dCh||[]).forEach(c=>{
+          if(c.done)return; // Skip completed charlas
           const pm=c.planned_month!=null?c.planned_month:-1;
-          const urgency=c.done?'available':(pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available');
+          const urgency=pm>=0?(pm<mi?'overdue':pm===mi?'current':'future'):'available';
           suggestions.push({id:c.id,name:'🎓 '+c.name,code:c.charla_key||'',dept:'datos',type:'charla',table:'datos_charlas',monthIdx:pm>=0?pm:mi,urgency});
         });
       }catch(e){}
     }
     
-    // Filter out already added activities
-    const myActs=LOG.activities.filter(a=>a.trip_id===tripId&&a.created_by===CURRENT_USER?.id);
-    const alreadyAdded=myActs.map(a=>a.activity_name.toLowerCase());
+    // Filter out already added activities (by ANY user in this trip)
+    const allTripActs=LOG.activities.filter(a=>a.trip_id===tripId);
+    const alreadyAdded=allTripActs.map(a=>a.activity_name.toLowerCase());
     suggestions=suggestions.filter(s=>!alreadyAdded.includes(s.name.toLowerCase()));
     
     // Sort
