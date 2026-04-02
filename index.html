@@ -396,8 +396,11 @@ function applyUserRole(){
     const pendEl=document.getElementById("sb-pendientes");if(pendEl)pendEl.style.display="block";
   }
   // Logística: show for all users
-  const logEl=document.getElementById("sb-logistica");const contEl=document.getElementById("sb-contable");if(contEl)contEl.style.display="block";
+  const logEl=document.getElementById("sb-logistica");
   if(logEl)logEl.style.display="block";
+  // Contabilidad: ONLY admin and contador
+  const contEl=document.getElementById("sb-contable");
+  if(contEl)contEl.style.display=(isAdmin||u.role==='contador')?"block":"none";
   // User info in sidebar
   const ui=document.getElementById("sb-user");
   if(ui)ui.innerHTML=`<div style="font-size:16px">${isAdmin?'👑':u.role==='jefe'?'👔':hasPsico?'🧠':'👤'}</div><div style="font-size:7px;color:var(--t3);line-height:1.2;margin-top:2px">${u.name.split(' ')[0]}</div>`;
@@ -2242,8 +2245,11 @@ function updateSidebar(){
     if(!el)return;
     el.style.display=has?"block":"none";
   });
-  const logEl=document.getElementById("sb-logistica");const contEl=document.getElementById("sb-contable");if(contEl)contEl.style.display="block";
+  const logEl=document.getElementById("sb-logistica");
   if(logEl)logEl.style.display="block";
+  // Contabilidad: ONLY admin and contador
+  const contEl=document.getElementById("sb-contable");
+  if(contEl)contEl.style.display=(isAdm||(CURRENT_USER&&CURRENT_USER.role==='contador'))?"block":"none";
 }
 
 const SST_CREATE_SQL=`-- Ejecutar en SQL Editor de Supabase
@@ -5059,6 +5065,7 @@ async function genAgInformePptx(){
 }
 
 async function agLoad(){
+  console.log('[AG] agLoad iniciado, companyId:', CONT?.companyId, 'sb:', !!sb);
   if(!sb)return;
   try{
     // Load manual agendamiento data
