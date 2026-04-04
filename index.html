@@ -6883,7 +6883,7 @@ function logRenderForm(){
         h+=`<span style="font-size:16px">${DEPT_ICONS[m.department]||'👤'}</span>`;
         h+=`<span style="flex:1;font-size:12px;color:var(--t1);font-weight:600">${m.app_users?.name||'?'}</span>`;
         h+=`<span style="font-size:10px;color:var(--t3);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:10px">${DEPT_LABELS[m.department]||m.department}</span>`;
-        h+=`<div class="cb ${infDone?'dn':''}" style="width:26px;height:26px;${infDone?'border-color:#34d399;background:rgba(52,211,153,0.2);color:#34d399':''}" onclick="logTogInforme('${m.id}')" title="${infDone?'Informe subido ✅':'Marcar informe subido'}">📄</div>`;
+        h+=`<button onclick="logTogInforme('${m.id}')" style="padding:6px 12px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid ${infDone?'rgba(52,211,153,0.4)':'rgba(251,191,36,0.4)'};background:${infDone?'rgba(52,211,153,0.15)':'rgba(251,191,36,0.1)'};color:${infDone?'#34d399':'#fbbf24'}">${infDone?'✅ Informe subido':'📄 Subir informe'}</button>`;
         if(m.extra_cost>0)h+=`<span style="font-size:10px;color:#fbbf24;font-weight:700">+$${m.extra_cost.toFixed(2)}</span>`;
         h+=`<button onclick="logRemoveMember('${m.id}')" style="background:#ef444420;border:1px solid #ef444440;color:#ef4444;border-radius:6px;padding:4px 8px;font-size:10px;cursor:pointer" title="Quitar del viaje">✕</button>`;
         h+=`</div>`;
