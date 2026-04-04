@@ -4295,13 +4295,15 @@ function logRenderWeek(isAdmin,visibleTrips){
       if(t.jornada_medica)h+=`<div style="background:linear-gradient(135deg,rgba(45,212,191,0.25),rgba(129,140,248,0.25));border:2px solid rgba(45,212,191,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#2dd4bf;letter-spacing:1px">🩺 JORNADA MÉDICA OCUPACIONAL</div></div>`;
       if(t.jornada_examenes)h+=`<div style="background:linear-gradient(135deg,rgba(129,140,248,0.25),rgba(244,114,182,0.25));border:2px solid rgba(129,140,248,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#818cf8;letter-spacing:1px">🔬 JORNADA DE EXÁMENES OCUPACIONALES</div></div>`;
       if(t.socializacion)h+=`<div style="background:linear-gradient(135deg,rgba(244,114,182,0.25),rgba(251,191,36,0.25));border:2px solid rgba(244,114,182,0.4);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px"><div style="font-size:16px;font-weight:900;color:#f472b6;letter-spacing:1px">📋 SOCIALIZACIÓN DE INFORME MENSUAL</div></div>`;
-      // Convocatoria check
+      // Convocatoria check - only admin
       const convocado=t.convocatoria_enviada||false;
+      if(CURRENT_USER&&CURRENT_USER.role==='admin'){
       h+=`<div onclick="event.stopPropagation();logToggleConvocatoria('${t.id}')" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;border-radius:8px;border:1px solid ${convocado?'rgba(45,212,191,0.4)':'rgba(255,255,255,0.1)'};background:${convocado?'rgba(45,212,191,0.1)':'rgba(255,255,255,0.02)'};cursor:pointer;transition:all 0.15s">`;
       h+=`<div style="width:20px;height:20px;border-radius:5px;border:2px solid ${convocado?'#2dd4bf':'rgba(255,255,255,0.2)'};background:${convocado?'#2dd4bf':'transparent'};display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex-shrink:0">${convocado?'✓':''}</div>`;
       h+=`<span style="font-size:11px;font-weight:700;color:${convocado?'#2dd4bf':'var(--t3)'}">📧 Convocatoria formal enviada</span>`;
       if(convocado&&t.convocatoria_fecha)h+=`<span style="font-size:9px;color:var(--t3);margin-left:auto">${t.convocatoria_fecha}</span>`;
       h+=`</div>`;
+      } // end admin-only convocatoria
       h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
       if(tcs.length>0){
         const coNames=tcs.map(c=>{
@@ -4321,6 +4323,15 @@ function logRenderWeek(isAdmin,visibleTrips){
         h+=`<span style="display:inline-block;background:${isMe?LOG_COLOR+'25':'rgba(255,255,255,0.06)'};border:1px solid ${isMe?LOG_COLOR+'50':'transparent'};border-radius:12px;padding:3px 10px;font-size:10px;color:${isMe?LOG_COLOR:'var(--t2)'};margin:2px 4px 2px 0;font-weight:${isMe?'700':'400'}">${DEPT_ICONS[m.department]||'👤'} ${m.app_users?.name||DEPT_LABELS[m.department]||m.department}${isMe?' (tú)':''}</span>`;
       });
       h+=`</div>`;
+      // Personal informe check
+      const myMember=members.find(m=>CURRENT_USER&&m.user_id===CURRENT_USER.id);
+      if(myMember){
+        const myInf=myMember.informe_subido===true;
+        h+=`<div style="margin-top:6px;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;border:1px solid ${myInf?'rgba(52,211,153,0.3)':'rgba(251,191,36,0.3)'};background:${myInf?'rgba(52,211,153,0.06)':'rgba(251,191,36,0.06)'}">`;
+        h+=`<div class="cb ${myInf?'dn':''}" style="width:22px;height:22px;${myInf?'border-color:#34d399;background:rgba(52,211,153,0.2);color:#34d399':'border-color:#fbbf24'}" onclick="event.stopPropagation();logTogInforme('${myMember.id}')">📄</div>`;
+        h+=`<span style="font-size:10px;font-weight:700;color:${myInf?'#34d399':'#fbbf24'}">${myInf?'✅ Informe subido':'📄 Marcar informe subido'}</span>`;
+        h+=`</div>`;
+      }
       // Activities grouped by department (in LEFT panel - remove from here)
       if(isAdmin){
         h+=`<div style="font-size:11px;font-weight:700;color:${LOG_COLOR};text-align:right;margin-top:4px">💰 $${(t.total_cost||0).toFixed(2)}</div>`;
@@ -5120,7 +5131,7 @@ async function agLoad(){
       const tids=LOG._agTrips.map(t=>t.id);
       const[tcR,tmR]=await Promise.all([
         sb.from("logistics_trip_companies").select("*").in("trip_id",tids),
-        sb.from("logistics_trip_members").select("trip_id,department").in("trip_id",tids)
+        sb.from("logistics_trip_members").select("trip_id,department,informe_subido").in("trip_id",tids)
       ]);
       LOG._agTripCos=tcR.data||[];
       LOG._agTripMembers=tmR.data||[];
@@ -5211,10 +5222,43 @@ function agGetVal(companyId,deptId,field){
       }
     }
   }
+  // Auto-detect inf from trip member informe_subido
+  if(field==='inf'){
+    const deptRoleMap={sst:'seguridad',salud:['salud','psicologo'],ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
+    const tripCos=LOG._agTripCos||[];
+    const tripMembers=LOG._agTripMembers||[];
+    const coTripIds=tripCos.filter(tc=>tc.company_id===companyId).map(tc=>tc.trip_id);
+    if(coTripIds.length>0){
+      const roleMatch=deptRoleMap[deptId];
+      const roles=Array.isArray(roleMatch)?roleMatch:[roleMatch];
+      for(const tid of coTripIds){
+        const deptMembers=tripMembers.filter(m=>m.trip_id===tid&&roles.includes(m.department));
+        if(deptMembers.length>0&&deptMembers.every(m=>m.informe_subido===true))return 'SÍ';
+      }
+    }
+  }
   if(field==='obs'||field==='cobro_obs')return '';
   return 'NO';
 }
 
+function logCheckEnviado(companyId,currentlyChecked){
+  if(currentlyChecked){
+    agSetVal(companyId,'_global','enviado','NO');return;
+  }
+  const missing=[];
+  AG_DEPTS.forEach(d=>{
+    const ag=agGetVal(companyId,d.id,'ag');
+    const inf=agGetVal(companyId,d.id,'inf');
+    if(ag==='SÍ'&&inf!=='SÍ'){
+      missing.push(d.icon+' '+d.label);
+    }
+  });
+  if(missing.length>0){
+    alert('⚠️ No se puede marcar como enviado.\n\nFalta informe de:\n'+missing.join('\n'));
+    return;
+  }
+  agSetVal(companyId,'_global','enviado','SÍ');
+}
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId)&&deptId!=='_global')return;
   // Update local data
@@ -5320,7 +5364,7 @@ function logRenderAgendamiento(){
     const envChecked=envVal==='SÍ';
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${envChecked?'rgba(244,114,182,0.15)':'transparent'}">`;
     if(canEditEnv){
-      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="agSetVal('${co.id}','_global','enviado',${envChecked}?'NO':'SÍ')">${envChecked?'✓':''}</div>`;
+      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="logCheckEnviado('${co.id}',${envChecked})">${envChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${envChecked?'✅':'⬜'}</span>`;
     }
@@ -6834,10 +6878,12 @@ function logRenderForm(){
     // Current members list
     if(members.length>0){
       members.forEach(m=>{
-        h+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;margin-bottom:4px">`;
+        const infDone=m.informe_subido===true;
+        h+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid ${infDone?'rgba(52,211,153,0.3)':'rgba(255,255,255,0.06)'};border-radius:8px;margin-bottom:4px">`;
         h+=`<span style="font-size:16px">${DEPT_ICONS[m.department]||'👤'}</span>`;
         h+=`<span style="flex:1;font-size:12px;color:var(--t1);font-weight:600">${m.app_users?.name||'?'}</span>`;
         h+=`<span style="font-size:10px;color:var(--t3);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:10px">${DEPT_LABELS[m.department]||m.department}</span>`;
+        h+=`<div class="cb ${infDone?'dn':''}" style="width:26px;height:26px;${infDone?'border-color:#34d399;background:rgba(52,211,153,0.2);color:#34d399':''}" onclick="logTogInforme('${m.id}')" title="${infDone?'Informe subido ✅':'Marcar informe subido'}">📄</div>`;
         if(m.extra_cost>0)h+=`<span style="font-size:10px;color:#fbbf24;font-weight:700">+$${m.extra_cost.toFixed(2)}</span>`;
         h+=`<button onclick="logRemoveMember('${m.id}')" style="background:#ef444420;border:1px solid #ef444440;color:#ef4444;border-radius:6px;padding:4px 8px;font-size:10px;cursor:pointer" title="Quitar del viaje">✕</button>`;
         h+=`</div>`;
@@ -8342,6 +8388,14 @@ async function genTripReportDocx(tripId){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }catch(e){alert("Error: "+e.message);console.error(e)}
+}
+async function logTogInforme(memberId){
+  const m=LOG.members.find(x=>String(x.id)===String(memberId));if(!m)return;
+  m.informe_subido=!m.informe_subido;
+  logRender();
+  try{
+    await sb.from("logistics_trip_members").update({informe_subido:m.informe_subido}).eq("id",memberId);
+  }catch(e){console.error("Toggle informe error:",e)}
 }
 async function logRemoveMember(memberId){
   if(!confirm("¿Quitar esta persona del viaje?"))return;
