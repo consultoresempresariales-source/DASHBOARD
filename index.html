@@ -5369,6 +5369,16 @@ function logRenderAgendamiento(){
       h+=`<span style="font-size:12px">${envChecked?'✅':'⬜'}</span>`;
     }
     h+=`</td>`;
+    // Informes enviados check
+    const infEnvVal=agGetVal(co.id,'_global','inf_enviado');
+    const infEnvChecked=infEnvVal==='SÍ';
+    h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${infEnvChecked?'rgba(45,212,191,0.15)':'transparent'}">`;
+    if(canEditEnv){
+      h+=`<div class="cb ${infEnvChecked?'dn':''}" style="${infEnvChecked?'border-color:#2dd4bf;background:rgba(45,212,191,0.2);color:#2dd4bf':''}" onclick="agSetVal('${co.id}','_global','inf_enviado',${infEnvChecked}?'NO':'SÍ')">${infEnvChecked?'✓':''}</div>`;
+    }else{
+      h+=`<span style="font-size:12px">${infEnvChecked?'✅':'⬜'}</span>`;
+    }
+    h+=`</td>`;
     // Socializado check
     const socVal=agGetVal(co.id,'_global','socializado');
     const socChecked=socVal==='SÍ';
@@ -5860,6 +5870,13 @@ async function logToggleConvocatoria(tripId){
     await sb.from("logistics_trips").update({convocatoria_enviada:newVal,convocatoria_fecha:fecha}).eq("id",tripId);
     trip.convocatoria_enviada=newVal;
     trip.convocatoria_fecha=fecha;
+    // Sync with agendamiento - mark enviado for all companies in this trip
+    const tripCos=LOG.tripCompanies.filter(tc=>tc.trip_id===tripId);
+    for(const tc of tripCos){
+      if(tc.company_id){
+        await sb.from("agendamiento").upsert({company_id:tc.company_id,dept:'_global',year:LOG.year,month:LOG.month,enviado:newVal?'SÍ':'NO'},{onConflict:"company_id,dept,year,month"});
+      }
+    }
     logRender();
   }catch(e){alert("Error: "+e.message)}
 }
