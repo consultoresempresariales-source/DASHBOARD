@@ -8422,6 +8422,13 @@ async function genTripReportDocx(tripId){
 async function logTogInforme(memberId){
   const m=LOG.members.find(x=>String(x.id)===String(memberId));if(!m)return;
   m.informe_subido=!m.informe_subido;
+  // Also update _agTripMembers for agendamiento sync
+  if(LOG._agTripMembers){
+    const am=LOG._agTripMembers.find(x=>String(x.trip_id)===String(m.trip_id)&&String(x.department)===String(m.department));
+    if(am)am.informe_subido=m.informe_subido;
+  }
+  // Force agendamiento to reload next time
+  LOG._agLoaded=false;
   logRender();
   try{
     await sb.from("logistics_trip_members").update({informe_subido:m.informe_subido}).eq("id",memberId);
