@@ -5608,7 +5608,7 @@ function logRenderResumen(){
 
   // Totals row
   h+='<tr style="background:rgba(255,255,255,0.04);border-top:2px solid rgba(255,255,255,0.1)">';
-  h+='<td colspan="3" style="padding:8px;font-weight:800;font-size:11px;border:1px solid rgba(255,255,255,0.06);color:var(--t1)">TOTALES</td>';
+  h+='<td colspan="6" style="padding:8px;font-weight:800;font-size:11px;border:1px solid rgba(255,255,255,0.06);color:var(--t1)">TOTALES</td>';
   AG_DEPTS.forEach(d=>{
     const s=deptStats[d.id];
     const pct=s.si+s.no>0?Math.round(s.si/(s.si+s.no)*100):0;
