@@ -5197,6 +5197,8 @@ function agGetVal(companyId,deptId,field){
   if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
     return r[field];
   }
+  // For est field: check if inactive was set - default to ACTIVO
+  if(field==='est')return 'ACTIVO';
   // No manual record - auto-detect from trips for ag and vis fields only
   if(field==='ag'||field==='vis'){
     const deptRoleMap={sst:'seguridad',salud:'salud',ambiente:'ambiente',lopdpd:'datos',tthh:['tthh','talento'],dpd:'_dpd'};
@@ -5267,6 +5269,17 @@ async function agSetVal(companyId,deptId,field,val){
   else{r={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};LOG.agData.push(r)}
   // Save to DB
   const upd={company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val};
+  // If changing est (ACTIVO/INACTIVO), propagate to all future months of the year
+  if(field==='est'){
+    try{
+      for(let fm=LOG.month;fm<=11;fm++){
+        await sb.from("agendamiento").upsert({company_id:companyId,dept:deptId,year:LOG.year,month:fm,est:val},{onConflict:"company_id,dept,year,month"});
+      }
+      console.log("agSetVal EST propagated:",companyId,deptId,val,"from month",LOG.month,"to 11");
+    }catch(e){console.error("EST propagate error:",e)}
+    logRender();
+    return;
+  }
   if(field==='enviado'||field==='socializado'||field==='cobro_obs'){
     // Save immediately for critical fields (no debounce)
     try{
