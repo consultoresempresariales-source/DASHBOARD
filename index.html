@@ -3519,7 +3519,7 @@ function renderAuditTab(mod,prefix,thColor,stTable,actTable){
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
   const userMods=CURRENT_USER?parseModules(CURRENT_USER):[];
   const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")))||(mod==="ambiente"&&(CURRENT_USER?.role==="ambiente"||userMods.includes("ambiente")));
-  const fnPfx=mod==="tthh"?"tthh":"datos";
+  const fnPfx=mod==="tthh"?"tthh":mod==="ambiente"?"ambiente":"datos";
   if(acts.length===0){
     return `<div style="text-align:center;padding:60px;color:var(--t3)">No hay procesos de auditoría definidos.${isModOwner?`<br><br><button class="add-btn" onclick="${fnPfx}AddAudit()" style="padding:10px 20px;font-size:14px">+ Agregar primer proceso</button>`:' El administrador debe crearlos.'}</div>`;
   }
@@ -3575,7 +3575,7 @@ function renderPlanTab(mod,prefix,thColor,stTable,actTable){
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
   const userMods=CURRENT_USER?parseModules(CURRENT_USER):[];
   const isModOwner=isAdmin||(mod==="tthh"&&(CURRENT_USER?.role==="talento"||CURRENT_USER?.role==="tthh"||userMods.includes("talento")))||(mod==="datos"&&(CURRENT_USER?.role==="datos"||userMods.includes("datos")))||(mod==="ambiente"&&(CURRENT_USER?.role==="ambiente"||userMods.includes("ambiente")));
-  const fnPfx=mod==="tthh"?"tthh":"datos";
+  const fnPfx=mod==="tthh"?"tthh":mod==="ambiente"?"ambiente":"datos";
   if(acts.length===0){
     return `<div style="text-align:center;padding:60px;color:var(--t3)">No hay actividades definidas.${isModOwner?`<br><br><button class="add-btn" onclick="${fnPfx}AddPlan()" style="padding:10px 20px;font-size:14px">+ Agregar primera actividad</button>`:' El administrador debe crearlas.'}</div>`;
   }
@@ -3860,6 +3860,100 @@ async function ambienteGetOrCreateAuditSt(actId){
   const{data}=await sb.from("ambiente_company_status").insert({activity_id:actId,company_id:CID,year:YR,status:"no_tiene",planned:[0,0,0,0,0,0,0,0,0,0,0,0],done:[0,0,0,0,0,0,0,0,0,0,0,0],observations:""}).select().single();
   if(data){AMBIENTE.auditSts.push(data);return data}return null;
 }
+// AMBIENTE CRUD functions
+async function ambienteAddAudit(){
+  const name=prompt("Nombre del proceso de auditoría:");if(!name||!name.trim())return;
+  const catList=["Gestión Ambiental","Residuos","Emisiones","Agua","Suelo","Legal","Otros"];
+  const catStr=catList.map((c,i)=>(i+1)+". "+c).join("\n");
+  const ci=prompt("Categoría:\n"+catStr,"1");
+  const cat=catList[parseInt(ci)-1]||catList[0];
+  const maxSort=AMBIENTE.auditActs.reduce((m,a)=>Math.max(m,a.sort_order||0),0);
+  const code=cat.substring(0,3).toUpperCase()+(maxSort+1);
+  try{
+    const{data,error}=await sb.from("ambiente_activities").insert({code:code,name:name.trim(),category:cat,sort_order:maxSort+1,active:true}).select().single();
+    if(error)throw error;
+    AMBIENTE.auditActs.push(data);
+    const allCos=cos.filter(c=>c.mod_ambiente===true);
+    if(allCos.length>0){
+      const ins=allCos.map(co=>({activity_id:data.id,company_id:co.id,year:YR,status:"no_tiene",planned:[0,0,0,0,0,0,0,0,0,0,0,0],done:[0,0,0,0,0,0,0,0,0,0,0,0],observations:""}));
+      await sb.from("ambiente_company_status").upsert(ins,{onConflict:"activity_id,company_id,year",ignoreDuplicates:true});
+    }else{
+      await sb.from("ambiente_company_status").upsert({activity_id:data.id,company_id:CID,year:YR,status:"no_tiene",planned:[0,0,0,0,0,0,0,0,0,0,0,0],done:[0,0,0,0,0,0,0,0,0,0,0,0],observations:""},{onConflict:"activity_id,company_id,year",ignoreDuplicates:true});
+    }
+    ambienteLoad();
+  }catch(e){alert("Error: "+e.message)}
+}
+function ambienteEditAuditName(id){
+  const a=AMBIENTE.auditActs.find(x=>String(x.id)===String(id));if(!a)return;
+  const nw=prompt("Editar nombre:",a.name);if(nw===null||!nw.trim())return;
+  a.name=nw.trim();ambienteRender();dbs("aa-en-"+id,()=>sb.from("ambiente_activities").update({name:a.name}).eq("id",id));
+}
+function ambienteSetAuditSt(stId,actId,val){
+  let st=AMBIENTE.auditSts.find(x=>String(x.id)===String(stId));
+  if(!st){st=AMBIENTE.auditSts.find(x=>String(x.activity_id)===String(actId)&&String(x.company_id)===String(CID))}
+  if(st){st.status=val;ambienteRender();dbs("aa-st-"+stId,()=>sb.from("ambiente_company_status").update({status:val}).eq("id",stId))}
+  else{ambienteGetOrCreateAuditSt(actId).then(s=>{if(s){s.status=val;AMBIENTE.auditSts.push(s);ambienteRender();sb.from("ambiente_company_status").update({status:val}).eq("id",s.id)}})}
+}
+function ambienteSetAuditObs(stId,actId,val){
+  let st=AMBIENTE.auditSts.find(x=>String(x.id)===String(stId));
+  if(!st){st=AMBIENTE.auditSts.find(x=>String(x.activity_id)===String(actId)&&String(x.company_id)===String(CID))}
+  if(st){st.observations=val;dbs("aa-obs-"+stId,()=>sb.from("ambiente_company_status").update({observations:val}).eq("id",stId))}
+}
+async function ambienteDelAudit(id){
+  if(!confirm("¿Eliminar este proceso de todas las empresas?"))return;
+  try{
+    await sb.from("ambiente_activities").update({active:false}).eq("id",id);
+    setUndo("Proceso eliminado de todas",async()=>{await sb.from("ambiente_activities").update({active:true}).eq("id",id);ambienteLoad()});
+    ambienteLoad()
+  }catch(e){alert("Error: "+e.message)}
+}
+async function ambienteAddPlan(){
+  const name=prompt("Nombre de la actividad:");if(!name||!name.trim())return;
+  const catList=["Gestión","Monitoreo","Capacitación","Documentación","Otros"];
+  const catStr=catList.map((c,i)=>(i+1)+". "+c).join("\n");
+  const ci=prompt("Categoría:\n"+catStr,"1");
+  const cat=catList[parseInt(ci)-1]||catList[0];
+  const maxSort=AMBIENTE.planActs.reduce((m,a)=>Math.max(m,a.sort_order||0),0);
+  const code=cat.substring(0,3).toUpperCase()+(maxSort+1);
+  try{
+    const{data,error}=await sb.from("ambiente_plan_activities").insert({code:code,name:name.trim(),category:cat,sort_order:maxSort+1,active:true}).select().single();
+    if(error)throw error;
+    AMBIENTE.planActs.push(data);
+    const{data:st}=await sb.from("ambiente_plan_status").insert({activity_id:data.id,company_id:CID,year:YR,status:"pendiente",planned:[0,0,0,0,0,0,0,0,0,0,0,0],done:[0,0,0,0,0,0,0,0,0,0,0,0],observations:""}).select().single();
+    if(st)AMBIENTE.planSts.push(st);
+    ambienteLoad()
+  }catch(e){alert("Error: "+e.message)}
+}
+function ambienteEditPlanName(id){
+  const a=AMBIENTE.planActs.find(x=>String(x.id)===String(id));if(!a)return;
+  const nw=prompt("Editar nombre:",a.name);if(nw===null||!nw.trim())return;
+  a.name=nw.trim();ambienteRender();dbs("ap-en-"+id,()=>sb.from("ambiente_plan_activities").update({name:a.name}).eq("id",id));
+}
+function ambienteSetPlanSt(stId,val){
+  const st=AMBIENTE.planSts.find(x=>String(x.id)===String(stId));
+  if(st){st.status=val;ambienteRender();dbs("ap-st-"+stId,()=>sb.from("ambiente_plan_status").update({status:val}).eq("id",stId))}
+}
+function ambienteTogPlanDone(stId,mi){
+  const st=AMBIENTE.planSts.find(x=>String(x.id)===String(stId));if(!st)return;
+  if(!st.done||!Array.isArray(st.done))st.done=Array(12).fill(0);
+  st.done[mi]=st.done[mi]===1?0:1;
+  ambienteRender();dbs("ap-d-"+stId+mi,()=>sb.from("ambiente_plan_status").update({done:st.done}).eq("id",stId));
+}
+function ambienteTogPlanPlan(stId,mi){
+  const st=AMBIENTE.planSts.find(x=>String(x.id)===String(stId));if(!st)return;
+  if(!st.planned||!Array.isArray(st.planned))st.planned=Array(12).fill(0);
+  st.planned[mi]=st.planned[mi]===1?0:1;
+  ambienteRender();dbs("ap-p-"+stId+mi,()=>sb.from("ambiente_plan_status").update({planned:st.planned}).eq("id",stId));
+}
+async function ambienteDelPlan(id){
+  if(!confirm("¿Eliminar esta actividad de todas las empresas?"))return;
+  try{
+    await sb.from("ambiente_plan_activities").update({active:false}).eq("id",id);
+    setUndo("Actividad eliminada de todas",async()=>{await sb.from("ambiente_plan_activities").update({active:true}).eq("id",id);ambienteLoad()});
+    ambienteLoad()
+  }catch(e){alert("Error: "+e.message)}
+}
+
 async function ambienteSetAuditSt(stId,actId,val){
   let st=AMBIENTE.auditSts.find(s=>s.id===stId);if(!st){st=await ambienteGetOrCreateAuditSt(actId);if(!st)return}
   st.status=val;ambienteRender();dbs("amb-st-"+st.id,()=>sb.from("ambiente_company_status").update({status:val}).eq("id",st.id));
@@ -7528,7 +7622,8 @@ async function contCajaNew(tipo){
   const categoria=categorias[parseInt(catIdx)-1]||categorias[0];
   
   const responsable=prompt('Responsable:',CURRENT_USER?.name||'')||'';
-  const fecha=new Date().toISOString().split('T')[0];
+  const hoy=new Date().toISOString().split('T')[0];
+  const fecha=prompt('Fecha (AAAA-MM-DD):',hoy)||hoy;
   
   try{
     const{data,error}=await sb.from("caja_chica").insert({
