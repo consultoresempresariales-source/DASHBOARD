@@ -425,7 +425,7 @@ async function showPostLoginNotifications(){
   if(!CURRENT_USER||!sb)return;
   try{
     const uid=CURRENT_USER.id;
-    const today=new Date().toISOString().split('T')[0];
+    const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
     // Get trips where this user is a member, from today onwards
     const{data:myMembers}=await sb.from("logistics_trip_members").select("trip_id").eq("user_id",uid);
     if(!myMembers||myMembers.length===0)return;
@@ -4207,7 +4207,7 @@ function logRender(){
 
   // Next trip banner for workers
   if(!isAdmin&&visibleTrips.length>0){
-    const today=new Date().toISOString().split('T')[0];
+    const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
     const upcoming=visibleTrips.filter(t=>t.trip_date>=today&&t.status!=='cancelled').sort((a,b)=>a.trip_date.localeCompare(b.trip_date));
     if(upcoming.length>0){
       const next=upcoming[0];
@@ -4336,7 +4336,7 @@ function logNextWeek(){LOG.weekStart=new Date(LOG.weekStart);LOG.weekStart.setDa
 
 // ===== WEEKLY VIEW =====
 function logRenderWeek(isAdmin,visibleTrips){
-  if(!LOG.weekStart){const now=new Date();const day=now.getDay();LOG.weekStart=new Date(now);LOG.weekStart.setDate(now.getDate()-day)}
+  if(!LOG.weekStart){const now=new Date();const day=now.getDay();const diff=day===0?6:day-1;LOG.weekStart=new Date(now);LOG.weekStart.setDate(now.getDate()-diff)}
   const ws=new Date(LOG.weekStart);
   const we=new Date(ws);we.setDate(ws.getDate()+6);
   const mNames=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -4358,11 +4358,11 @@ function logRenderWeek(isAdmin,visibleTrips){
   }
   h+=`</div>`;
 
-  const today=new Date().toISOString().split('T')[0];
+  const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
   h+=`<div class="c">`;
   for(let i=0;i<7;i++){
     const d=new Date(ws);d.setDate(ws.getDate()+i);
-    const dateStr=d.toISOString().split('T')[0];
+    const dateStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const isToday=dateStr===today;
     const dayTrips=visibleTrips.filter(t=>t.trip_date===dateStr).sort((a,b)=>(a.departure_time||'07:00').localeCompare(b.departure_time||'07:00'));
     const dayBg=isToday?`background:${LOG_COLOR}10;border:2px solid ${LOG_COLOR}40`:'background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06)';
