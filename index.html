@@ -7045,6 +7045,12 @@ function logRenderForm(){
   }
 
   // ACTIVITIES (admin sees all, read-only)
+  if(!isNew&&members.length>0){
+    h+=`<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">`;
+    h+=`<button onclick="genRegistroAsistencia('${e.id}','salud')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(45,212,191,0.4);background:rgba(45,212,191,0.1);color:#2dd4bf;font-size:11px;font-weight:700;cursor:pointer">🩺 Registro Asistencia Salud</button>`;
+    h+=`<button onclick="genRegistroAsistencia('${e.id}','seguridad')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.1);color:#f59e0b;font-size:11px;font-weight:700;cursor:pointer">🔧 Registro Asistencia SST</button>`;
+    h+=`</div>`;
+  }
   if(!isNew){
     const acts=LOG.activities.filter(a=>a.trip_id===e.id);
     h+=`<div style="margin-bottom:16px"><div style="font-size:10px;color:var(--t3);font-weight:700;margin-bottom:6px">📋 ACTIVIDADES PLANIFICADAS</div>`;
@@ -8632,6 +8638,139 @@ async function genTripReportDocx(tripId){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }catch(e){alert("Error: "+e.message);console.error(e)}
+}
+async function genRegistroAsistencia(tripId,dept){
+  const trip=LOG.trips.find(t=>String(t.id)===String(tripId));if(!trip)return;
+  const tCos=LOG.tripCompanies.filter(tc=>tc.trip_id===tripId);
+  const coId=tCos[0]?.company_id;
+  const co=cos.find(c=>c.id===coId);
+  const coName=tCos[0]?.custom_name||co?.name||'EMPRESA';
+  // Check if nomina exists for this company
+  let nomina=[];
+  if(coId){
+    try{
+      const{data}=await sb.from("nomina").select("*").eq("company_id",coId).order("nombre");
+      nomina=data||[];
+    }catch(e){nomina=[]}
+  }
+  if(nomina.length===0){
+    // No nomina - ask to upload
+    const upload=confirm('📋 No hay nómina cargada para '+coName+'.\n\n¿Desea subir el archivo de nómina del IESS?');
+    if(upload){subirNomina(coId,coName,tripId,dept)}
+    return;
+  }
+  // Generate Excel with nomina data
+  generarExcelAsistencia(trip,tCos,co,coName,nomina,dept);
+}
+
+function subirNomina(companyId,companyName,tripId,dept){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.xlsx,.xls';
+  input.onchange=async function(e){
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const ab=await file.arrayBuffer();
+      const wb=XLSX.read(ab);
+      // Find the sheet with worker data (Table 3 or first sheet with N°, Nombre, Cédula)
+      let workers=[];
+      for(const sn of wb.SheetNames){
+        const ws=wb.Sheets[sn];
+        const data=XLSX.utils.sheet_to_json(ws,{header:1});
+        for(let i=0;i<data.length;i++){
+          const row=data[i];
+          if(!row)continue;
+          const r=row.map(c=>String(c||'').trim());
+          // Detect header row
+          if(r.some(c=>c.toLowerCase().includes('nombre'))&&r.some(c=>c.toLowerCase().includes('dula'))){
+            // Found header - parse subsequent rows
+            const nameIdx=r.findIndex(c=>c.toLowerCase().includes('nombre'));
+            const cedIdx=r.findIndex(c=>c.toLowerCase().includes('dula'));
+            const actIdx=r.findIndex(c=>c.toLowerCase().includes('actividad'));
+            for(let j=i+1;j<data.length;j++){
+              const dr=data[j];
+              if(!dr||!dr[nameIdx])continue;
+              const nombre=String(dr[nameIdx]||'').trim();
+              const cedula=String(dr[cedIdx]||'').trim();
+              const cargo=String(dr[actIdx]||'').trim();
+              if(nombre&&nombre!=='Total Rol'&&!nombre.includes('Total')){
+                workers.push({nombre,cedula,cargo});
+              }
+            }
+            break;
+          }
+        }
+        if(workers.length>0)break;
+      }
+      if(workers.length===0){alert('No se encontraron trabajadores en el archivo. Asegúrese de que tenga columnas: Nombre, Cédula, Actividad');return}
+      // Save to Supabase
+      const now=new Date().toISOString();
+      const userName=CURRENT_USER?.name||'';
+      // Delete old nomina for this company
+      await sb.from("nomina").delete().eq("company_id",companyId);
+      // Insert new
+      const rows=workers.map(w=>({company_id:companyId,nombre:w.nombre,cedula:w.cedula,cargo:w.cargo,uploaded_by:CURRENT_USER?.id,uploaded_at:now,uploaded_by_name:userName}));
+      for(let i=0;i<rows.length;i+=50){
+        await sb.from("nomina").insert(rows.slice(i,i+50));
+      }
+      alert('✅ Nómina cargada: '+workers.length+' trabajadores para '+companyName+'\n\nSubido por: '+userName+'\nFecha: '+new Date().toLocaleDateString('es-EC'));
+      // Now generate the register
+      if(tripId){
+        const trip=LOG.trips.find(t=>String(t.id)===String(tripId));
+        const tCos=LOG.tripCompanies.filter(tc=>tc.trip_id===tripId);
+        const co=cos.find(c=>c.id===companyId);
+        generarExcelAsistencia(trip,tCos,co,companyName,workers.map((w,i)=>({...w,id:i})),dept);
+      }
+    }catch(err){alert('Error leyendo archivo: '+err.message)}
+  };
+  input.click();
+}
+
+function generarExcelAsistencia(trip,tCos,co,coName,nomina,dept){
+  const td=new Date(trip.trip_date+'T12:00:00');
+  const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const dias=['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
+  const mesNum=String(td.getMonth()+1).padStart(3,'0');
+  const anio=td.getFullYear();
+  const fechaStr=dias[td.getDay()]+', '+td.getDate()+' DE '+meses[td.getMonth()]+' DE '+anio;
+  const codigo='ANU-'+mesNum+'-'+anio;
+  const tema=prompt('Tema de la capacitación:','')||'';
+  const hora=trip.departure_time||'08:00';
+  const responsable=CURRENT_USER?.name||'';
+  const wb=XLSX.utils.book_new();
+  const rows=[];
+  rows.push([]);rows.push([]);rows.push([]);
+  rows.push(['','',dept==='salud'?'PLAN DE PROMOCIÓN DE LA SALUD EN EL TRABAJO':'PLAN DE SEGURIDAD Y SALUD EN EL TRABAJO']);
+  rows.push([]);rows.push([]);
+  rows.push(['REGISTRO DE PARTICIPANTES','','','','','','','','',codigo]);
+  rows.push(['FECHA: '+fechaStr,'','','HORA: '+hora,'','','','','EMPRESA: '+coName]);
+  rows.push(['RESPONSABLE: '+responsable]);
+  rows.push(['TEMA: '+tema]);
+  rows.push(['Nro.','Nombres y Apellidos','AUTOIDENTIFICACIÓN ÉTNICA','','','','','','','','PARTICIPANTES','','','','','','','','ACTIVIDAD','Nro. Cédula','FIRMA']);
+  rows.push(['','','Indígena','Afroecuatoriano','Negro/a','Mulato/a','Montubio/a','Mestizo/a','Otro/a','No sabe','ADOLESCENTES (18-19)','','','ADULTOS (20-64)','','','ADULTOS MAYORES (65+)','','','','']);
+  rows.push(['','','','','','','','','','','M','H','LGBTI','M','H','LGBTI','M','H','LGBTIQ+','','']);
+  // Fill with nomina data
+  nomina.forEach((w,i)=>{
+    rows.push([i+1,w.nombre,'','','','','','','','','','','','','','','','',w.cargo,w.cedula,'']);
+  });
+  // Add extra empty rows for visitors
+  const extra=Math.max(5,25-nomina.length);
+  for(let i=0;i<extra;i++){
+    rows.push([nomina.length+i+1,'','','','','','','','','','','','','','','','','','','','']);
+  }
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:5},{wch:35},{wch:9},{wch:14},{wch:9},{wch:9},{wch:11},{wch:11},{wch:7},{wch:8},{wch:5},{wch:6},{wch:6},{wch:5},{wch:6},{wch:6},{wch:5},{wch:6},{wch:30},{wch:12},{wch:15}];
+  ws['!merges']=[
+    {s:{r:3,c:2},e:{r:3,c:8}},
+    {s:{r:6,c:0},e:{r:6,c:2}},{s:{r:6,c:9},e:{r:6,c:10}},
+    {s:{r:7,c:0},e:{r:7,c:2}},{s:{r:7,c:3},e:{r:7,c:5}},{s:{r:7,c:8},e:{r:7,c:10}},
+    {s:{r:8,c:0},e:{r:8,c:8}},{s:{r:9,c:0},e:{r:9,c:8}},
+    {s:{r:10,c:2},e:{r:10,c:9}},{s:{r:10,c:10},e:{r:10,c:17}},
+    {s:{r:11,c:10},e:{r:11,c:12}},{s:{r:11,c:13},e:{r:11,c:15}},{s:{r:11,c:16},e:{r:11,c:18}},
+  ];
+  XLSX.utils.book_append_sheet(wb,ws,'Registro');
+  const fileName='Registro_'+(dept==='salud'?'Salud':'SST')+'_'+coName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+codigo+'.xlsx';
+  XLSX.writeFile(wb,fileName);
 }
 async function logTogInforme(memberId){
   const m=LOG.members.find(x=>String(x.id)===String(memberId));if(!m)return;
