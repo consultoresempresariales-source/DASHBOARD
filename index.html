@@ -7671,11 +7671,13 @@ function contRenderDeudas(){
   if(!isAdmin)return '<div style="text-align:center;padding:40px;color:var(--t3)">⛔ Solo administrador y contadora</div>';
   if(!CONT.deudas){contLoadDeudas().then(()=>contRender());return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';}
   
-  // Config: proveedores y sus precios
-  const provs=[
-    {id:'laboratorio',name:'🧪 Laboratorio',pConvenio:7.30,pVenta:14.00,icon:'🧪'},
-    {id:'rayosx',name:'📡 Rayos X',pConvenio:14.50,pVenta:24.00,icon:'📡'}
+  // Config: proveedores dinámicos
+  const defaultProvs=[
+    {id:'laboratorio',name:'Laboratorio',pConvenio:7.30,pVenta:14.00,icon:'🧪'},
+    {id:'rayosx',name:'Rayos X',pConvenio:14.50,pVenta:24.00,icon:'📡'}
   ];
+  const extraProvs=(CONT.deudasConfig||[]).map(p=>({id:p.id,name:p.name,pConvenio:p.precio_convenio||0,pVenta:p.precio_venta||0,icon:p.icon||'🏢'}));
+  const provs=[...defaultProvs,...extraProvs];
   
   let h='';
   // Cards por proveedor
@@ -7715,6 +7717,7 @@ function contRenderDeudas(){
   h+=`<button onclick="contDeudaNew('pago_convenio')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(52,211,153,0.4);background:rgba(52,211,153,0.1);color:#34d399;font-size:12px;font-weight:700;cursor:pointer">💚 Jornada Precio Convenio</button>`;
   h+=`<button onclick="contDeudaNew('pago_venta')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.1);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer">💛 Jornada Precio Venta (abona deuda)</button>`;
   h+=`<button onclick="contDeudaNew('abono')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer">💵 Abono Directo</button>`;
+  h+=`<button onclick="contAddProveedor()" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;font-size:12px;font-weight:700;cursor:pointer">➕ Agregar Proveedor</button>`;
   h+=`</div>`;
   
   // History tables - separated by provider
@@ -7753,17 +7756,26 @@ function contRenderDeudas(){
     t+=`</tbody></table></div>`;
     return t;
   }
-  h+=`<div class="gr" style="grid-template-columns:1fr 1fr;gap:16px">`;
-  h+=_renderProvTable('laboratorio','Laboratorio','🧪','#2dd4bf');
-  h+=_renderProvTable('rayosx','Rayos X','📡','#818cf8');
+  const provColors=['#2dd4bf','#818cf8','#f59e0b','#f472b6','#34d399','#60a5fa','#a855f7'];
+  h+=`<div class="gr" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px">`;
+  provs.forEach((p,i)=>{
+    h+=_renderProvTable(p.id,p.name,p.icon,provColors[i%provColors.length]);
+  });
   h+=`</div>`;
   return h;
 }
 
 async function contDeudaNew(tipo){
-  const provSel=prompt('Proveedor:\n1. Laboratorio\n2. Rayos X','1');
-  const prov=provSel==='2'?'rayosx':'laboratorio';
-  const precios=prov==='laboratorio'?{conv:7.30,venta:14.00}:{conv:14.50,venta:24.00};
+  const defaultProvs2=[{id:'laboratorio',name:'Laboratorio',pConvenio:7.30,pVenta:14.00},{id:'rayosx',name:'Rayos X',pConvenio:14.50,pVenta:24.00}];
+  const extraProvs2=(CONT.deudasConfig||[]).map(p=>({id:p.id,name:p.name,pConvenio:p.precio_convenio||0,pVenta:p.precio_venta||0}));
+  const allProvs=[...defaultProvs2,...extraProvs2];
+  const provList=allProvs.map((p,i)=>(i+1)+'. '+p.name).join('\n');
+  const provSel=prompt('Proveedor:\n'+provList,'1');
+  const provIdx=parseInt(provSel)-1;
+  if(isNaN(provIdx)||provIdx<0||provIdx>=allProvs.length)return;
+  const selProv=allProvs[provIdx];
+  const prov=selProv.id;
+  const precios={conv:selProv.pConvenio,venta:selProv.pVenta};
   const hoy=new Date().toISOString().split('T')[0];
   const fecha=prompt('Fecha (AAAA-MM-DD):',hoy)||hoy;
   let row={proveedor:prov,tipo:tipo,fecha:fecha,created_by:CURRENT_USER?.id,precio_convenio:precios.conv,precio_venta:precios.venta};
@@ -7790,6 +7802,20 @@ async function contDeudaNew(tipo){
   }catch(e){alert('Error: '+e.message)}
 }
 
+
+async function contAddProveedor(){
+  const name=prompt('Nombre del proveedor:');if(!name||!name.trim())return;
+  const icon=prompt('Emoji/icono:','🏢')||'🏢';
+  const pc=prompt('Precio convenio ($):','0');
+  const pv=prompt('Precio venta ($):','0');
+  const id=name.trim().toLowerCase().replace(/[^a-z0-9]/g,'_');
+  try{
+    const{data,error}=await sb.from("deudas_config").insert({id:id,name:name.trim(),icon:icon,precio_convenio:parseFloat(pc)||0,precio_venta:parseFloat(pv)||0}).select().single();
+    if(error)throw error;
+    CONT.deudasConfig.push(data);
+    contRender();
+  }catch(e){alert('Error: '+e.message)}
+}
 async function contDeudaDel(id){
   if(!confirm('¿Eliminar este registro?'))return;
   try{
