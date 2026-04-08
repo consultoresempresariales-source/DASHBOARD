@@ -7722,7 +7722,7 @@ function contRenderDeudas(){
   
   // History tables - separated by provider
   function _renderProvTable(provId,provName,provIcon,provColor){
-    const all=[...(CONT.deudas||[])].filter(d=>d.proveedor===provId).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const _tipoOrder={deuda_inicial:0,pago_convenio:1,pago_venta:1,abono:2};const all=[...(CONT.deudas||[])].filter(d=>d.proveedor===provId).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)||(_tipoOrder[a.tipo]||9)-(_tipoOrder[b.tipo]||9)||(new Date(a.created_at)-new Date(b.created_at)));
     let saldo=0;
     all.forEach(d=>{
       if(d.tipo==='deuda_inicial')saldo+=(d.monto||0);
