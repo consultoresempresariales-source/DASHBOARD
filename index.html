@@ -7717,32 +7717,46 @@ function contRenderDeudas(){
   h+=`<button onclick="contDeudaNew('abono')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer">💵 Abono Directo</button>`;
   h+=`</div>`;
   
-  // History table
-  h+=`<div class="c" style="overflow-x:auto"><table><thead><tr>`;
-  h+=`<th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Total Pagado</th><th style="text-align:right">Abono Deuda</th><th style="text-align:right">Adicional</th><th>Nota</th><th>Acción</th>`;
-  h+=`</tr></thead><tbody>`;
-  const sorted=[...(CONT.deudas||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
-  sorted.forEach(d=>{
-    const prov=d.proveedor==='laboratorio'?'🧪 Lab':'📡 RX';
-    const tipo=d.tipo==='deuda_inicial'?'📋 Deuda':d.tipo==='pago_convenio'?'💚 Convenio':d.tipo==='pago_venta'?'💛 Venta':'💵 Abono';
-    const tColor=d.tipo==='deuda_inicial'?'#ef4444':d.tipo==='pago_venta'?'#fbbf24':d.tipo==='abono'?'#60a5fa':'#34d399';
-    const abono=d.tipo==='pago_venta'?((d.precio_venta-d.precio_convenio)*(d.cantidad||0)):d.tipo==='abono'?(d.monto||0):0;
-    const totalPagado=d.tipo==='deuda_inicial'?d.monto:(d.tipo==='abono'?d.monto:((d.tipo==='pago_venta'?d.precio_venta:d.precio_convenio)*(d.cantidad||0))+(d.extra_cost||0));
-    h+=`<tr>`;
-    h+=`<td style="font-family:var(--mn);font-size:11px">${d.fecha||''}</td>`;
-    h+=`<td style="font-size:11px">${prov}</td>`;
-    h+=`<td><span style="font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:${tColor}15;color:${tColor};border:1px solid ${tColor}30">${tipo}</span></td>`;
-    h+=`<td style="text-align:center;font-size:11px">${d.cantidad||'-'}</td>`;
-    h+=`<td style="text-align:right;font-family:var(--mn);font-size:11px">$${(d.tipo==='pago_venta'?d.precio_venta:d.tipo==='pago_convenio'?d.precio_convenio:d.monto||0).toFixed(2)}</td>`;
-    h+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px">$${totalPagado.toFixed(2)}</td>`;
-    h+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${abono>0?'#34d399':'var(--t3)'}">${abono>0?'$'+abono.toFixed(2):'-'}</td>`;
-    h+=`<td style="text-align:right;font-family:var(--mn);font-size:11px;color:${(d.extra_cost||0)>0?'#fb923c':'var(--t3)'}">${(d.extra_cost||0)>0?'$'+(d.extra_cost).toFixed(2):'-'}</td>`;
-    h+=`<td style="font-size:10px;color:var(--t3)">${d.nota||''}</td>`;
-    h+=`<td style="text-align:center"><button onclick="contDeudaDel('${d.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button></td>`;
-    h+=`</tr>`;
-  });
-  if(sorted.length===0)h+=`<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--t3)">No hay movimientos</td></tr>`;
-  h+=`</tbody></table></div>`;
+  // History tables - separated by provider
+  function _renderProvTable(provId,provName,provIcon,provColor){
+    const all=[...(CONT.deudas||[])].filter(d=>d.proveedor===provId).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    let saldo=0;
+    all.forEach(d=>{
+      if(d.tipo==='deuda_inicial')saldo+=(d.monto||0);
+      else if(d.tipo==='abono')saldo-=(d.monto||0);
+      else if(d.tipo==='pago_venta')saldo-=((d.precio_venta-d.precio_convenio)*(d.cantidad||0));
+      d._saldo=saldo;
+    });
+    all.reverse();
+    let t=`<div class="c" style="border-color:${provColor}40;overflow-x:auto;margin-bottom:16px">`;
+    t+=`<div style="font-size:14px;font-weight:800;margin-bottom:10px;color:${provColor}">${provIcon} ${provName}</div>`;
+    t+=`<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Total</th><th style="text-align:right">Abono</th><th style="text-align:right">Adicional</th><th style="text-align:right">Saldo</th><th>Nota</th><th>Acc.</th></tr></thead><tbody>`;
+    all.forEach(d=>{
+      const tipo=d.tipo==='deuda_inicial'?'📋 Deuda':d.tipo==='pago_convenio'?'💚 Convenio':d.tipo==='pago_venta'?'💛 Venta':'💵 Abono';
+      const tColor=d.tipo==='deuda_inicial'?'#ef4444':d.tipo==='pago_venta'?'#fbbf24':d.tipo==='abono'?'#60a5fa':'#34d399';
+      const abono=d.tipo==='pago_venta'?((d.precio_venta-d.precio_convenio)*(d.cantidad||0)):d.tipo==='abono'?(d.monto||0):0;
+      const totalPagado=d.tipo==='deuda_inicial'?d.monto:(d.tipo==='abono'?d.monto:((d.tipo==='pago_venta'?d.precio_venta:d.precio_convenio)*(d.cantidad||0))+(d.extra_cost||0));
+      t+=`<tr>`;
+      t+=`<td style="font-family:var(--mn);font-size:11px">${d.fecha||''}</td>`;
+      t+=`<td><span style="font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:${tColor}15;color:${tColor};border:1px solid ${tColor}30">${tipo}</span></td>`;
+      t+=`<td style="text-align:center;font-size:11px">${d.cantidad||'-'}</td>`;
+      t+=`<td style="text-align:right;font-family:var(--mn);font-size:11px">$${(d.tipo==='pago_venta'?d.precio_venta:d.tipo==='pago_convenio'?d.precio_convenio:d.monto||0).toFixed(2)}</td>`;
+      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px">$${totalPagado.toFixed(2)}</td>`;
+      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${abono>0?'#34d399':'var(--t3)'}">${abono>0?'$'+abono.toFixed(2):'-'}</td>`;
+      t+=`<td style="text-align:right;font-family:var(--mn);font-size:11px;color:${(d.extra_cost||0)>0?'#fb923c':'var(--t3)'}">${(d.extra_cost||0)>0?'$'+(d.extra_cost).toFixed(2):'-'}</td>`;
+      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${d._saldo>0?'#ef4444':'#34d399'}">$${(d._saldo||0).toFixed(2)}</td>`;
+      t+=`<td style="font-size:10px;color:var(--t3)">${d.nota||''}</td>`;
+      t+=`<td style="text-align:center"><button onclick="contDeudaDel('${d.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button></td>`;
+      t+=`</tr>`;
+    });
+    if(all.length===0)t+=`<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--t3)">No hay movimientos</td></tr>`;
+    t+=`</tbody></table></div>`;
+    return t;
+  }
+  h+=`<div class="gr" style="grid-template-columns:1fr 1fr;gap:16px">`;
+  h+=_renderProvTable('laboratorio','Laboratorio','🧪','#2dd4bf');
+  h+=_renderProvTable('rayosx','Rayos X','📡','#818cf8');
+  h+=`</div>`;
   return h;
 }
 
