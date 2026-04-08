@@ -5337,9 +5337,9 @@ function agGetVal(companyId,deptId,field){
   return 'NO';
 }
 
-function logCheckEnviado(companyId,currentlyChecked){
+function logCheckInfEnviado(companyId,currentlyChecked){
   if(currentlyChecked){
-    agSetVal(companyId,'_global','enviado','NO');return;
+    agSetVal(companyId,'_global','inf_enviado','NO');return;
   }
   const missing=[];
   AG_DEPTS.forEach(d=>{
@@ -5350,10 +5350,10 @@ function logCheckEnviado(companyId,currentlyChecked){
     }
   });
   if(missing.length>0){
-    alert('⚠️ No se puede marcar como enviado.\n\nFalta informe de:\n'+missing.join('\n'));
+    alert('⚠️ No se puede marcar informes como enviados.\n\nFalta informe de:\n'+missing.join('\n'));
     return;
   }
-  agSetVal(companyId,'_global','enviado','SÍ');
+  agSetVal(companyId,'_global','inf_enviado','SÍ');
 }
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId)&&deptId!=='_global')return;
@@ -5471,7 +5471,7 @@ function logRenderAgendamiento(){
     const envChecked=envVal==='SÍ';
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${envChecked?'rgba(244,114,182,0.15)':'transparent'}">`;
     if(canEditEnv){
-      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="logCheckEnviado('${co.id}',${envChecked})">${envChecked?'✓':''}</div>`;
+      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="agSetVal('${co.id}','_global','enviado',${envChecked}?'NO':'SÍ')">${envChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${envChecked?'✅':'⬜'}</span>`;
     }
@@ -5481,7 +5481,7 @@ function logRenderAgendamiento(){
     const infEnvChecked=infEnvVal==='SÍ';
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${infEnvChecked?'rgba(45,212,191,0.15)':'transparent'}">`;
     if(canEditEnv){
-      h+=`<div class="cb ${infEnvChecked?'dn':''}" style="${infEnvChecked?'border-color:#2dd4bf;background:rgba(45,212,191,0.2);color:#2dd4bf':''}" onclick="agSetVal('${co.id}','_global','inf_enviado',${infEnvChecked}?'NO':'SÍ')">${infEnvChecked?'✓':''}</div>`;
+      h+=`<div class="cb ${infEnvChecked?'dn':''}" style="${infEnvChecked?'border-color:#2dd4bf;background:rgba(45,212,191,0.2);color:#2dd4bf':''}" onclick="logCheckInfEnviado('${co.id}',${infEnvChecked})">${infEnvChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${infEnvChecked?'✅':'⬜'}</span>`;
     }
