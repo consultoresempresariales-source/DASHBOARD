@@ -6211,6 +6211,7 @@ async function logSendWA(tripId){
     if(t.jornada_examenes)msg+=String.fromCodePoint(0x1F52C)+' Jornada de Examenes Ocupacionales\n';
     if(t.socializacion)msg+=String.fromCodePoint(0x1F4CB)+' Socializacion de Informe Mensual\n';
     msg+=String.fromCodePoint(0x1F4CD)+' *Modalidad:* '+(t.modalidad==='telematica'?'Telematica (Zoom)':'Presencial')+'\n';
+    if(t.jornada_examenes)msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
     msg+='\nPor favor confirmar disponibilidad.\n\n';
     msg+='Atentamente\n';
     msg+='_Consultores Empresariales ALTAIR_';
