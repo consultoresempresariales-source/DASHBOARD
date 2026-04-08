@@ -7362,6 +7362,7 @@ async function contLoad(){
   }
   contUpdateHeader();
   await contLoadCaja();
+  await contLoadDeudas();
   contRender();
 }
 
@@ -7653,6 +7654,135 @@ async function contCajaDel(id){
 }
 // ========== FIN CAJA CHICA ==========
 
+
+// ========== PROVEEDORES / DEUDAS ==========
+async function contLoadDeudas(){
+  if(!sb)return;
+  try{
+    const{data}=await sb.from("deudas_proveedores").select("*").order("fecha",{ascending:false});
+    CONT.deudas=data||[];
+    const{data:p}=await sb.from("deudas_config").select("*");
+    CONT.deudasConfig=p||[];
+  }catch(e){CONT.deudas=[];CONT.deudasConfig=[];console.error("Deudas load:",e)}
+}
+
+function contRenderDeudas(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  if(!isAdmin)return '<div style="text-align:center;padding:40px;color:var(--t3)">⛔ Solo administrador y contadora</div>';
+  if(!CONT.deudas){contLoadDeudas().then(()=>contRender());return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';}
+  
+  // Config: proveedores y sus precios
+  const provs=[
+    {id:'laboratorio',name:'🧪 Laboratorio',pConvenio:7.30,pVenta:14.00,icon:'🧪'},
+    {id:'rayosx',name:'📡 Rayos X',pConvenio:14.50,pVenta:24.00,icon:'📡'}
+  ];
+  
+  let h='';
+  // Cards por proveedor
+  h+=`<div class="gr g3" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px">`;
+  provs.forEach(p=>{
+    const movs=(CONT.deudas||[]).filter(d=>d.proveedor===p.id);
+    const deudaInicial=movs.filter(d=>d.tipo==='deuda_inicial').reduce((a,d)=>a+(d.monto||0),0);
+    const abonos=movs.filter(d=>d.tipo==='abono').reduce((a,d)=>a+(d.monto||0),0);
+    const pagosConvenio=movs.filter(d=>d.tipo==='pago_convenio').reduce((a,d)=>a+(d.cantidad||0),0);
+    const pagosVenta=movs.filter(d=>d.tipo==='pago_venta').reduce((a,d)=>a+(d.cantidad||0),0);
+    const abonoAutoVenta=movs.filter(d=>d.tipo==='pago_venta').reduce((a,d)=>a+((d.precio_venta-d.precio_convenio)*(d.cantidad||0)),0);
+    const totalAbonos=abonos+abonoAutoVenta;
+    const saldoDeuda=deudaInicial-totalAbonos;
+    const sColor=saldoDeuda>0?'#ef4444':'#34d399';
+    
+    h+=`<div class="c" style="border-color:${saldoDeuda>0?'rgba(239,68,68,0.3)':'rgba(52,211,153,0.3)'}">`;
+    h+=`<div style="font-size:18px;font-weight:800;margin-bottom:8px">${p.icon} ${p.name}</div>`;
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">`;
+    h+=`<div style="color:var(--t3)">Deuda inicial:</div><div style="font-weight:700;color:#ef4444">$${deudaInicial.toFixed(2)}</div>`;
+    h+=`<div style="color:var(--t3)">Total abonado:</div><div style="font-weight:700;color:#34d399">$${totalAbonos.toFixed(2)}</div>`;
+    h+=`<div style="color:var(--t3)">Precio convenio:</div><div style="font-weight:700">$${p.pConvenio}</div>`;
+    h+=`<div style="color:var(--t3)">Precio venta:</div><div style="font-weight:700">$${p.pVenta}</div>`;
+    h+=`<div style="color:var(--t3)">Jornadas convenio:</div><div style="font-weight:700">${pagosConvenio} exámenes</div>`;
+    h+=`<div style="color:var(--t3)">Jornadas venta:</div><div style="font-weight:700">${pagosVenta} exámenes</div>`;
+    h+=`</div>`;
+    h+=`<div style="margin-top:10px;padding:10px;border-radius:8px;background:${sColor}15;border:1px solid ${sColor}30;text-align:center">`;
+    h+=`<div style="font-size:10px;color:var(--t3)">SALDO DEUDA</div>`;
+    h+=`<div style="font-size:24px;font-weight:900;color:${sColor}">$${saldoDeuda.toFixed(2)}</div>`;
+    h+=`</div>`;
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  
+  // Buttons
+  h+=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">`;
+  h+=`<button onclick="contDeudaNew('deuda_inicial')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#ef4444;font-size:12px;font-weight:700;cursor:pointer">📋 Registrar Deuda Inicial</button>`;
+  h+=`<button onclick="contDeudaNew('pago_convenio')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(52,211,153,0.4);background:rgba(52,211,153,0.1);color:#34d399;font-size:12px;font-weight:700;cursor:pointer">💚 Jornada Precio Convenio</button>`;
+  h+=`<button onclick="contDeudaNew('pago_venta')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.1);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer">💛 Jornada Precio Venta (abona deuda)</button>`;
+  h+=`<button onclick="contDeudaNew('abono')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer">💵 Abono Directo</button>`;
+  h+=`</div>`;
+  
+  // History table
+  h+=`<div class="c" style="overflow-x:auto"><table><thead><tr>`;
+  h+=`<th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Total Pagado</th><th style="text-align:right">Abono Deuda</th><th>Nota</th><th>Acción</th>`;
+  h+=`</tr></thead><tbody>`;
+  const sorted=[...(CONT.deudas||[])].sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  sorted.forEach(d=>{
+    const prov=d.proveedor==='laboratorio'?'🧪 Lab':'📡 RX';
+    const tipo=d.tipo==='deuda_inicial'?'📋 Deuda':d.tipo==='pago_convenio'?'💚 Convenio':d.tipo==='pago_venta'?'💛 Venta':'💵 Abono';
+    const tColor=d.tipo==='deuda_inicial'?'#ef4444':d.tipo==='pago_venta'?'#fbbf24':d.tipo==='abono'?'#60a5fa':'#34d399';
+    const abono=d.tipo==='pago_venta'?((d.precio_venta-d.precio_convenio)*(d.cantidad||0)):d.tipo==='abono'?(d.monto||0):0;
+    const totalPagado=d.tipo==='deuda_inicial'?d.monto:(d.tipo==='abono'?d.monto:((d.tipo==='pago_venta'?d.precio_venta:d.precio_convenio)*(d.cantidad||0)));
+    h+=`<tr>`;
+    h+=`<td style="font-family:var(--mn);font-size:11px">${d.fecha||''}</td>`;
+    h+=`<td style="font-size:11px">${prov}</td>`;
+    h+=`<td><span style="font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:${tColor}15;color:${tColor};border:1px solid ${tColor}30">${tipo}</span></td>`;
+    h+=`<td style="text-align:center;font-size:11px">${d.cantidad||'-'}</td>`;
+    h+=`<td style="text-align:right;font-family:var(--mn);font-size:11px">$${(d.tipo==='pago_venta'?d.precio_venta:d.tipo==='pago_convenio'?d.precio_convenio:d.monto||0).toFixed(2)}</td>`;
+    h+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px">$${totalPagado.toFixed(2)}</td>`;
+    h+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${abono>0?'#34d399':'var(--t3)'}">${abono>0?'$'+abono.toFixed(2):'-'}</td>`;
+    h+=`<td style="font-size:10px;color:var(--t3)">${d.nota||''}</td>`;
+    h+=`<td style="text-align:center"><button onclick="contDeudaDel('${d.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button></td>`;
+    h+=`</tr>`;
+  });
+  if(sorted.length===0)h+=`<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--t3)">No hay movimientos</td></tr>`;
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
+async function contDeudaNew(tipo){
+  const provSel=prompt('Proveedor:\n1. Laboratorio\n2. Rayos X','1');
+  const prov=provSel==='2'?'rayosx':'laboratorio';
+  const precios=prov==='laboratorio'?{conv:7.30,venta:14.00}:{conv:14.50,venta:24.00};
+  const hoy=new Date().toISOString().split('T')[0];
+  const fecha=prompt('Fecha (AAAA-MM-DD):',hoy)||hoy;
+  let row={proveedor:prov,tipo:tipo,fecha:fecha,created_by:CURRENT_USER?.id,precio_convenio:precios.conv,precio_venta:precios.venta};
+  
+  if(tipo==='deuda_inicial'){
+    const m=prompt('Monto de la deuda ($):');if(!m)return;
+    row.monto=parseFloat(m);if(isNaN(row.monto))return;
+  }else if(tipo==='abono'){
+    const m=prompt('Monto del abono ($):');if(!m)return;
+    row.monto=parseFloat(m);if(isNaN(row.monto))return;
+  }else{
+    const c=prompt('Cantidad de exámenes:');if(!c)return;
+    row.cantidad=parseInt(c);if(isNaN(row.cantidad)||row.cantidad<=0)return;
+  }
+  const nota=prompt('Nota (opcional):','')||'';
+  row.nota=nota;
+  try{
+    const{data,error}=await sb.from("deudas_proveedores").insert(row).select().single();
+    if(error)throw error;
+    CONT.deudas.push(data);
+    contRender();
+  }catch(e){alert('Error: '+e.message)}
+}
+
+async function contDeudaDel(id){
+  if(!confirm('¿Eliminar este registro?'))return;
+  try{
+    await sb.from("deudas_proveedores").delete().eq("id",id);
+    CONT.deudas=CONT.deudas.filter(d=>d.id!==id);
+    contRender();
+  }catch(e){alert('Error: '+e.message)}
+}
+// ========== FIN PROVEEDORES ==========
+
 function contRenderConfig(){
   const co=CONT.companies.find(c=>c.id===CONT.companyId);
   if(!co)return '<div style="text-align:center;padding:40px;color:var(--t3)">Selecciona una empresa primero</div>';
@@ -7734,7 +7864,7 @@ async function contDelLogo(){
 function contRender(){
   const mc=document.getElementById("contMc");if(!mc)return;
   // Nav
-  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'deudas',l:'🏥 Proveedores'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
   const nv=document.getElementById("contNv");
   if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
 
@@ -7745,6 +7875,7 @@ function contRender(){
   else if(CONT.tab==='payments'){h=contPayments()}
   else if(CONT.tab==='expenses'){h=contExpenses()}
   else if(CONT.tab==='caja'){h=contRenderCaja()}
+  else if(CONT.tab==='deudas'){h=contRenderDeudas()}
   else if(CONT.tab==='clients'){h=contRenderClients()}
   else if(CONT.tab==='reports'){h=contReports()}
   else if(CONT.tab==='config'){h=contRenderConfig()}
