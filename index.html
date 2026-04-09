@@ -5423,13 +5423,13 @@ function agEnviarSolicitud(companyId){
   msg+='Nos comunicamos para solicitar disponibilidad para agendar una visita a su empresa.\n\n';
   msg+=String.fromCodePoint(0x1F4C5)+' *Fecha propuesta:* '+fechaStr+'\n';
   msg+=String.fromCodePoint(0x1F552)+' *Hora propuesta:* '+hora+'\n';
-  if(depts.length>0){msg+=String.fromCodePoint(0x1F465)+' *Departamentos:*\n';depts.forEach(function(dd){msg+='   '+String.fromCodePoint(0x2705)+' '+(deptLabels[dd]||dd)+'\n'})}
-  jornadas.forEach(function(j){
+  if(depts.length>0){msg+='\n*DEPARTAMENTOS:*\n';depts.forEach(function(dd){msg+='   '+String.fromCodePoint(0x2705)+' '+(deptLabels[dd]||dd)+'\n'})}
+  if(jornadas.length>0){msg+='\n*ACTIVIDADES:*\n';jornadas.forEach(function(j){
     if(j==='examenes')msg+=String.fromCodePoint(0x1F52C)+' '+jorLabels[j]+'\n';
     else if(j==='medica')msg+=String.fromCodePoint(0x1FA7A)+' '+jorLabels[j]+'\n';
     else if(j==='socializacion')msg+=String.fromCodePoint(0x1F4CB)+' '+jorLabels[j]+'\n';
     else if(j==='capacitacion')msg+=String.fromCodePoint(0x1F393)+' '+jorLabels[j]+'\n';
-  });
+  })}
   if(jornadas.includes('examenes'))msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
   msg+='\nPor favor confirmar si la fecha es conveniente o sugerir una alternativa.\n\n';
   msg+='Atentamente\n';
