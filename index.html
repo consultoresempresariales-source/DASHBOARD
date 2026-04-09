@@ -6024,23 +6024,23 @@ async function logSendGroupWA(tipo){
   let titulo='';
 
   if(tipo==='hoy'){
-    const hoy=now.toISOString().split('T')[0];
+    const hoy=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
     trips=LOG.trips.filter(t=>t.trip_date===hoy&&t.status!=='cancelled');
-    titulo='PLANIFICACION DE HOY '+dias[now.getDay()].toUpperCase()+' '+now.getDate()+' de '+meses[now.getMonth()];
+    titulo='PLANIFICACIÓN DE HOY '+dias[now.getDay()].toUpperCase()+' '+now.getDate()+' de '+meses[now.getMonth()];
   }else if(tipo==='manana'){
     const man=new Date(now);man.setDate(man.getDate()+1);
-    const manStr=man.toISOString().split('T')[0];
+    const manStr=man.getFullYear()+'-'+String(man.getMonth()+1).padStart(2,'0')+'-'+String(man.getDate()).padStart(2,'0');
     trips=LOG.trips.filter(t=>t.trip_date===manStr&&t.status!=='cancelled');
-    titulo='PLANIFICACION DE MANANA '+dias[man.getDay()].toUpperCase()+' '+man.getDate()+' de '+meses[man.getMonth()];
+    titulo='PLANIFICACIÓN DE MAÑANA '+dias[man.getDay()].toUpperCase()+' '+man.getDate()+' de '+meses[man.getMonth()];
   }else{
     // Semana: lunes a viernes de la semana actual
     const day=now.getDay();
     const lunes=new Date(now);lunes.setDate(now.getDate()-(day===0?6:day-1));
     const viernes=new Date(lunes);viernes.setDate(lunes.getDate()+4);
-    const lunesStr=lunes.toISOString().split('T')[0];
-    const viernesStr=viernes.toISOString().split('T')[0];
+    const lunesStr=lunes.getFullYear()+'-'+String(lunes.getMonth()+1).padStart(2,'0')+'-'+String(lunes.getDate()).padStart(2,'0');
+    const viernesStr=viernes.getFullYear()+'-'+String(viernes.getMonth()+1).padStart(2,'0')+'-'+String(viernes.getDate()).padStart(2,'0');
     trips=LOG.trips.filter(t=>t.trip_date>=lunesStr&&t.trip_date<=viernesStr&&t.status!=='cancelled');
-    titulo='PLANIFICACION SEMANAL ('+lunes.getDate()+' al '+viernes.getDate()+' de '+meses[lunes.getMonth()]+')';
+    titulo='PLANIFICACIÓN SEMANAL ('+lunes.getDate()+' al '+viernes.getDate()+' de '+meses[lunes.getMonth()]+')';
   }
 
   if(trips.length===0){alert('No hay viajes para '+tipo);return}
@@ -6061,7 +6061,7 @@ async function logSendGroupWA(tipo){
   const doc=String.fromCodePoint(0x1F4CB);
 
   let msg=star+' *'+titulo+'*\n';
-  msg+='_Consultores Empresariales ALTAIR_\n\n';
+  msg+='*Consultores Empresariales ALTAIR*\n\n';
 
   let currentDate='';
   trips.forEach(t=>{
@@ -6228,7 +6228,7 @@ async function logSendWA(tripId){
     if(t.jornada_examenes)msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
     msg+='\nPor favor confirmar disponibilidad.\n\n';
     msg+='Atentamente\n';
-    msg+='_Consultores Empresariales ALTAIR_';
+    msg+='*Consultores Empresariales ALTAIR*';
 
     const waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
     window.open(waUrl,'whatsapp_tab');
