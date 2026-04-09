@@ -6124,12 +6124,7 @@ async function logSendGroupWA(tipo){
     waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
   }
 
-  if(!window._waTab||window._waTab.closed){
-    window._waTab=window.open(waUrl,'_blank');
-  }else{
-    window._waTab.location.href=waUrl;
-    window._waTab.focus();
-  }
+  window.open(waUrl,'whatsapp_tab');
 }
 
 function logEditGroupWA(){
@@ -6236,12 +6231,7 @@ async function logSendWA(tripId){
     msg+='_Consultores Empresariales ALTAIR_';
 
     const waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
-    if(!window._waTab||window._waTab.closed){
-      window._waTab=window.open(waUrl,'_blank');
-    }else{
-      window._waTab.location.href=waUrl;
-      window._waTab.focus();
-    }
+    window.open(waUrl,'whatsapp_tab');
   }
 }
 
