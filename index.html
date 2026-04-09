@@ -5374,6 +5374,71 @@ function logCheckInfEnviado(companyId,currentlyChecked){
   }
   agSetVal(companyId,'_global','inf_enviado','SÍ');
 }
+
+function agSolicitarFecha(companyId){
+  const co=cos.find(c=>c.id===companyId);if(!co)return;
+  document.getElementById('agSolModal')?.remove();
+  const hoy=new Date();const hoyStr=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  let m='';
+  m+='<div id="agSolModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">';
+  m+='<div style="background:var(--bg2);border:2px solid #10b981;border-radius:16px;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">';
+  m+='<div style="padding:16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;background:rgba(16,185,129,0.06)">';
+  m+='<div><div style="font-size:16px;font-weight:800;color:#10b981">\u{1F4F2} Solicitar Fecha</div><div style="font-size:12px;color:var(--t2)">'+co.name+'</div></div>';
+  m+='<button onclick="document.getElementById(\'agSolModal\').remove()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:8px;padding:5px 12px;cursor:pointer;font-weight:700">\u2715</button>';
+  m+='</div><div style="padding:16px">';
+  m+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
+  m+='<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:3px">FECHA PROPUESTA</label><input id="sf_fecha" type="date" value="'+hoyStr+'" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:rgba(255,255,255,0.04);color:var(--t1);font-size:12px"></div>';
+  m+='<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:3px">HORA PROPUESTA</label><input id="sf_hora" type="time" value="08:00" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:rgba(255,255,255,0.04);color:var(--t1);font-size:12px"></div>';
+  m+='</div>';
+  m+='<div style="margin-bottom:12px"><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:6px">DEPARTAMENTOS</label><div style="display:flex;flex-wrap:wrap;gap:6px">';
+  [{id:'sst',l:'\u{1F527} SST'},{id:'salud',l:'\u{1FA7A} Salud'},{id:'ambiente',l:'\u{1F33F} Ambiente'},{id:'tthh',l:'\u{1F465} TTHH'},{id:'datos',l:'\u{1F6E1} Datos'},{id:'psico',l:'\u{1F9E0} Psicología'}].forEach(function(d){
+    m+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" class="sf_dept" value="'+d.id+'"> '+d.l+'</label>';
+  });
+  m+='</div></div>';
+  m+='<div style="margin-bottom:12px"><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:6px">TIPO DE JORNADA</label><div style="display:flex;flex-wrap:wrap;gap:6px">';
+  [{id:'examenes',l:'\u{1F52C} Exámenes Ocupacionales'},{id:'medica',l:'\u{1FA7A} Jornada Médica'},{id:'socializacion',l:'\u{1F4CB} Socialización'},{id:'capacitacion',l:'\u{1F393} Capacitación'}].forEach(function(j){
+    m+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" class="sf_jornada" value="'+j.id+'"> '+j.l+'</label>';
+  });
+  m+='</div></div>';
+  m+='<button onclick="agEnviarSolicitud(\''+co.id+'\')" style="width:100%;padding:12px;border-radius:10px;border:none;background:#25D366;color:#fff;font-size:14px;font-weight:800;cursor:pointer">\u{1F4F2} Enviar por WhatsApp</button>';
+  m+='</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',m);
+}
+
+function agEnviarSolicitud(companyId){
+  const co=cos.find(c=>c.id===companyId);if(!co)return;
+  const phone=co.contact_phone||co.phone||'';
+  const contactName=co.contact_name||co.rep_legal||'';
+  const fecha=document.getElementById('sf_fecha').value;
+  const hora=document.getElementById('sf_hora').value;
+  const depts=[...document.querySelectorAll('.sf_dept:checked')].map(c=>c.value);
+  const jornadas=[...document.querySelectorAll('.sf_jornada:checked')].map(c=>c.value);
+  const deptLabels={sst:'Seguridad Industrial',salud:'Salud Ocupacional',ambiente:'Seguridad Ambiental',tthh:'Talento Humano',datos:'Protección de Datos',psico:'Psicología Ocupacional'};
+  const jorLabels={examenes:'Jornada de Exámenes Ocupacionales',medica:'Jornada Médica Ocupacional',socializacion:'Socialización de Informe Mensual',capacitacion:'Capacitación'};
+  const d=new Date(fecha+'T12:00:00');
+  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fechaStr=dias[d.getDay()]+' '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();
+  var msg='Estimado/a '+(contactName||'representante')+',\n\n';
+  msg+='Nos comunicamos para solicitar disponibilidad para agendar una visita a su empresa.\n\n';
+  msg+=String.fromCodePoint(0x1F4C5)+' *Fecha propuesta:* '+fechaStr+'\n';
+  msg+=String.fromCodePoint(0x1F552)+' *Hora propuesta:* '+hora+'\n';
+  if(depts.length>0){msg+=String.fromCodePoint(0x1F465)+' *Departamentos:*\n';depts.forEach(function(dd){msg+='   '+String.fromCodePoint(0x2705)+' '+(deptLabels[dd]||dd)+'\n'})}
+  jornadas.forEach(function(j){
+    if(j==='examenes')msg+=String.fromCodePoint(0x1F52C)+' '+jorLabels[j]+'\n';
+    else if(j==='medica')msg+=String.fromCodePoint(0x1FA7A)+' '+jorLabels[j]+'\n';
+    else if(j==='socializacion')msg+=String.fromCodePoint(0x1F4CB)+' '+jorLabels[j]+'\n';
+    else if(j==='capacitacion')msg+=String.fromCodePoint(0x1F393)+' '+jorLabels[j]+'\n';
+  });
+  if(jornadas.includes('examenes'))msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
+  msg+='\nPor favor confirmar si la fecha es conveniente o sugerir una alternativa.\n\n';
+  msg+='Atentamente\n';
+  msg+='*Consultores Empresariales ALTAIR*';
+  if(phone){var cleanPhone=phone.replace(/[^0-9+]/g,'').replace(/^0/,'593');window.open('https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg),'whatsapp_tab')}
+  else{window.open('https://web.whatsapp.com/send?text='+encodeURIComponent(msg),'whatsapp_tab')}
+  document.getElementById('agSolModal').remove();
+}
+
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId)&&deptId!=='_global')return;
   // Update local data
@@ -5471,7 +5536,7 @@ function logRenderAgendamiento(){
   filteredCos.forEach((co,idx)=>{
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
-    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap">${co.name}</td>`;
+    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap"><span>${co.name}</span> <button onclick="event.stopPropagation();agSolicitarFecha('${co.id}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px" title="Solicitar fecha por WhatsApp">📲</button></td>`;
     const canEditEnv=CURRENT_USER&&(CURRENT_USER.role==='admin'||IS_JEFE());
     // Frequency selector
     const coFreq=agGetFreq(co.id);
