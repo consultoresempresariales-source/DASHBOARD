@@ -5202,6 +5202,25 @@ async function agLoad(){
     }else{
       LOG.agData=data||[];
     }
+    // Inherit est from previous month if not set for current month
+    if(LOG.month>0){
+      const prevMonth=LOG.month-1;
+      const{data:prevData}=await sb.from("agendamiento").select("*").eq("year",LOG.year).eq("month",prevMonth);
+      if(prevData){
+        prevData.forEach(pd=>{
+          if(pd.est&&pd.est==='INACTIVO'&&pd.dept!=='_global'&&pd.dept!=='_freq'){
+            const existing=LOG.agData.find(x=>x.company_id===pd.company_id&&x.dept===pd.dept);
+            if(!existing||(!existing.est||existing.est==='')){
+              // Copy INACTIVO to current month
+              if(existing){existing.est='INACTIVO'}
+              else{LOG.agData.push({...pd,month:LOG.month,id:undefined})}
+              // Also save to DB so it persists
+              sb.from("agendamiento").upsert({company_id:pd.company_id,dept:pd.dept,year:LOG.year,month:LOG.month,est:'INACTIVO'},{onConflict:"company_id,dept,year,month"});
+            }
+          }
+        });
+      }
+    }
     // Also load frequency records (dept='_freq') from any month this year
     try{
       const{data:freqData}=await sb.from("agendamiento").select("*").eq("year",LOG.year).eq("dept","_freq");
