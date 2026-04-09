@@ -4759,8 +4759,9 @@ async function genAgInformeDocx(){
   AG_DEPTS.forEach(d=>{
     let totalCos=0,agSi=0,visSi=0,infSi=0;
     allCos.forEach(co=>{
+      const est=agGetVal(co.id,d.id,'est');
       const ag=agGetVal(co.id,d.id,'ag');
-      if(ag==='N/A')return;
+      if(ag==='N/A'||est==='INACTIVO')return;
       totalCos++;
       if(ag==='SÍ')agSi++;
       if(agGetVal(co.id,d.id,'vis')==='SÍ')visSi++;
@@ -4997,7 +4998,8 @@ async function genAgInformePptx(){
   AG_DEPTS.forEach(d=>{
     let tot=0,ag=0,vis=0,inf=0;
     allCos.forEach(co=>{
-      if(agGetVal(co.id,d.id,'ag')==='N/A')return;
+      const _est=agGetVal(co.id,d.id,'est');
+      if(agGetVal(co.id,d.id,'ag')==='N/A'||_est==='INACTIVO')return;
       tot++;
       if(agGetVal(co.id,d.id,'ag')==='SÍ')ag++;
       if(agGetVal(co.id,d.id,'vis')==='SÍ')vis++;
