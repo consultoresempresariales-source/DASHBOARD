@@ -5407,8 +5407,8 @@ function agSolicitarFecha(companyId){
 
 function agEnviarSolicitud(companyId){
   const co=cos.find(c=>c.id===companyId);if(!co)return;
-  const phone=co.contact_phone||co.phone||'';
-  const contactName=co.contact_name||co.rep_legal||'';
+  const phone=co.whatsapp||co.contact_phone||co.phone||'';
+  const contactName=co.whatsapp_contact||co.contact_name||co.rep_legal||'';
   const fecha=document.getElementById('sf_fecha').value;
   const hora=document.getElementById('sf_hora').value;
   const depts=[...document.querySelectorAll('.sf_dept:checked')].map(c=>c.value);
