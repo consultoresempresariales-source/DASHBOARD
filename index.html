@@ -7309,6 +7309,16 @@ async function logSaveTrip(){
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
+      // Stay in form to add members immediately
+      await logLoad();
+      const newTrip=LOG.trips.find(t=>t.id===data.id);
+      if(newTrip){
+        const ms=LOG.members.filter(m=>m.trip_id===data.id);
+        LOG.editTrip={...newTrip,num_people:ms.length||1};
+        LOG.tab='form';
+        logRender();
+        return;
+      }
     }
     LOG.tab='calendar';
     await logLoad();
