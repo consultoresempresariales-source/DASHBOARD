@@ -4993,23 +4993,46 @@ async function genAgInformePptx(){
   const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(allCos.length===0){alert("No hay empresas");return}
 
-  // Stats
+  // Stats with detailed breakdown
   const stats={};
   AG_DEPTS.forEach(d=>{
-    let tot=0,ag=0,vis=0,inf=0;
+    let activas=0,bimensuales=0,noResponde=0,cancelado=0,reagendar=0,suspendido=0,ag=0,vis=0,inf=0;
+    let enviado=0,socializado=0;
     allCos.forEach(co=>{
       const _est=agGetVal(co.id,d.id,'est');
-      if(agGetVal(co.id,d.id,'ag')==='N/A'||_est==='INACTIVO')return;
-      tot++;
-      if(agGetVal(co.id,d.id,'ag')==='SÍ')ag++;
+      if(_est==='INACTIVO')return;
+      activas++;
+      const _ag=agGetVal(co.id,d.id,'ag');
+      const obs=agGetVal(co.id,d.id,'obs')||'';
+      // Check frequency
+      const freq=agGetFreq(co.id);
+      if(freq>1&&!agIsActiveMonth(freq,LOG.month,agGetFreqStart(co.id))&&_ag!=='SÍ'){bimensuales++;return}
+      // Check obs category
+      if(obs==='No responde'){noResponde++}
+      else if(obs==='Cancelado por empresa'){cancelado++}
+      else if(obs==='Reagendar'){reagendar++}
+      else if(obs==='Suspendido'){suspendido++}
+      if(_ag==='SÍ')ag++;
       if(agGetVal(co.id,d.id,'vis')==='SÍ')vis++;
       if(agGetVal(co.id,d.id,'inf')==='SÍ')inf++;
     });
-    stats[d.id]={tot,ag,vis,inf,agP:tot?Math.round(ag/tot*100):0,visP:tot?Math.round(vis/tot*100):0,infP:tot?Math.round(inf/tot*100):0};
+    // Enviado and socializado from _global
+    allCos.forEach(co=>{
+      const _est=agGetVal(co.id,d.id,'est');
+      if(_est==='INACTIVO')return;
+      if(agGetVal(co.id,'_global','enviado')==='SÍ')enviado++;
+      if(agGetVal(co.id,'_global','socializado')==='SÍ')socializado++;
+    });
+    const aVisitar=activas-bimensuales;
+    const gestionables=aVisitar-noResponde-cancelado;
+    const cumplP=gestionables>0?Math.round(ag/gestionables*100):0;
+    const visP=gestionables>0?Math.round(vis/gestionables*100):0;
+    const infP=gestionables>0?Math.round(inf/gestionables*100):0;
+    stats[d.id]={activas,bimensuales,aVisitar,noResponde,cancelado,reagendar,suspendido,gestionables,ag,vis,inf,enviado,socializado,cumplP,visP,infP};
   });
   const numEmpresas=allCos.length;
-  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].tot>0);
-  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agP,0)/depsWithData.length):0;
+  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].activas>0);
+  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].cumplP,0)/depsWithData.length):0;
   const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visP,0)/depsWithData.length):0;
   const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infP,0)/depsWithData.length):0;
   let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
@@ -5075,53 +5098,69 @@ async function genAgInformePptx(){
   s3.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
 
   // Table
-  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:10}},{text:'TOTAL',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}}];
+  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:8}},{text:'ACTIVAS',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'BIMENS.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'NO RESP.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'GESTIÓN',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'ENVIAD.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'SOCIAL.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}}];
   const rows=[hdr];
   AG_DEPTS.forEach((d,i)=>{
     const s=stats[d.id];const bg=i%2?LG:WH;
-    const pc=v=>({text:v+'%',options:{fontSize:11,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
+    const pc=v=>({text:v+'%',options:{fontSize:9,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
     rows.push([
-      {text:d.icon+' '+d.label,options:{fontSize:10,bold:true,fill:bg}},
-      {text:String(s.tot),options:{fontSize:10,align:'center',fill:bg}},
-      {text:String(s.ag),options:{fontSize:10,align:'center',fill:bg}},
-      pc(s.agP),
-      {text:String(s.vis),options:{fontSize:10,align:'center',fill:bg}},
+      {text:d.icon+' '+d.label,options:{fontSize:9,bold:true,fill:bg}},
+      {text:String(s.activas),options:{fontSize:9,align:'center',fill:bg}},
+      {text:String(s.bimensuales),options:{fontSize:9,align:'center',fill:bg,color:s.bimensuales>0?YEL:'000000'}},
+      {text:String(s.noResponde+s.cancelado),options:{fontSize:9,align:'center',fill:bg,color:s.noResponde+s.cancelado>0?RED:'000000'}},
+      {text:String(s.gestionables),options:{fontSize:9,align:'center',fill:bg,bold:true}},
+      {text:String(s.ag),options:{fontSize:9,align:'center',fill:bg}},
+      pc(s.cumplP),
+      {text:String(s.vis),options:{fontSize:9,align:'center',fill:bg}},
       pc(s.visP),
-      {text:String(s.inf),options:{fontSize:10,align:'center',fill:bg}},
-      pc(s.infP)
+      {text:String(s.inf),options:{fontSize:9,align:'center',fill:bg}},
+      pc(s.infP),
+      {text:String(s.enviado),options:{fontSize:9,align:'center',fill:bg}},
+      {text:String(s.socializado),options:{fontSize:9,align:'center',fill:bg}}
     ]);
   });
-  // Total row
-  rows.push([
-    {text:'TOTAL',options:{fontSize:11,bold:true,fill:TEAL,color:WH}},
-    {text:String(numEmpresas),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gA+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gV+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gI+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
-  ]);
-  s3.addTable(rows,{x:0.5,y:1.2,w:9,colW:[2.2,0.9,0.9,0.8,0.9,0.8,0.9,0.8],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.4});
+  s3.addTable(rows,{x:0.3,y:1.2,w:9.4,colW:[1.6,0.7,0.7,0.7,0.7,0.7,0.5,0.7,0.5,0.7,0.5,0.7,0.7],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.35});
 
-  // ===== SLIDE 4: ANÁLISIS POR ÁREA (barras) =====
+  // ===== SLIDE 4: BARRAS TRIPLE (Agendamiento / Visita / Informe) =====
   const s4=pres.addSlide();
   s4.background={fill:DK};
-  s4.addText('ANÁLISIS POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
-  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+  s4.addText('CUMPLIMIENTO POR DEPARTAMENTO',{x:0.5,y:0.2,w:9,h:0.5,fontSize:24,fontFace:'Georgia',color:WH,bold:true});
+  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.65,w:2,h:0.04,fill:{color:TEAL}});
+  // Legend
+  s4.addShape(pres.shapes.RECTANGLE,{x:3.5,y:0.25,w:0.3,h:0.2,fill:{color:TEAL}});
+  s4.addText('Agendamiento',{x:3.85,y:0.2,w:1.3,h:0.3,fontSize:9,color:GY});
+  s4.addShape(pres.shapes.RECTANGLE,{x:5.2,y:0.25,w:0.3,h:0.2,fill:{color:GRN}});
+  s4.addText('Visita',{x:5.55,y:0.2,w:0.8,h:0.3,fontSize:9,color:GY});
+  s4.addShape(pres.shapes.RECTANGLE,{x:6.4,y:0.25,w:0.3,h:0.2,fill:{color:PURP}});
+  s4.addText('Informe',{x:6.75,y:0.2,w:0.8,h:0.3,fontSize:9,color:GY});
 
+  const barMaxW=5.0;
+  const barH=0.18;
+  const groupH=0.85;
   AG_DEPTS.forEach((d,i)=>{
     const s=stats[d.id];
-    const y=1.2+i*0.7;
-    const barW=5.5;
-    // Label
-    s4.addText(d.icon+' '+d.label,{x:0.5,y,w:1.8,h:0.5,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
-    // Bar background
-    s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW,h:0.3,fill:{color:'1E293B'}});
+    const yBase=1.0+i*groupH;
+    // Dept label
+    s4.addText(d.icon+' '+d.label,{x:0.3,y:yBase,w:2.0,h:groupH,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
+    // Gestionables label
+    s4.addText(s.gestionables+' emp.',{x:0.3,y:yBase+0.45,w:2.0,h:0.25,fontSize:8,fontFace:'Calibri',color:GY});
+    const xStart=2.5;
+    // Bar backgrounds
+    for(let b=0;b<3;b++){
+      s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+b*(barH+0.04),w:barMaxW,h:barH,fill:{color:'1E293B'}});
+    }
     // Agendamiento bar
-    if(s.agP>0)s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW*s.agP/100,h:0.3,fill:{color:TEAL}});
-    // % label
-    s4.addText(s.agP+'%',{x:8.2,y,w:1.2,h:0.5,fontSize:14,fontFace:'Georgia',color:s.agP>=80?GRN:s.agP>=50?YEL:RED,bold:true,align:'center',valign:'middle'});
+    const agW=barMaxW*s.cumplP/100;
+    if(agW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05,w:agW,h:barH,fill:{color:TEAL}});
+    s4.addText(s.ag+'/'+s.gestionables+' ('+s.cumplP+'%)',{x:xStart+agW+0.1,y:yBase+0.02,w:2,h:barH+0.06,fontSize:8,color:TEAL,bold:true});
+    // Visita bar
+    const visW=barMaxW*s.visP/100;
+    if(visW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+barH+0.04,w:visW,h:barH,fill:{color:GRN}});
+    s4.addText(s.vis+'/'+s.gestionables+' ('+s.visP+'%)',{x:xStart+visW+0.1,y:yBase+0.02+barH+0.04,w:2,h:barH+0.06,fontSize:8,color:GRN,bold:true});
+    // Informe bar
+    const infW=barMaxW*s.infP/100;
+    if(infW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+2*(barH+0.04),w:infW,h:barH,fill:{color:PURP}});
+    s4.addText(s.inf+'/'+s.gestionables+' ('+s.infP+'%)',{x:xStart+infW+0.1,y:yBase+0.02+2*(barH+0.04),w:2,h:barH+0.06,fontSize:8,color:PURP,bold:true});
   });
 
   // ===== SLIDE 5: DETALLE POR EMPRESA =====
@@ -5441,6 +5480,16 @@ function agEnviarSolicitud(companyId){
   document.getElementById('agSolModal').remove();
 }
 
+
+function agObsChange(companyId,deptId,val,sel){
+  if(val==='Otro'){
+    agSetVal(companyId,deptId,'obs','Otro');
+    logRender();
+  }else{
+    agSetVal(companyId,deptId,'obs',val);
+    sel.style.color=val==='No responde'||val==='Cancelado por empresa'?'#ef4444':val==='Reagendar'?'#f59e0b':val==='Sin novedad'?'#34d399':'var(--t3)';
+  }
+}
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId)&&deptId!=='_global')return;
   // Update local data
@@ -5587,8 +5636,23 @@ function logRenderAgendamiento(){
       AG_FIELDS.forEach(f=>{
         const val=agGetVal(co.id,d.id,f);
         if(f==='obs'){
-          // Observations: text input
-          h+=`<td style="padding:2px;border:1px solid rgba(255,255,255,0.04)"><input value="${(val||'').replace(/"/g,'&quot;')}" ${canEdit?`onchange="agSetVal('${co.id}','${d.id}','obs',this.value)"`:'disabled'} style="width:100%;padding:3px;border:none;background:transparent;color:var(--t1);font-size:9px;outline:none;${!canEdit?'opacity:0.4;':''}" placeholder="..."></td>`;
+          // Observations: selector + optional text
+          const obsOpts=['','Sin novedad','Reagendar','No responde','Cancelado por empresa','Suspendido','Otro'];
+          const obsIcons={'':'','Sin novedad':'✅','Reagendar':'🔄','No responde':'📵','Cancelado por empresa':'❌','Suspendido':'⏸️','Otro':'📝'};
+          const obsColors={'':'var(--t3)','Sin novedad':'#34d399','Reagendar':'#f59e0b','No responde':'#ef4444','Cancelado por empresa':'#ef4444','Suspendido':'#94a3b8','Otro':'#60a5fa'};
+          const curObs=val||'';
+          const isPreset=obsOpts.includes(curObs);
+          const selVal=isPreset?curObs:(curObs?'Otro':'');
+          h+=`<td style="padding:2px;border:1px solid rgba(255,255,255,0.04)">`;
+          if(canEdit){
+            h+=`<select onchange="agObsChange('${co.id}','${d.id}',this.value,this)" style="padding:2px;border:none;background:transparent;color:${obsColors[selVal]||'var(--t3)'};font-size:8px;font-weight:700;cursor:pointer;outline:none;width:100%">`;
+            obsOpts.forEach(o=>{h+=`<option value="${o}" ${selVal===o?'selected':''}>${obsIcons[o]||''} ${o||'...'}</option>`});
+            h+=`</select>`;
+            if(selVal==='Otro'){h+=`<input value="${curObs==='Otro'?'':curObs.replace(/"/g,'&quot;')}" onchange="agSetVal('${co.id}','${d.id}','obs',this.value)" style="width:100%;padding:2px;border:none;border-top:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--t1);font-size:8px;outline:none" placeholder="Detalle...">`}
+          }else{
+            h+=`<span style="font-size:8px;color:${obsColors[selVal]||'var(--t3)'}">${obsIcons[selVal]||''} ${curObs||'—'}</span>`;
+          }
+          h+=`</td>`;
         }else if(f==='est'){
           // Estado: ACTIVO/INACTIVO
           const isActive=val!=='INACTIVO';
