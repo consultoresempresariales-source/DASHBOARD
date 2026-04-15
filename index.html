@@ -5460,21 +5460,8 @@ async function agSetVal(companyId,deptId,field,val){
     logRender();
     return;
   }
-  if(field==='enviado'||field==='socializado'||field==='cobro_obs'){
-    // Save immediately for critical fields (no debounce)
-    try{
-      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
-      if(error)console.error("agSetVal ERROR:",field,error.message);
-      else console.log("agSetVal OK:",companyId,field,val);
-    }catch(e){console.error("agSetVal CATCH:",e)}
-  }else{
-    dbs("ag-"+companyId+deptId+field,async()=>{
-      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
-      if(error)console.error("agSetVal:",error);
-    });
-  }
-  // Only do a full re-render for check buttons (enviado/socializado) that need visual update
-  if(field==='enviado'||field==='socializado'){
+  // Re-render FIRST for check buttons (instant visual feedback)
+  if(field==='enviado'||field==='socializado'||field==='inf_enviado'){
     const agTable=document.getElementById('agTableWrap');
     const st=agTable?agTable.scrollTop:0;
     const sl=agTable?agTable.scrollLeft:0;
@@ -5485,6 +5472,18 @@ async function agSetVal(companyId,deptId,field,val){
       if(t){t.scrollTop=st;t.scrollLeft=sl}
       window.scrollTo(0,ms);
       setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
+    });
+  }
+  // Then save to DB (async, non-blocking)
+  if(field==='enviado'||field==='socializado'||field==='inf_enviado'||field==='cobro_obs'){
+    sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"}).then(({error})=>{
+      if(error)console.error("agSetVal ERROR:",field,error.message);
+      else console.log("agSetVal OK:",companyId,field,val);
+    });
+  }else{
+    dbs("ag-"+companyId+deptId+field,async()=>{
+      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
+      if(error)console.error("agSetVal:",error);
     });
   }
 }
