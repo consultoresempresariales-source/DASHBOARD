@@ -5300,17 +5300,17 @@ async function agSetFreq(companyId,freq){
 }
 
 function agGetVal(companyId,deptId,field){
-  // Check frequency - if not active this month, return N/A for ag/vis/inf
+  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
+  // If there is a manual record, ALWAYS return its value (user's choice wins)
+  if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
+    return r[field];
+  }
+  // Check frequency - if not active this month, return N/A for ag/vis/inf (only if no manual value)
   if(deptId!=='_global'&&deptId!=='_freq'&&(field==='ag'||field==='vis'||field==='inf')){
     const freq=agGetFreq(companyId);
     if(freq>1&&!agIsActiveMonth(freq,LOG.month,agGetFreqStart(companyId))){
       return 'N/A';
     }
-  }
-  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
-  // If there is a manual record, ALWAYS return its value (user's choice wins)
-  if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
-    return r[field];
   }
   // For est field: check if inactive was set - default to ACTIVO
   if(field==='est')return 'ACTIVO';
@@ -5460,26 +5460,27 @@ async function agSetVal(companyId,deptId,field,val){
     logRender();
     return;
   }
-  // Re-render FIRST for check buttons (instant visual feedback)
-  if(field==='enviado'||field==='socializado'||field==='inf_enviado'){
+  // Save to DB and re-render
+  if(field==='enviado'||field==='socializado'||field==='inf_enviado'||field==='cobro_obs'){
     const agTable=document.getElementById('agTableWrap');
     const st=agTable?agTable.scrollTop:0;
     const sl=agTable?agTable.scrollLeft:0;
     const ms=window.scrollY;
-    logRender();
-    requestAnimationFrame(()=>{
-      const t=document.getElementById('agTableWrap');
-      if(t){t.scrollTop=st;t.scrollLeft=sl}
-      window.scrollTo(0,ms);
-      setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
-    });
-  }
-  // Then save to DB (async, non-blocking)
-  if(field==='enviado'||field==='socializado'||field==='inf_enviado'||field==='cobro_obs'){
-    sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"}).then(({error})=>{
+    // Save first, then re-render
+    try{
+      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
       if(error)console.error("agSetVal ERROR:",field,error.message);
       else console.log("agSetVal OK:",companyId,field,val);
-    });
+    }catch(e){console.error("agSetVal CATCH:",e)}
+    if(field==='enviado'||field==='socializado'||field==='inf_enviado'){
+      logRender();
+      requestAnimationFrame(()=>{
+        const t=document.getElementById('agTableWrap');
+        if(t){t.scrollTop=st;t.scrollLeft=sl}
+        window.scrollTo(0,ms);
+        setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
+      });
+    }
   }else{
     dbs("ag-"+companyId+deptId+field,async()=>{
       const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
