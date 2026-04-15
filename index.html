@@ -4995,10 +4995,14 @@ async function genAgInformePptx(){
 
   // Stats with detailed breakdown
   const stats={};
+  const deptModMap={sst:'mod_seguridad',salud:'mod_salud',ambiente:'mod_ambiente',lopdpd:'mod_datos',tthh:'mod_tthh',dpd:'mod_datos'};
   AG_DEPTS.forEach(d=>{
     let activas=0,bimensuales=0,noResponde=0,cancelado=0,reagendar=0,suspendido=0,ag=0,vis=0,inf=0;
     let enviado=0,socializado=0;
+    const modKey=deptModMap[d.id];
     allCos.forEach(co=>{
+      // Only count companies that have this department's module active
+      if(modKey&&!co[modKey])return;
       const _est=agGetVal(co.id,d.id,'est');
       if(_est==='INACTIVO')return;
       activas++;
@@ -5018,6 +5022,7 @@ async function genAgInformePptx(){
     });
     // Enviado and socializado from _global
     allCos.forEach(co=>{
+      if(modKey&&!co[modKey])return;
       const _est=agGetVal(co.id,d.id,'est');
       if(_est==='INACTIVO')return;
       if(agGetVal(co.id,'_global','enviado')==='SÍ')enviado++;
