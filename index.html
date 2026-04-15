@@ -5344,6 +5344,10 @@ function agGetVal(companyId,deptId,field){
   if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
     return r[field];
   }
+  // For enviado/socializado/inf_enviado on _global: default to NO if no record
+  if(deptId==='_global'&&(field==='enviado'||field==='socializado'||field==='inf_enviado')){
+    return 'NO';
+  }
   // Check frequency - if not active this month, return N/A for ag/vis/inf (only if no manual value)
   if(deptId!=='_global'&&deptId!=='_freq'&&(field==='ag'||field==='vis'||field==='inf')){
     const freq=agGetFreq(companyId);
@@ -5515,11 +5519,18 @@ async function agSetVal(companyId,deptId,field,val){
     const st=agTable?agTable.scrollTop:0;
     const sl=agTable?agTable.scrollLeft:0;
     const ms=window.scrollY;
-    // Save first, then re-render
+    // Check if record exists, then update only the field (not upsert which replaces all)
     try{
-      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
-      if(error)console.error("agSetVal ERROR:",field,error.message);
-      else console.log("agSetVal OK:",companyId,field,val);
+      const{data:existing}=await sb.from("agendamiento").select("id").eq("company_id",companyId).eq("dept",deptId).eq("year",LOG.year).eq("month",LOG.month).limit(1);
+      if(existing&&existing.length>0){
+        const{error}=await sb.from("agendamiento").update({[field]:val}).eq("id",existing[0].id);
+        if(error)console.error("agSetVal UPDATE ERROR:",field,error.message);
+        else console.log("agSetVal UPDATE OK:",companyId,field,val);
+      }else{
+        const{error}=await sb.from("agendamiento").insert({company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val});
+        if(error)console.error("agSetVal INSERT ERROR:",field,error.message);
+        else console.log("agSetVal INSERT OK:",companyId,field,val);
+      }
     }catch(e){console.error("agSetVal CATCH:",e)}
     if(field==='enviado'||field==='socializado'||field==='inf_enviado'){
       logRender();
