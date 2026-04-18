@@ -8663,19 +8663,58 @@ async function contDelExp(id){if(!confirm("¿Eliminar gasto?"))return;await sb.f
 async function contImportSRIXml(files){
   if(!files||files.length===0)return;
   let imported=0,errors=0,duplicates=0;
+  const errDetails=[];
   const existingNums=new Set(CONT.invoices.map(i=>i.invoice_number));
+
+  // Helper: extrae el XML real del comprobante (maneja XMLs "autorizados" del SRI)
+  function extractComprobante(xmlText){
+    if(xmlText.charCodeAt(0)===0xFEFF)xmlText=xmlText.slice(1);
+    xmlText=xmlText.trim();
+
+    const parser=new DOMParser();
+    let doc=parser.parseFromString(xmlText,'text/xml');
+
+    // Caso 1: XML envuelto en <autorizacion>...<comprobante>CDATA</comprobante>...</autorizacion>
+    let compNode=doc.querySelector('autorizacion > comprobante, comprobante');
+    if(compNode){
+      const inner=compNode.textContent.trim();
+      if(inner.startsWith('<?xml')||inner.startsWith('<factura')||inner.startsWith('<notaCredito')||inner.startsWith('<comprobanteRetencion')||inner.startsWith('<liquidacionCompra')||inner.startsWith('<notaDebito')){
+        doc=parser.parseFromString(inner,'text/xml');
+      }
+    }
+
+    // Caso 2: entidades HTML escapadas
+    if(!doc.querySelector('factura')&&!doc.querySelector('notaCredito')&&!doc.querySelector('comprobanteRetencion')){
+      const decoded=xmlText
+        .replace(/&lt;/g,'<')
+        .replace(/&gt;/g,'>')
+        .replace(/&quot;/g,'"')
+        .replace(/&amp;/g,'&');
+      if(decoded.includes('<factura')||decoded.includes('<notaCredito')||decoded.includes('<comprobanteRetencion')){
+        const startIdx=Math.max(
+          decoded.indexOf('<factura'),
+          decoded.indexOf('<notaCredito'),
+          decoded.indexOf('<comprobanteRetencion')
+        );
+        if(startIdx>=0){
+          const sub=decoded.substring(startIdx);
+          doc=parser.parseFromString(sub,'text/xml');
+        }
+      }
+    }
+    return doc;
+  }
 
   for(const file of files){
     try{
       let xmlTexts=[];
-      if(file.name.endsWith('.zip')){
-        // ZIP file with multiple XMLs
+      if(file.name.toLowerCase().endsWith('.zip')){
         if(typeof JSZip==='undefined'){
           await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
         }
         const zip=await JSZip.loadAsync(file);
         for(const[name,entry] of Object.entries(zip.files)){
-          if(name.endsWith('.xml')&&!entry.dir){
+          if(name.toLowerCase().endsWith('.xml')&&!entry.dir){
             xmlTexts.push(await entry.async('text'));
           }
         }
@@ -8683,43 +8722,54 @@ async function contImportSRIXml(files){
         xmlTexts.push(await file.text());
       }
 
+      if(xmlTexts.length===0){
+        errDetails.push(`${file.name}: no se encontraron XMLs dentro del archivo`);
+        errors++;continue;
+      }
+
       for(const xmlText of xmlTexts){
         try{
-          const parser=new DOMParser();
-          const doc=parser.parseFromString(xmlText,'text/xml');
-          
-          // Detect document type
+          const doc=extractComprobante(xmlText);
+
           const factura=doc.querySelector('factura');
           const notaCredito=doc.querySelector('notaCredito');
           const retencion=doc.querySelector('comprobanteRetencion');
           const root=factura||notaCredito||retencion;
-          if(!root){errors++;continue}
+          if(!root){
+            errDetails.push(`${file.name}: no se detectó factura/nota de crédito/retención`);
+            errors++;continue;
+          }
 
-          // Extract infoTributaria
           const infoTrib=root.querySelector('infoTributaria');
-          if(!infoTrib){errors++;continue}
-          
-          const getTag=(parent,tag)=>{const el=parent.querySelector(tag);return el?el.textContent.trim():''};
-          
+          if(!infoTrib){
+            errDetails.push(`${file.name}: falta infoTributaria`);
+            errors++;continue;
+          }
+
+          const getTag=(parent,tag)=>{const el=parent&&parent.querySelector(tag);return el?el.textContent.trim():''};
+
           const ruc=getTag(infoTrib,'ruc');
-          const razonSocial=getTag(infoTrib,'razonSocial');
+          const razonSocial=getTag(infoTrib,'razonSocial')||getTag(infoTrib,'nombreComercial');
           const estab=getTag(infoTrib,'estab');
           const ptoEmi=getTag(infoTrib,'ptoEmi');
           const secuencial=getTag(infoTrib,'secuencial');
           const numFact=estab+'-'+ptoEmi+'-'+secuencial;
           const claveAcceso=getTag(infoTrib,'claveAcceso');
-          const codDoc=getTag(infoTrib,'codDoc'); // 01=factura, 04=NC, 07=retencion
+          const codDoc=getTag(infoTrib,'codDoc');
 
-          // Check duplicate
+          if(!estab||!ptoEmi||!secuencial){
+            errDetails.push(`${file.name}: falta número de comprobante (estab/ptoEmi/secuencial)`);
+            errors++;continue;
+          }
+
           if(existingNums.has(numFact)){duplicates++;continue}
 
-          let tipo='compra'; // default: it's a purchase (received)
+          let tipo='compra';
           let companyName='',companyRuc='',concept='',subtotal=0,iva=0,total=0,fecha='';
 
           if(factura){
             const infoFact=factura.querySelector('infoFactura');
             if(infoFact){
-              // Parse date (DD/MM/YYYY -> YYYY-MM-DD)
               const fechaRaw=getTag(infoFact,'fechaEmision');
               if(fechaRaw.includes('/')){
                 const p=fechaRaw.split('/');
@@ -8730,7 +8780,6 @@ async function contImportSRIXml(files){
               total=parseFloat(getTag(infoFact,'importeTotal'))||0;
               iva=total-subtotal;
 
-              // Check IVA from totalConImpuestos
               const impuestos=infoFact.querySelectorAll('totalImpuesto');
               let ivaSum=0;
               impuestos.forEach(imp=>{
@@ -8739,19 +8788,11 @@ async function contImportSRIXml(files){
               });
               if(ivaSum>0)iva=ivaSum;
 
-              // Determine if we emitted or received
-              const rucComprador=getTag(infoFact,'identificacionComprador');
-              const nombreComprador=getTag(infoFact,'razonSocialComprador');
-              
-              // If the emisor RUC is our company, it's a SALE (venta)
-              // If the comprador RUC is our company, it's a PURCHASE (compra)
-              // Default: treat as compra (received invoice)
-              companyName=razonSocial; // The emisor
+              companyName=razonSocial;
               companyRuc=ruc;
               tipo='compra';
             }
 
-            // Get concept from first detail
             const det=factura.querySelector('detalle');
             if(det)concept=getTag(det,'descripcion');
             if(!concept){
@@ -8765,7 +8806,7 @@ async function contImportSRIXml(files){
               const fechaRaw=getTag(infoNC,'fechaEmision');
               if(fechaRaw.includes('/')){const p=fechaRaw.split('/');fecha=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0')}else fecha=fechaRaw;
               subtotal=parseFloat(getTag(infoNC,'totalSinImpuestos'))||0;
-              total=parseFloat(getTag(infoNC,'valorModificacion'))||0;
+              total=parseFloat(getTag(infoNC,'valorModificacion'))||parseFloat(getTag(infoNC,'totalConImpuestos'))||0;
               iva=total-subtotal;
               companyName=razonSocial;companyRuc=ruc;
             }
@@ -8785,19 +8826,18 @@ async function contImportSRIXml(files){
             concept='Retención en la fuente';
           }
 
-          // Match company
-          const matchCo=cos.find(c=>c.ruc===companyRuc);
-
+          const matchCo=cos.find(c=>c.ruc===ruc);
           const ivaRate=subtotal>0?Math.round(iva/subtotal*100):15;
 
-          // Insert
-          const{error}=await sb.from("cont_invoices").insert({
+          const payload={
+            cont_company_id:CONT.companyId,
             company_id:matchCo?.id||null,
             company_name:companyName,
+            company_ruc:ruc,
             invoice_number:numFact,
-            concept:concept.substring(0,200),
+            concept:(concept||'').substring(0,200),
             subtotal,iva,iva_rate:ivaRate,total,
-            invoice_date:fecha,
+            invoice_date:fecha||new Date().toISOString().split('T')[0],
             status:'emitida',
             type:tipo,
             sri_clave_acceso:claveAcceso,
@@ -8805,20 +8845,42 @@ async function contImportSRIXml(files){
             sri_cod_doc:codDoc,
             year:fecha?parseInt(fecha.split('-')[0]):new Date().getFullYear(),
             created_by:CURRENT_USER?.id
-          });
-          if(error){console.error("Import error:",error.message);errors++}
-          else{imported++;existingNums.add(numFact)}
-        }catch(e){console.error("XML parse error:",e);errors++}
+          };
+
+          const{error}=await sb.from("cont_invoices").insert(payload);
+          if(error){
+            console.error("Import error:",error.message,payload);
+            errDetails.push(`${numFact}: ${error.message}`);
+            errors++;
+          }else{
+            imported++;
+            existingNums.add(numFact);
+          }
+        }catch(e){
+          console.error("XML parse error:",e);
+          errDetails.push(`${file.name}: ${e.message}`);
+          errors++;
+        }
       }
-    }catch(e){console.error("File error:",e);errors++}
+    }catch(e){
+      console.error("File error:",e);
+      errDetails.push(`${file.name}: ${e.message}`);
+      errors++;
+    }
   }
 
-  let msg=`✅ Importación completada:\n\n📄 ${imported} comprobantes importados`;
+  let msg=`📥 Importación completada:\n\n✅ ${imported} comprobantes importados`;
   if(duplicates>0)msg+=`\n⚠️ ${duplicates} duplicados (ya existían)`;
-  if(errors>0)msg+=`\n❌ ${errors} errores`;
+  if(errors>0){
+    msg+=`\n❌ ${errors} errores`;
+    if(errDetails.length>0)msg+=`\n\nDetalles:\n• `+errDetails.slice(0,5).join('\n• ');
+    if(errDetails.length>5)msg+=`\n• ...y ${errDetails.length-5} más (ver consola)`;
+  }
   alert(msg);
-  document.getElementById('sriXmlInput').value='';
+  const inp=document.getElementById('sriXmlInput');
+  if(inp)inp.value='';
   await contLoad();
+  contRender();
 }
 
 async function contEditInv(id){
