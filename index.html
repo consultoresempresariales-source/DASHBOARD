@@ -8510,7 +8510,18 @@ async function contNewExpense(){
   }catch(e){alert("Error: "+e.message)}
 }
 
-async function contDelInv(id){if(!confirm("¿Eliminar factura?"))return;await sb.from("cont_invoices").delete().eq("id",id);await contLoad()}
+async function contDelInv(id){
+  const inv=CONT.invoices.find(i=>String(i.id)===String(id));
+  if(!inv){alert("⚠️ Factura no encontrada");return}
+  if(!confirm(`¿Eliminar la factura ${inv.invoice_number||'S/N'}?\n\nEmpresa: ${inv.company_name||'—'}\nTotal: $${(inv.total||0).toFixed(2)}\n\nEsta acción no se puede deshacer.`))return;
+  try{
+    const{error}=await sb.from("cont_invoices").delete().eq("id",id);
+    if(error)throw error;
+    // También eliminar cobros asociados (si los hay)
+    await sb.from("cont_payments").delete().eq("invoice_id",id);
+    await contLoad();
+  }catch(e){alert("❌ Error al eliminar: "+e.message)}
+}
 
 // === EMAIL SENDING ===
 const RESEND_KEY='re_EB3P43R6_91dVid7ooji47X6SZyfdbsNS';
@@ -8811,11 +8822,26 @@ async function contImportSRIXml(files){
 }
 
 async function contEditInv(id){
-  const inv=CONT.invoices.find(i=>i.id===id);if(!inv)return;
-  const newSt=prompt("Nuevo estado (emitida/pagada/parcial/vencida/anulada):",inv.status);
-  if(!newSt||newSt===inv.status)return;
-  await sb.from("cont_invoices").update({status:newSt}).eq("id",id);
-  await contLoad();
+  const inv=CONT.invoices.find(i=>String(i.id)===String(id));
+  if(!inv){alert("⚠️ Factura no encontrada");return}
+  // Cargar datos de la factura al formulario
+  CONT._editInv=inv.id;
+  CONT._invForm={
+    company_id:inv.company_id||null,
+    company_name:inv.company_name||'',
+    ruc:inv.company_ruc||'',
+    _coSearch:'',
+    invoice_number:inv.invoice_number||'',
+    concept:inv.concept||'',
+    subtotal:inv.subtotal||0,
+    iva_rate:inv.iva_rate||0,
+    registra_iva:(inv.iva_rate||0)>0,
+    type:inv.type||'venta',
+    invoice_date:inv.invoice_date||new Date().toISOString().split('T')[0],
+    items:inv.items||[{desc:inv.concept||'',qty:1,price:inv.subtotal||0}]
+  };
+  CONT.tab='inv_form';
+  contRender();
 }
 
 // === Word Report - follows model INFORME_MENSUAL_MEDICO.docx exactly ===
