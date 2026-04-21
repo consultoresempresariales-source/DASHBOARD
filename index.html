@@ -100,6 +100,8 @@ canvas{width:100%!important;max-height:220px}
   #globalContractBanner{left:48px !important;}
 }
 </style></head><body>
+<!-- BANNER FIJO DE CONTRATOS/EXÁMENES -->
+<div id="globalContractBanner" style="display:none;position:fixed;top:0;left:60px;right:0;z-index:9998;padding:7px 16px;background:linear-gradient(135deg,#0a0c14,#0d1020);border-bottom:2px solid rgba(251,191,36,0.45);backdrop-filter:blur(10px);box-shadow:0 2px 12px rgba(0,0,0,0.4)"></div>
 <nav class="sidebar">
   <div class="sb-item active" onclick="switchModule('salud')" id="sb-salud" style="display:none"><span class="sb-icon">🩺</span><span class="sb-label">SALUD</span></div>
   <div class="sb-item" onclick="switchModule('seguridad')" id="sb-seguridad" style="display:none"><span class="sb-icon">🔧</span><span class="sb-label">SEGUR.</span></div>
@@ -8431,8 +8433,6 @@ function contBuildInvoiceHTML(inv,co){
     <p style="color:#64748b;font-size:10px;margin:6px 0 0">Este documento fue generado electrónicamente</p>
   </div>
 </div>
-<!-- BANNER FIJO DE CONTRATOS/EXÁMENES -->
-<div id="globalContractBanner" style="display:none;position:fixed;top:0;left:60px;right:0;z-index:500;padding:6px 16px;background:linear-gradient(135deg,rgba(14,12,5,0.97),rgba(20,16,4,0.97));border-bottom:2px solid rgba(251,191,36,0.4);backdrop-filter:blur(8px)"></div>
 </body></html>`;
 }
 async function contDelPay(id){if(!confirm("¿Eliminar cobro?"))return;await sb.from("cont_payments").delete().eq("id",id);await contLoad()}
