@@ -424,7 +424,7 @@ function applyUserRole(){
   const sw=document.getElementById("sb-switch");if(sw)sw.style.display=isAdmin?"block":"none";
   render();
   // Mostrar banner de alertas de contratos para todos los usuarios
-  setTimeout(()=>showContractAlertsBanner(),1200);
+  setTimeout(async()=>{await loadCos();showContractAlertsBanner()},1200);
   // Post-login: show pending trips notification for workers (not jefe)
   if(!isAdmin&&!IS_JEFE()){setTimeout(()=>showPostLoginNotifications(),800)}
 }
