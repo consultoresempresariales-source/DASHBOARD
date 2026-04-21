@@ -425,6 +425,8 @@ function applyUserRole(){
   render();
   // Mostrar banner de alertas de contratos para todos los usuarios
   setTimeout(async()=>{await loadCos();showContractAlertsBanner()},1200);
+  // Notificación de renovaciones urgentes (≤30 días)
+  setTimeout(()=>checkRenovacionesNotification(),2000);
   // Post-login: show pending trips notification for workers (not jefe)
   if(!isAdmin&&!IS_JEFE()){setTimeout(()=>showPostLoginNotifications(),800)}
 }
@@ -7450,6 +7452,161 @@ const CONT_CATS_EXP=[
 const CONT_PAY_METHODS=[{id:'transferencia',label:'Transferencia'},{id:'efectivo',label:'Efectivo'},{id:'cheque',label:'Cheque'},{id:'tarjeta',label:'Tarjeta'}];
 const CONT_INV_STATUS=[{id:'emitida',label:'Emitida',color:'#60a5fa'},{id:'pagada',label:'Pagada',color:'#34d399'},{id:'parcial',label:'Parcial',color:'#fbbf24'},{id:'vencida',label:'Vencida',color:'#ef4444'},{id:'anulada',label:'Anulada',color:'#94a3b8'}];
 
+
+// ===== RENOVACIONES DE CONTRATOS Y EXÁMENES =====
+async function contSaveRenovacion(coId, field, value){
+  try{
+    await sb.from("companies").update({[field]: value||null}).eq("id", coId);
+    await loadCos();
+    contRenderRenovacionesLive();
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+function contRenderRenovacionesLive(){
+  const mc=document.getElementById("contMc");
+  if(mc&&CONT.tab==='renovaciones')mc.innerHTML=contRenderRenovaciones();
+}
+
+function contRenderRenovaciones(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const allCos=[...cos].sort((a,b)=>a.name.localeCompare(b.name));
+
+  function daysDiff(dateStr){
+    if(!dateStr)return null;
+    const d=new Date(dateStr);d.setHours(0,0,0,0);
+    return Math.round((d-today)/(1000*60*60*24));
+  }
+
+  function statusBadge(diff){
+    if(diff===null)return '<span style="font-size:10px;color:var(--t3);font-style:italic">Sin fecha</span>';
+    if(diff<0)      return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(239,68,68,0.15);color:#ef4444">⛔ VENCIDO hace ${Math.abs(diff)}d</span>`;
+    if(diff<=30)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(239,68,68,0.12);color:#ef4444">🚨 ${diff} días</span>`;
+    if(diff<=60)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(251,191,36,0.12);color:#fbbf24">⚠️ ${diff} días</span>`;
+    if(diff<=90)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(251,146,60,0.10);color:#fb923c">🔔 ${diff} días</span>`;
+    return `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(52,211,153,0.08);color:#34d399">✅ ${diff} días</span>`;
+  }
+
+  // Contar alertas críticas
+  let alertCount=0;
+  allCos.forEach(co=>{
+    ['contract_end_date','exam_renewal_date','sst_contract_end_date'].forEach(f=>{
+      const d=daysDiff(co[f]);
+      if(d!==null&&d<=30)alertCount++;
+    });
+  });
+
+  let h='';
+  // Header resumen
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">`;
+  const totalConFecha=allCos.filter(c=>c.contract_end_date||c.exam_renewal_date||c.sst_contract_end_date).length;
+  const vencidos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)<0)).length;
+  const criticos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)>=0&&daysDiff(d)<=30)).length;
+  const proximos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)>30&&daysDiff(d)<=90)).length;
+  h+=`<div class="c"><div class="ib">🏢</div><div class="kl">Empresas con fechas</div><div class="kv" style="color:#60a5fa">${totalConFecha}</div><div class="ks">de ${allCos.length} total</div></div>`;
+  h+=`<div class="c"><div class="ib">⛔</div><div class="kl">Vencidos</div><div class="kv" style="color:#ef4444">${vencidos}</div><div class="ks">requieren acción</div></div>`;
+  h+=`<div class="c"><div class="ib">🚨</div><div class="kl">Críticos (≤30d)</div><div class="kv" style="color:#ef4444">${criticos}</div><div class="ks">menos de 30 días</div></div>`;
+  h+=`<div class="c"><div class="ib">🔔</div><div class="kl">Próximos (≤90d)</div><div class="kv" style="color:#fb923c">${proximos}</div><div class="ks">entre 31 y 90 días</div></div>`;
+  h+=`</div>`;
+
+  // Tabla de empresas
+  h+=`<div class="tw"><table>`;
+  h+=`<thead><tr>`;
+  h+=`<th style="text-align:left;min-width:180px">🏢 Empresa</th>`;
+  h+=`<th style="text-align:center;min-width:220px">🩺 Contrato Salud</th>`;
+  h+=`<th style="text-align:center;min-width:220px">🔬 Exámenes Médicos</th>`;
+  h+=`<th style="text-align:center;min-width:220px">🔧 Contrato Seguridad</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  allCos.forEach(co=>{
+    const d1=daysDiff(co.contract_end_date);
+    const d2=daysDiff(co.exam_renewal_date);
+    const d3=daysDiff(co.sst_contract_end_date);
+    const hasCrit=[d1,d2,d3].some(d=>d!==null&&d<=30);
+    const rowBg=hasCrit?'background:rgba(239,68,68,0.03)':'';
+
+    h+=`<tr class="ra" style="border-bottom:1px solid rgba(255,255,255,0.05);${rowBg}">`;
+
+    // Empresa
+    h+=`<td style="padding:12px 8px"><div style="font-size:12px;font-weight:700;color:var(--t1)">${co.name}</div><div style="font-size:10px;color:var(--t3);margin-top:2px">${co.ruc||'Sin RUC'}</div></td>`;
+
+    // Contrato Salud
+    h+=`<td style="padding:10px 8px;text-align:center">`;
+    h+=`<input type="date" value="${co.contract_end_date||''}" onchange="contSaveRenovacion('${co.id}','contract_end_date',this.value)" style="width:130px;padding:5px 8px;border-radius:6px;border:1px solid rgba(45,212,191,0.25);background:rgba(45,212,191,0.06);color:var(--t1);font-size:11px;font-family:var(--mn);margin-bottom:5px;display:block;margin:0 auto 5px">`;
+    h+=`<div style="margin-top:5px">${statusBadge(d1)}</div>`;
+    h+=`</td>`;
+
+    // Exámenes Médicos
+    h+=`<td style="padding:10px 8px;text-align:center">`;
+    h+=`<input type="date" value="${co.exam_renewal_date||''}" onchange="contSaveRenovacion('${co.id}','exam_renewal_date',this.value)" style="width:130px;padding:5px 8px;border-radius:6px;border:1px solid rgba(244,114,182,0.25);background:rgba(244,114,182,0.06);color:var(--t1);font-size:11px;font-family:var(--mn);margin-bottom:5px;display:block;margin:0 auto 5px">`;
+    h+=`<div style="margin-top:5px">${statusBadge(d2)}</div>`;
+    h+=`</td>`;
+
+    // Contrato Seguridad
+    h+=`<td style="padding:10px 8px;text-align:center">`;
+    h+=`<input type="date" value="${co.sst_contract_end_date||''}" onchange="contSaveRenovacion('${co.id}','sst_contract_end_date',this.value)" style="width:130px;padding:5px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.06);color:var(--t1);font-size:11px;font-family:var(--mn);margin-bottom:5px;display:block;margin:0 auto 5px">`;
+    h+=`<div style="margin-top:5px">${statusBadge(d3)}</div>`;
+    h+=`</td>`;
+
+    h+=`</tr>`;
+  });
+
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
+// Notificación de renovaciones al login (igual que viajes)
+async function checkRenovacionesNotification(){
+  try{
+    await loadCos();
+    const today=new Date();today.setHours(0,0,0,0);
+    const urgent=[];
+    cos.forEach(co=>{
+      const checks=[
+        {field:'contract_end_date',    label:'Contrato Salud',    icon:'🩺'},
+        {field:'exam_renewal_date',    label:'Exámenes Médicos',  icon:'🔬'},
+        {field:'sst_contract_end_date',label:'Contrato Seguridad',icon:'🔧'}
+      ];
+      checks.forEach(({field,label,icon})=>{
+        if(!co[field])return;
+        const d=new Date(co[field]);d.setHours(0,0,0,0);
+        const diff=Math.round((d-today)/(1000*60*60*24));
+        if(diff<=30){
+          urgent.push({co:co.name,label,icon,diff,date:co[field]});
+        }
+      });
+    });
+    if(urgent.length===0)return;
+    urgent.sort((a,b)=>a.diff-b.diff);
+
+    // Mostrar popup igual al de viajes
+    const ex=document.getElementById("renovNotifPopup");if(ex)ex.remove();
+    let h=`<div id="renovNotifPopup" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">`;
+    h+=`<div style="background:#1e293b;border:2px solid rgba(251,191,36,0.5);border-radius:16px;max-width:460px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">`;
+    h+=`<div style="background:linear-gradient(135deg,rgba(251,191,36,0.12),rgba(251,191,36,0.04));padding:20px;border-radius:14px 14px 0 0">`;
+    h+=`<div style="font-size:22px;margin-bottom:6px">⚠️</div>`;
+    h+=`<div style="font-size:18px;font-weight:800;color:#fbbf24">Renovaciones Urgentes</div>`;
+    h+=`<div style="font-size:12px;color:var(--t2);margin-top:4px">${urgent.length} contrato${urgent.length>1?'s/examen':'/examen'} vence${urgent.length>1?'n':''} en los próximos 30 días</div>`;
+    h+=`</div>`;
+    h+=`<div style="padding:16px">`;
+    urgent.forEach(u=>{
+      const fechaFmt=new Date(u.date+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+      const urgColor=u.diff<0?'#ef4444':u.diff<=7?'#ef4444':u.diff<=15?'#fbbf24':'#fb923c';
+      const urgLabel=u.diff<0?`⛔ VENCIDO hace ${Math.abs(u.diff)}d`:u.diff===0?'🚨 VENCE HOY':`🚨 ${u.diff} días`;
+      h+=`<div onclick="document.getElementById('renovNotifPopup').remove();switchModule('contable');setTimeout(()=>{CONT.tab='renovaciones';contRender()},300)" style="background:${urgColor}10;border:1px solid ${urgColor}30;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='${urgColor}20'" onmouseout="this.style.background='${urgColor}10'">`;
+      h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">`;
+      h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">${u.icon} ${u.co}</div>`;
+      h+=`<span style="background:${urgColor};color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px">${urgLabel}</span>`;
+      h+=`</div>`;
+      h+=`<div style="font-size:12px;color:var(--t2)">📋 ${u.label}</div>`;
+      h+=`<div style="font-size:11px;color:var(--t3);margin-top:2px">📅 ${fechaFmt}</div>`;
+      h+=`</div>`;
+    });
+    h+=`<button onclick="document.getElementById('renovNotifPopup').remove()" style="width:100%;margin-top:8px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0c0f1a;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer">✅ Entendido</button>`;
+    h+=`</div></div></div>`;
+    document.body.insertAdjacentHTML('beforeend',h);
+  }catch(e){console.log("Renov notif:",e.message)}
+}
+
 async function contLoad(){
   if(!sb)return;
   const mc=document.getElementById("contMc");
@@ -7866,7 +8023,7 @@ async function contDelLogo(){
 function contRender(){
   const mc=document.getElementById("contMc");if(!mc)return;
   // Nav
-  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'renovaciones',l:'🔔 Renovaciones'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
   const nv=document.getElementById("contNv");
   if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
 
@@ -7881,6 +8038,7 @@ function contRender(){
   else if(CONT.tab==='reports'){h=contReports()}
   else if(CONT.tab==='config'){h=contRenderConfig()}
   else if(CONT.tab==='co_form'){h=contRenderCoForm()}
+  else if(CONT.tab==='renovaciones'){h=contRenderRenovaciones()}
   mc.innerHTML=h;
 }
 
