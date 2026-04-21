@@ -90,6 +90,15 @@ canvas{width:100%!important;max-height:220px}
   opacity: 0.5 !important;
   cursor: default !important;
 }
+
+/* Banner de contratos visible */
+#globalContractBanner[style*="flex"],
+#globalContractBanner:not([style*="display:none"]):not([style*="display: none"]) {
+  display:flex !important;
+}
+@media(max-width:600px){
+  #globalContractBanner{left:48px !important;}
+}
 </style></head><body>
 <nav class="sidebar">
   <div class="sb-item active" onclick="switchModule('salud')" id="sb-salud" style="display:none"><span class="sb-icon">🩺</span><span class="sb-label">SALUD</span></div>
@@ -175,8 +184,7 @@ canvas{width:100%!important;max-height:220px}
 <button class="b2" onclick="hideEditUser()">Cancelar</button>
 </div></div>
 <div class="app-wrap">
-<!-- BANNER GLOBAL CONTRATOS/EXÁMENES -->
-<div id="globalContractBanner" style="display:none;padding:8px 20px 0;margin-left:0"></div>
+
 <div id="configModule" style="display:none">
 <div class="hd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
 <div style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:linear-gradient(135deg,#64748b,#475569)">⚙️</div><div class="bn"><h1 style="background:linear-gradient(135deg,#94a3b8,#64748b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Configuración General</h1><p style="color:var(--t3)">Gestión de empresas y módulos</p></div></div>
@@ -2032,33 +2040,40 @@ async function showContractAlertsBanner(){
     const today=new Date();today.setHours(0,0,0,0);
     const alerts=[];
     for(const co of cos){
-      function chk(dateStr,label,icon){
+      const checks=[
+        {field:'contract_end_date',label:'Contrato Salud',icon:'🩺'},
+        {field:'exam_renewal_date',label:'Exámenes Médicos',icon:'🔬'},
+        {field:'sst_contract_end_date',label:'Contrato Seguridad',icon:'🔧'}
+      ];
+      checks.forEach(({field,label,icon})=>{
+        const dateStr=co[field];
         if(!dateStr)return;
         const d=new Date(dateStr);d.setHours(0,0,0,0);
         const diff=Math.round((d-today)/(1000*60*60*24));
         if(diff>90)return;
-        let cl,bg,txt;
-        if(diff<0){cl="#ef4444";bg="rgba(239,68,68,0.12)";txt="⛔ VENCIDO";}
-        else if(diff<=30){cl="#ef4444";bg="rgba(239,68,68,0.10)";txt=`🚨 ${diff}d`;}
-        else if(diff<=60){cl="#fbbf24";bg="rgba(251,191,36,0.10)";txt=`⚠️ ${diff}d`;}
-        else{cl="#fb923c";bg="rgba(251,146,60,0.08)";txt=`🔔 ${diff}d`;}
-        alerts.push({co:co.name,label,icon,cl,bg,txt,diff});
-      }
-      chk(co.contract_end_date,"Contrato Salud","🩺");
-      chk(co.exam_renewal_date,"Exámenes Méd.","🔬");
-      chk(co.sst_contract_end_date,"Contrato SST","🔧");
+        let cl,txt;
+        if(diff<0){cl="#ef4444";txt="⛔ VENCIDO";}
+        else if(diff<=30){cl="#ef4444";txt=`🚨 ${diff}d`;}
+        else if(diff<=60){cl="#fbbf24";txt=`⚠️ ${diff}d`;}
+        else{cl="#fb923c";txt=`🔔 ${diff}d`;}
+        alerts.push({co:co.name,label,icon,cl,txt,diff,date:dateStr});
+      });
     }
     if(alerts.length===0){banner.style.display="none";return;}
     alerts.sort((a,b)=>a.diff-b.diff);
-    let h=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 12px;border-radius:10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);margin-bottom:6px">`;
-    h+=`<span style="font-size:12px;font-weight:800;color:#fbbf24;white-space:nowrap">⚠️ Contratos/Exámenes:</span>`;
+    const fechaFmt=v=>new Date(v+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'});
+    let h=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">`;
+    h+=`<span style="font-size:12px;font-weight:800;color:#fbbf24;white-space:nowrap">⚠️ Vencimientos:</span>`;
     alerts.forEach(a=>{
-      h+=`<span onclick="switchModule('pendientes')" style="cursor:pointer;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid ${a.cl}40;background:${a.bg};color:${a.cl};font-weight:700;white-space:nowrap" title="${a.co} — ${a.label}">${a.icon} ${a.co.split(' ')[0]} · ${a.txt}</span>`;
+      h+=`<span onclick="switchModule('pendientes')" title="📅 ${fechaFmt(a.date)}" style="cursor:pointer;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid ${a.cl}55;background:${a.cl}15;color:${a.cl};font-weight:700;white-space:nowrap">${a.icon} ${a.co.length>20?a.co.substring(0,18)+'…':a.co} · ${a.label} · ${a.txt}</span>`;
     });
-    h+=`<span onclick="this.parentElement.parentElement.style.display='none'" style="margin-left:auto;cursor:pointer;color:var(--t3);font-size:14px;padding:2px 6px;border-radius:4px;hover:background:rgba(255,255,255,0.05)" title="Cerrar">✕</span>`;
+    h+=`<span onclick="banner.style.display='none';document.querySelectorAll('.app-wrap,.hd,.mn').forEach(e=>{e.style.paddingTop=''})" style="margin-left:auto;cursor:pointer;color:#64748b;font-size:16px;padding:0 4px" title="Cerrar">✕</span>`;
     h+=`</div>`;
     banner.innerHTML=h;
     banner.style.display="block";
+    // Ajustar padding del header para que no tape contenido
+    const appWrap=document.querySelector('.app-wrap');
+    if(appWrap)appWrap.style.paddingTop='38px';
   }catch(e){console.log("Banner error:",e.message)}
 }
 async function renderPendientes(){
@@ -8400,7 +8415,10 @@ function contBuildInvoiceHTML(inv,co){
     <p style="color:#94a3b8;font-size:11px;margin:0">${co.name} · RUC: ${co.ruc||''}</p>
     <p style="color:#64748b;font-size:10px;margin:6px 0 0">Este documento fue generado electrónicamente</p>
   </div>
-</div></body></html>`;
+</div>
+<!-- BANNER FIJO DE CONTRATOS/EXÁMENES -->
+<div id="globalContractBanner" style="display:none;position:fixed;top:0;left:60px;right:0;z-index:500;padding:6px 16px;background:linear-gradient(135deg,rgba(14,12,5,0.97),rgba(20,16,4,0.97));border-bottom:2px solid rgba(251,191,36,0.4);backdrop-filter:blur(8px)"></div>
+</body></html>`;
 }
 async function contDelPay(id){if(!confirm("¿Eliminar cobro?"))return;await sb.from("cont_payments").delete().eq("id",id);await contLoad()}
 async function contDelExp(id){if(!confirm("¿Eliminar gasto?"))return;await sb.from("cont_expenses").delete().eq("id",id);await contLoad()}
