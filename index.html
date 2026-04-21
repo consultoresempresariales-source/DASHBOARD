@@ -2038,11 +2038,11 @@ async function showContractAlertsBanner(){
   try{
     await loadCos();
     const today=new Date();today.setHours(0,0,0,0);
-    const alerts=[];
+    const items=[];
     for(const co of cos){
       const checks=[
-        {field:'contract_end_date',label:'Contrato Salud',icon:'🩺'},
-        {field:'exam_renewal_date',label:'Exámenes Médicos',icon:'🔬'},
+        {field:'contract_end_date',    label:'Contrato Salud',    icon:'🩺'},
+        {field:'exam_renewal_date',    label:'Exámenes Médicos',  icon:'🔬'},
         {field:'sst_contract_end_date',label:'Contrato Seguridad',icon:'🔧'}
       ];
       checks.forEach(({field,label,icon})=>{
@@ -2050,30 +2050,44 @@ async function showContractAlertsBanner(){
         if(!dateStr)return;
         const d=new Date(dateStr);d.setHours(0,0,0,0);
         const diff=Math.round((d-today)/(1000*60*60*24));
-        if(diff>90)return;
-        let cl,txt;
-        if(diff<0){cl="#ef4444";txt="⛔ VENCIDO";}
-        else if(diff<=30){cl="#ef4444";txt=`🚨 ${diff}d`;}
-        else if(diff<=60){cl="#fbbf24";txt=`⚠️ ${diff}d`;}
-        else{cl="#fb923c";txt=`🔔 ${diff}d`;}
-        alerts.push({co:co.name,label,icon,cl,txt,diff,date:dateStr});
+        // Color y símbolo según rango — siempre mostrar sin importar días
+        let cl,bg,prefix;
+        if(diff<0)      {cl="#ef4444";bg="rgba(239,68,68,0.15)";   prefix="⛔ VENCIDO";}
+        else if(diff<=30){cl="#ef4444";bg="rgba(239,68,68,0.13)";   prefix="🚨";}
+        else if(diff<=60){cl="#fbbf24";bg="rgba(251,191,36,0.13)";  prefix="⚠️";}
+        else if(diff<=90){cl="#fb923c";bg="rgba(251,146,60,0.12)";  prefix="🔔";}
+        else             {cl="#94a3b8";bg="rgba(148,163,184,0.08)"; prefix="📅";}
+        const label_days=diff<0?`hace ${Math.abs(diff)}d`:`${diff}d`;
+        items.push({co:co.name,label,icon,cl,bg,prefix,label_days,date:dateStr,diff});
       });
     }
-    if(alerts.length===0){banner.style.display="none";return;}
-    alerts.sort((a,b)=>a.diff-b.diff);
+    // Siempre mostrar si hay fechas registradas
+    if(items.length===0){banner.style.display="none";return;}
+    items.sort((a,b)=>a.diff-b.diff);
     const fechaFmt=v=>new Date(v+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'});
-    let h=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">`;
-    h+=`<span style="font-size:12px;font-weight:800;color:#fbbf24;white-space:nowrap">⚠️ Vencimientos:</span>`;
-    alerts.forEach(a=>{
-      h+=`<span onclick="switchModule('pendientes')" title="📅 ${fechaFmt(a.date)}" style="cursor:pointer;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid ${a.cl}55;background:${a.cl}15;color:${a.cl};font-weight:700;white-space:nowrap">${a.icon} ${a.co.length>20?a.co.substring(0,18)+'…':a.co} · ${a.label} · ${a.txt}</span>`;
+    let h=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%">`;
+    h+=`<span style="font-size:11px;font-weight:800;color:#94a3b8;white-space:nowrap;letter-spacing:.05em">RENOVACIONES:</span>`;
+    items.forEach(a=>{
+      const nombre=a.co.length>16?a.co.substring(0,14)+'…':a.co;
+      h+=`<span onclick="switchModule('pendientes')" title="Empresa: ${a.co}
+Servicio: ${a.label}
+Fecha: ${fechaFmt(a.date)}
+Días: ${a.label_days}" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid ${a.cl}40;background:${a.bg};color:${a.cl};font-weight:700;white-space:nowrap">`;
+      h+=`<span>${a.icon}</span>`;
+      h+=`<span style="color:var(--t2);font-weight:600">${nombre}</span>`;
+      h+=`<span style="color:var(--t3)">·</span>`;
+      h+=`<span style="font-size:10px;color:var(--t3)">${a.label}</span>`;
+      h+=`<span style="color:var(--t3)">·</span>`;
+      h+=`<span style="font-weight:800">${a.prefix} ${a.label_days}</span>`;
+      h+=`</span>`;
     });
-    h+=`<span onclick="banner.style.display='none';document.querySelectorAll('.app-wrap,.hd,.mn').forEach(e=>{e.style.paddingTop=''})" style="margin-left:auto;cursor:pointer;color:#64748b;font-size:16px;padding:0 4px" title="Cerrar">✕</span>`;
+    h+=`<span onclick="this.closest('#globalContractBanner').style.display='none';document.querySelector('.app-wrap').style.paddingTop=''" style="margin-left:auto;cursor:pointer;color:#475569;font-size:16px;padding:0 6px;flex-shrink:0" title="Cerrar">✕</span>`;
     h+=`</div>`;
     banner.innerHTML=h;
     banner.style.display="block";
-    // Ajustar padding del header para que no tape contenido
-    const appWrap=document.querySelector('.app-wrap');
-    if(appWrap)appWrap.style.paddingTop='38px';
+    // Empujar el contenido hacia abajo para no tapar el header
+    const aw=document.querySelector('.app-wrap');
+    if(aw)aw.style.paddingTop='36px';
   }catch(e){console.log("Banner error:",e.message)}
 }
 async function renderPendientes(){
@@ -2152,11 +2166,12 @@ async function renderPendientes(){
         const d=new Date(dateStr);d.setHours(0,0,0,0);
         const diff=Math.round((d-today)/(1000*60*60*24));
         let level,bg,cl;
-        if(diff<0){level="VENCIDO";bg="rgba(239,68,68,0.12)";cl="#ef4444";}
-        else if(diff<=30){level="CRÍTICO ("+diff+"d)";bg="rgba(239,68,68,0.08)";cl="#ef4444";}
-        else if(diff<=60){level="PRÓXIMO ("+diff+"d)";bg="rgba(251,191,36,0.08)";cl="#fbbf24";}
-        else if(diff<=90){level="ATENCIÓN ("+diff+"d)";bg="rgba(251,146,60,0.08)";cl="#fb923c";}
-        else return; // Más de 90 días: no mostrar alerta
+        if(diff<0)       {level="⛔ VENCIDO";           bg="rgba(239,68,68,0.12)"; cl="#ef4444";}
+        else if(diff<=30){level="🚨 CRÍTICO — "+diff+"d"; bg="rgba(239,68,68,0.08)"; cl="#ef4444";}
+        else if(diff<=60){level="⚠️ PRÓXIMO — "+diff+"d"; bg="rgba(251,191,36,0.08)";cl="#fbbf24";}
+        else if(diff<=90){level="🔔 ATENCIÓN — "+diff+"d";bg="rgba(251,146,60,0.08)";cl="#fb923c";}
+        else             {level="📅 "+diff+" días";       bg="rgba(148,163,184,0.06)";cl="#64748b";}
+        // Siempre agregar — sin límite de días
         contractAlerts.push({co:co.name,label,icon,level,date:dateStr,diff,bg,cl});
       }
       calcAlert(co.contract_end_date,"Contrato Salud","🩺","#2dd4bf");
