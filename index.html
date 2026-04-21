@@ -149,9 +149,9 @@ canvas{width:100%!important;max-height:220px}
 <button class="b2" onclick="hideNewUser()">Cancelar</button>
 </div></div>
 <div class="ov" id="setupOv"><div class="ob"><h2>⚡ Conectar Supabase</h2><p>Settings → API</p><label>URL</label><input id="sUrl" placeholder="https://xxx.supabase.co"><label>Anon Key</label><input id="sKey" placeholder="eyJ..."><div class="er" id="sErr"></div><button class="bt" onclick="doConnect()">🔗 Conectar</button></div></div>
-<div class="ov" id="ncOv" style="display:none"><div class="ob"><h2>🏢 Nueva Empresa</h2><label>Nombre *</label><input id="ncN"><label>RUC</label><input id="ncR"><label>Actividad</label><input id="ncA"><label>Código CIIU</label><input id="ncCIIU" placeholder="Ej: G4711.00"><label>Ubicación</label><input id="ncL"><label>Representante Legal</label><input id="ncRL"><label>Trabajadores *</label><input id="ncW" type="number" min="1" value="10"><div class="er" id="ncE"></div><button class="bt" onclick="createCo()">✅ Crear</button><button class="b2" onclick="hideNc()">Cancelar</button></div></div>
+<div class="ov" id="ncOv" style="display:none"><div class="ob"><h2>🏢 Nueva Empresa</h2><label>Nombre *</label><input id="ncN"><label>RUC</label><input id="ncR"><label>Actividad</label><input id="ncA"><label>Código CIIU</label><input id="ncCIIU" placeholder="Ej: G4711.00"><label>Ubicación</label><input id="ncL"><label>Representante Legal</label><input id="ncRL"><label>Trabajadores *</label><input id="ncW" type="number" min="1" value="10"><div style="margin-top:4px;padding:12px;border-radius:10px;border:1px solid rgba(45,212,191,0.25);background:rgba(45,212,191,0.04)"><div style="font-size:11px;font-weight:700;color:#2dd4bf;margin-bottom:10px">📅 Fechas de Contrato y Servicios</div><label>Inicio del Contrato (Salud)</label><input id="ncContStart" type="date"><label>Fin del Contrato / Renovación (Salud)</label><input id="ncContEnd" type="date"><label>Próxima Renovación Exámenes Médicos</label><input id="ncExamDate" type="date"></div><div class="er" id="ncE"></div><button class="bt" onclick="createCo()">✅ Crear</button><button class="b2" onclick="hideNc()">Cancelar</button></div></div>
 <div class="ov" id="naOv" style="display:none"><div class="ob"><h2>📍 Nueva Área</h2><label>Nombre *</label><input id="naName"><div class="er" id="naE"></div><button class="bt" onclick="createArea()">✅ Agregar</button><button class="b2" onclick="hideNa()">Cancelar</button></div></div>
-<div class="ov" id="sstNcOv" style="display:none"><div class="ob"><h2>🔧 Nueva Empresa — Seguridad Industrial</h2><label>Nombre *</label><input id="sstNcN"><label>RUC</label><input id="sstNcR"><label>Actividad</label><input id="sstNcA"><label>Código CIIU</label><input id="sstNcCIIU" placeholder="Ej: G4711.00"><label>Ubicación</label><input id="sstNcL"><label>Representante Legal</label><input id="sstNcRL"><label>Trabajadores *</label><input id="sstNcW" type="number" min="1" value="10"><div class="er" id="sstNcE"></div><button class="bt" onclick="sstCreateCo()">✅ Crear</button><button class="b2" onclick="hideSSTNc()">Cancelar</button></div></div>
+<div class="ov" id="sstNcOv" style="display:none"><div class="ob"><h2>🔧 Nueva Empresa — Seguridad Industrial</h2><label>Nombre *</label><input id="sstNcN"><label>RUC</label><input id="sstNcR"><label>Actividad</label><input id="sstNcA"><label>Código CIIU</label><input id="sstNcCIIU" placeholder="Ej: G4711.00"><label>Ubicación</label><input id="sstNcL"><label>Representante Legal</label><input id="sstNcRL"><label>Trabajadores *</label><input id="sstNcW" type="number" min="1" value="10"><div style="margin-top:4px;padding:12px;border-radius:10px;border:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.04)"><div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:10px">📅 Fechas de Contrato SST</div><label>Inicio del Contrato (Seguridad)</label><input id="sstNcContStart" type="date"><label>Fin del Contrato / Renovación (Seguridad)</label><input id="sstNcContEnd" type="date"></div><div class="er" id="sstNcE"></div><button class="bt" onclick="sstCreateCo()">✅ Crear</button><button class="b2" onclick="hideSSTNc()">Cancelar</button></div></div>
 <div class="ov" id="editUserOv" style="display:none"><div class="ob" style="max-width:420px">
 <h2>✏️ Editar Usuario</h2>
 <input id="euId" type="hidden">
@@ -175,6 +175,8 @@ canvas{width:100%!important;max-height:220px}
 <button class="b2" onclick="hideEditUser()">Cancelar</button>
 </div></div>
 <div class="app-wrap">
+<!-- BANNER GLOBAL CONTRATOS/EXÁMENES -->
+<div id="globalContractBanner" style="display:none;padding:8px 20px 0;margin-left:0"></div>
 <div id="configModule" style="display:none">
 <div class="hd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
 <div style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:linear-gradient(135deg,#64748b,#475569)">⚙️</div><div class="bn"><h1 style="background:linear-gradient(135deg,#94a3b8,#64748b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Configuración General</h1><p style="color:var(--t3)">Gestión de empresas y módulos</p></div></div>
@@ -411,6 +413,8 @@ function applyUserRole(){
   const lo=document.getElementById("sb-logout");if(lo)lo.style.display="block";
   const sw=document.getElementById("sb-switch");if(sw)sw.style.display=isAdmin?"block":"none";
   render();
+  // Mostrar banner de alertas de contratos para todos los usuarios
+  setTimeout(()=>showContractAlertsBanner(),1200);
   // Post-login: show pending trips notification for workers (not jefe)
   if(!isAdmin&&!IS_JEFE()){setTimeout(()=>showPostLoginNotifications(),800)}
 }
@@ -425,7 +429,7 @@ async function showPostLoginNotifications(){
   if(!CURRENT_USER||!sb)return;
   try{
     const uid=CURRENT_USER.id;
-    const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+    const today=new Date().toISOString().split('T')[0];
     // Get trips where this user is a member, from today onwards
     const{data:myMembers}=await sb.from("logistics_trip_members").select("trip_id").eq("user_id",uid);
     if(!myMembers||myMembers.length===0)return;
@@ -659,11 +663,11 @@ async function delYear(){if(D.allYears.length<=1)return alert("Debe haber al men
 // === COMPANY/AREA CRUD ===
 function showNc(){document.getElementById("ncOv").style.display="flex"}
 function hideNc(){document.getElementById("ncOv").style.display="none"}
-async function createCo(){const n=document.getElementById("ncN").value.trim(),tw=parseInt(document.getElementById("ncW").value)||10,e=document.getElementById("ncE");if(!n){e.textContent="Nombre obligatorio.";e.style.display="block";return}e.style.display="none";const ruc=document.getElementById("ncR").value.trim();const act=document.getElementById("ncA").value.trim();const loc=document.getElementById("ncL").value.trim();const repLegal=document.getElementById("ncRL").value.trim();const ciiu=(document.getElementById("ncCIIU")||{}).value||"";async function tryCreate(){const{data,error}=await sb.from("companies").insert({name:n,ruc:ruc,activity:act,location:loc,total_workers:tw,rep_legal:repLegal,ciiu_code:ciiu.trim(),mod_salud:true}).select().single();return{data,error}}try{let r=await tryCreate();if(r.error&&r.error.message&&r.error.message.includes("imc_records")){await sb.from("imc_records").delete().neq("company_id","00000000-0000-0000-0000-000000000000").is("company_id",null);r=await tryCreate()}if(r.error&&r.error.message&&r.error.message.includes("imc_records")){await loadCos();const f=cos.find(c=>c.name===n);if(f){CID=f.id;YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render();return}const{data:newest}=await sb.from("companies").select("*").eq("name",n).order("id",{ascending:false}).limit(1);if(newest&&newest[0]){await loadCos();CID=newest[0].id;YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render();return}e.innerHTML='Error del trigger IMC en Supabase.<br>Ejecuta en SQL Editor:<br><code style="font-size:10px;background:#1e1e2e;padding:4px 8px;border-radius:4px;display:block;margin-top:6px">DROP TRIGGER IF EXISTS create_imc_on_company ON companies;</code><br>Luego recarga.';e.style.display="block";return}if(r.error)throw r.error;CID=r.data.id;await loadCos();YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render()}catch(er){e.textContent="Error: "+er.message;e.style.display="block"}}
+async function createCo(){const n=document.getElementById("ncN").value.trim(),tw=parseInt(document.getElementById("ncW").value)||10,e=document.getElementById("ncE");if(!n){e.textContent="Nombre obligatorio.";e.style.display="block";return}e.style.display="none";const ruc=document.getElementById("ncR").value.trim();const act=document.getElementById("ncA").value.trim();const loc=document.getElementById("ncL").value.trim();const repLegal=document.getElementById("ncRL").value.trim();const ciiu=(document.getElementById("ncCIIU")||{}).value||"";const contStart=document.getElementById("ncContStart")?.value||null;const contEnd=document.getElementById("ncContEnd")?.value||null;const examDate=document.getElementById("ncExamDate")?.value||null;async function tryCreate(){const{data,error}=await sb.from("companies").insert({name:n,ruc:ruc,activity:act,location:loc,total_workers:tw,rep_legal:repLegal,ciiu_code:ciiu.trim(),mod_salud:true,contract_start_date:contStart||undefined,contract_end_date:contEnd||undefined,exam_renewal_date:examDate||undefined}).select().single();return{data,error}}try{let r=await tryCreate();if(r.error&&r.error.message&&r.error.message.includes("imc_records")){await sb.from("imc_records").delete().neq("company_id","00000000-0000-0000-0000-000000000000").is("company_id",null);r=await tryCreate()}if(r.error&&r.error.message&&r.error.message.includes("imc_records")){await loadCos();const f=cos.find(c=>c.name===n);if(f){CID=f.id;YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render();return}const{data:newest}=await sb.from("companies").select("*").eq("name",n).order("id",{ascending:false}).limit(1);if(newest&&newest[0]){await loadCos();CID=newest[0].id;YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render();return}e.innerHTML='Error del trigger IMC en Supabase.<br>Ejecuta en SQL Editor:<br><code style="font-size:10px;background:#1e1e2e;padding:4px 8px;border-radius:4px;display:block;margin-top:6px">DROP TRIGGER IF EXISTS create_imc_on_company ON companies;</code><br>Luego recarga.';e.style.display="block";return}if(r.error)throw r.error;CID=r.data.id;await loadCos();YR=2026;try{await loadYears()}catch(x){}try{await loadCD()}catch(x){}hideNc();V="dashboard";ss("ok");render()}catch(er){e.textContent="Error: "+er.message;e.style.display="block"}}
 // SST: Create company with mod_seguridad=true
 function showSSTNc(){document.getElementById("sstNcOv").style.display="flex"}
 function hideSSTNc(){document.getElementById("sstNcOv").style.display="none"}
-async function sstCreateCo(){const n=document.getElementById("sstNcN").value.trim(),tw=parseInt(document.getElementById("sstNcW").value)||10,e=document.getElementById("sstNcE");if(!n){e.textContent="Nombre obligatorio.";e.style.display="block";return}e.style.display="none";const ruc=document.getElementById("sstNcR").value.trim();const act=document.getElementById("sstNcA").value.trim();const loc=document.getElementById("sstNcL").value.trim();const repLegal=document.getElementById("sstNcRL").value.trim();const ciiu=(document.getElementById("sstNcCIIU")||{}).value||"";try{const{data,error}=await sb.from("companies").insert({name:n,ruc:ruc,activity:act,location:loc,total_workers:tw,rep_legal:repLegal,ciiu_code:ciiu.trim(),mod_seguridad:true}).select().single();if(error&&error.message&&error.message.includes("imc_records")){await loadCos();const f=cos.find(c=>c.name===n);if(f){CID=f.id;SST_YR=2026;hideSSTNc();sstLoad();return}const{data:newest}=await sb.from("companies").select("*").eq("name",n).order("id",{ascending:false}).limit(1);if(newest&&newest[0]){await loadCos();CID=newest[0].id;SST_YR=2026;hideSSTNc();sstLoad();return}e.innerHTML='Trigger IMC impide crear. Ejecuta en SQL Editor:<br><code style="font-size:10px">DROP TRIGGER IF EXISTS create_imc_on_company ON companies;</code>';e.style.display="block";return}if(error)throw error;CID=data.id;await loadCos();SST_YR=2026;hideSSTNc();sstLoad()}catch(er){e.textContent="Error: "+er.message;e.style.display="block"}}
+async function sstCreateCo(){const n=document.getElementById("sstNcN").value.trim(),tw=parseInt(document.getElementById("sstNcW").value)||10,e=document.getElementById("sstNcE");if(!n){e.textContent="Nombre obligatorio.";e.style.display="block";return}e.style.display="none";const ruc=document.getElementById("sstNcR").value.trim();const act=document.getElementById("sstNcA").value.trim();const loc=document.getElementById("sstNcL").value.trim();const repLegal=document.getElementById("sstNcRL").value.trim();const ciiu=(document.getElementById("sstNcCIIU")||{}).value||"";const sstContStart=document.getElementById("sstNcContStart")?.value||null;const sstContEnd=document.getElementById("sstNcContEnd")?.value||null;try{const{data,error}=await sb.from("companies").insert({name:n,ruc:ruc,activity:act,location:loc,total_workers:tw,rep_legal:repLegal,ciiu_code:ciiu.trim(),mod_seguridad:true,sst_contract_start_date:sstContStart||undefined,sst_contract_end_date:sstContEnd||undefined}).select().single();if(error&&error.message&&error.message.includes("imc_records")){await loadCos();const f=cos.find(c=>c.name===n);if(f){CID=f.id;SST_YR=2026;hideSSTNc();sstLoad();return}const{data:newest}=await sb.from("companies").select("*").eq("name",n).order("id",{ascending:false}).limit(1);if(newest&&newest[0]){await loadCos();CID=newest[0].id;SST_YR=2026;hideSSTNc();sstLoad();return}e.innerHTML='Trigger IMC impide crear. Ejecuta en SQL Editor:<br><code style="font-size:10px">DROP TRIGGER IF EXISTS create_imc_on_company ON companies;</code>';e.style.display="block";return}if(error)throw error;CID=data.id;await loadCos();SST_YR=2026;hideSSTNc();sstLoad()}catch(er){e.textContent="Error: "+er.message;e.style.display="block"}}
 // SST: Add year
 function sstPromptYr(){const y=prompt("Agregar año (ej: 2027):");if(!y||isNaN(y))return;SST_YR=+y;sstLoad()}
 async function delCo(){if(!CID||cos.length<=1)return alert("Debe haber al menos 1 empresa.");if(!confirm("¿Eliminar empresa y TODOS sus datos?"))return;try{await sb.from("companies").delete().eq("id",CID);await loadCos();CID=cos[0]?.id;if(CID){await loadYears();await loadCD()}V="dashboard";ss("ok");render()}catch(e){alert(e.message)}}
@@ -1178,6 +1182,33 @@ function render(){
     const perfil=getSSTPerfil(D.tw,ciiuRisk);
     h+=`<div style="margin-bottom:16px;padding:10px;border-radius:8px;border:1px solid ${getRiskColor(ciiuRisk)}40;background:${getRiskColor(ciiuRisk)}08"><div style="font-size:10px;font-weight:700;color:${getRiskColor(ciiuRisk)};margin-bottom:6px">⚡ PERFIL SST (AM 196 Art. 13)</div><div style="font-size:11px;color:var(--t2)">👷 Responsable: <b style="color:var(--t1)">${perfil.tecnico?'Técnico SST':'Monitor SST'}</b></div><div style="font-size:11px;color:var(--t2)">🤝 Organismo: <b style="color:var(--t1)">${perfil.comite?'Comité Paritario':perfil.delegado?'Delegado SST':'N/A (< 10 trab.)'}</b></div></div>`;
     h+=`<div style="margin-bottom:16px"><label style="font-size:11px;color:var(--t3);font-weight:600;display:block;margin-bottom:4px">👔 Representante Legal</label><input style="width:100%;padding:8px 12px;border-radius:7px;border:1px solid rgba(251,191,36,0.3);background:rgba(251,191,36,0.04);color:var(--t1);font-size:13px;font-family:var(--sn);outline:none" value="${c.rep_legal||''}" onchange="saveRepLegal(this.value)" placeholder="Nombre del representante legal"></div>`;
+    // ── SECCIÓN FECHAS DE CONTRATO Y EXÁMENES ──────────────────────────────
+    const fmtD=v=>v?new Date(v+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'}):'No registrada';
+    function contractBadge(dateStr){
+      if(!dateStr)return '<span style="font-size:10px;color:var(--t3)">Sin fecha</span>';
+      const d=new Date(dateStr+'T12:00:00');const today=new Date();today.setHours(0,0,0,0);
+      const diff=Math.round((d-today)/(1000*60*60*24));
+      if(diff<0)return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.15);color:#ef4444;font-weight:700">⛔ VENCIDO (${Math.abs(diff)}d)</span>`;
+      if(diff<=30)return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.12);color:#ef4444;font-weight:700">🚨 ${diff}d restantes</span>`;
+      if(diff<=60)return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(251,191,36,0.12);color:#fbbf24;font-weight:700">⚠️ ${diff}d restantes</span>`;
+      if(diff<=90)return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(251,146,60,0.1);color:#fb923c;font-weight:700">🔔 ${diff}d restantes</span>`;
+      return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(52,211,153,0.1);color:#34d399;font-weight:700">✅ ${diff}d restantes</span>`;
+    }
+    h+=`<div style="margin-top:20px;padding:16px;border-radius:12px;border:1px solid rgba(45,212,191,0.2);background:rgba(45,212,191,0.03)">`;
+    h+=`<div style="font-size:12px;font-weight:800;color:#2dd4bf;margin-bottom:14px;display:flex;align-items:center;gap:7px">📅 Contrato y Exámenes — Seguimiento de Vencimientos</div>`;
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">`;
+    h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Inicio Contrato (Salud)</label><input type="date" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);outline:none" value="${c.contract_start_date||''}" onchange="saveField('contract_start_date',this.value)"></div>`;
+    h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Renovación Contrato (Salud) ${contractBadge(c.contract_end_date)}</label><input type="date" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);outline:none" value="${c.contract_end_date||''}" onchange="saveField('contract_end_date',this.value)"></div>`;
+    h+=`</div>`;
+    h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Próxima Renovación Exámenes Médicos ${contractBadge(c.exam_renewal_date)}</label><input type="date" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);outline:none" value="${c.exam_renewal_date||''}" onchange="saveField('exam_renewal_date',this.value)"></div>`;
+    if(c.mod_seguridad){
+      h+=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
+      h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Inicio Contrato (Seguridad)</label><input type="date" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);outline:none" value="${c.sst_contract_start_date||''}" onchange="saveField('sst_contract_start_date',this.value)"></div>`;
+      h+=`<div><label style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px">Renovación Contrato (Seguridad) ${contractBadge(c.sst_contract_end_date)}</label><input type="date" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--t1);font-size:12px;font-family:var(--mn);outline:none" value="${c.sst_contract_end_date||''}" onchange="saveField('sst_contract_end_date',this.value)"></div>`;
+      h+=`</div>`;
+    }
+    h+=`</div>`;
+    // ─────────────────────────────────────────────────────────────────────
     h+=`<div style="margin-bottom:16px"><label style="font-size:11px;color:var(--t3);font-weight:600;display:block;margin-bottom:4px">Años Activos</label><div style="font-size:13px;color:var(--t2)">${D.allYears.join(", ")}</div></div>`;
     if(D.allYears.length>1)h+=`<div style="margin-bottom:16px"><button class="del-btn" style="padding:8px 16px;font-size:12px" onclick="delYear()">🗑️ Eliminar año ${YR}</button></div>`;
     // Doctor / signature section
@@ -1993,6 +2024,43 @@ async function checkAutoBackup(){
     if(st)st.innerHTML=`<span style="color:var(--t3)">Último respaldo: hace ${hrs<24?hrs+'h':Math.round(hrs/24)+'d'}. Próximo auto: en ${Math.round(48-diff)}h</span>`;
   }
 }
+async function showContractAlertsBanner(){
+  const banner=document.getElementById("globalContractBanner");
+  if(!banner)return;
+  try{
+    await loadCos();
+    const today=new Date();today.setHours(0,0,0,0);
+    const alerts=[];
+    for(const co of cos){
+      function chk(dateStr,label,icon){
+        if(!dateStr)return;
+        const d=new Date(dateStr);d.setHours(0,0,0,0);
+        const diff=Math.round((d-today)/(1000*60*60*24));
+        if(diff>90)return;
+        let cl,bg,txt;
+        if(diff<0){cl="#ef4444";bg="rgba(239,68,68,0.12)";txt="⛔ VENCIDO";}
+        else if(diff<=30){cl="#ef4444";bg="rgba(239,68,68,0.10)";txt=`🚨 ${diff}d`;}
+        else if(diff<=60){cl="#fbbf24";bg="rgba(251,191,36,0.10)";txt=`⚠️ ${diff}d`;}
+        else{cl="#fb923c";bg="rgba(251,146,60,0.08)";txt=`🔔 ${diff}d`;}
+        alerts.push({co:co.name,label,icon,cl,bg,txt,diff});
+      }
+      chk(co.contract_end_date,"Contrato Salud","🩺");
+      chk(co.exam_renewal_date,"Exámenes Méd.","🔬");
+      chk(co.sst_contract_end_date,"Contrato SST","🔧");
+    }
+    if(alerts.length===0){banner.style.display="none";return;}
+    alerts.sort((a,b)=>a.diff-b.diff);
+    let h=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 12px;border-radius:10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);margin-bottom:6px">`;
+    h+=`<span style="font-size:12px;font-weight:800;color:#fbbf24;white-space:nowrap">⚠️ Contratos/Exámenes:</span>`;
+    alerts.forEach(a=>{
+      h+=`<span onclick="switchModule('pendientes')" style="cursor:pointer;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid ${a.cl}40;background:${a.bg};color:${a.cl};font-weight:700;white-space:nowrap" title="${a.co} — ${a.label}">${a.icon} ${a.co.split(' ')[0]} · ${a.txt}</span>`;
+    });
+    h+=`<span onclick="this.parentElement.parentElement.style.display='none'" style="margin-left:auto;cursor:pointer;color:var(--t3);font-size:14px;padding:2px 6px;border-radius:4px;hover:background:rgba(255,255,255,0.05)" title="Cerrar">✕</span>`;
+    h+=`</div>`;
+    banner.innerHTML=h;
+    banner.style.display="block";
+  }catch(e){console.log("Banner error:",e.message)}
+}
 async function renderPendientes(){
   const mc=document.getElementById("pendMc");const ms=document.getElementById("pendMes");if(!mc)return;
   const cm=new Date().getMonth();const yr=new Date().getFullYear();
@@ -2058,13 +2126,52 @@ async function renderPendientes(){
         }
       });
     }
+    // ── ALERTAS DE CONTRATOS Y EXÁMENES ──────────────────────────────────
+    const today=new Date();today.setHours(0,0,0,0);
+    const contractAlerts=[];
+    await loadCos();
+    for(const co of cos){
+      // Función helper: calcula días restantes y nivel de alerta
+      function calcAlert(dateStr,label,icon,color){
+        if(!dateStr)return;
+        const d=new Date(dateStr);d.setHours(0,0,0,0);
+        const diff=Math.round((d-today)/(1000*60*60*24));
+        let level,bg,cl;
+        if(diff<0){level="VENCIDO";bg="rgba(239,68,68,0.12)";cl="#ef4444";}
+        else if(diff<=30){level="CRÍTICO ("+diff+"d)";bg="rgba(239,68,68,0.08)";cl="#ef4444";}
+        else if(diff<=60){level="PRÓXIMO ("+diff+"d)";bg="rgba(251,191,36,0.08)";cl="#fbbf24";}
+        else if(diff<=90){level="ATENCIÓN ("+diff+"d)";bg="rgba(251,146,60,0.08)";cl="#fb923c";}
+        else return; // Más de 90 días: no mostrar alerta
+        contractAlerts.push({co:co.name,label,icon,level,date:dateStr,diff,bg,cl});
+      }
+      calcAlert(co.contract_end_date,"Contrato Salud","🩺","#2dd4bf");
+      calcAlert(co.exam_renewal_date,"Exámenes Médicos","🔬","#2dd4bf");
+      calcAlert(co.sst_contract_end_date,"Contrato Seguridad","🔧","#f59e0b");
+    }
+    // Sort: vencidos primero, luego por días restantes
+    contractAlerts.sort((a,b)=>a.diff-b.diff);
     // Sort: overdue first, then by module
     items.sort((a,b)=>(b.overdue?1:0)-(a.overdue?1:0)||a.mod.localeCompare(b.mod));
     // Render
     const overdueCount=items.filter(i=>i.overdue).length;
     const thisMonthCount=items.filter(i=>!i.overdue).length;
     let h='';
-    h+=`<div class="gr g4" style="margin-bottom:16px"><div class="c"><div class="kl">Total Pendientes</div><div class="kv" style="color:#fbbf24">${items.length}</div></div><div class="c"><div class="kl">Este Mes</div><div class="kv" style="color:#60a5fa">${thisMonthCount}</div></div><div class="c"><div class="kl">Vencidas</div><div class="kv" style="color:#ef4444">${overdueCount}</div></div><div class="c"><div class="kl">Empresas</div><div class="kv" style="color:#34d399">${new Set(items.map(i=>i.co)).size}</div></div></div>`;
+    // ── BANNER DE ALERTAS CONTRATOS ───────────────────────────────────────
+    if(contractAlerts.length>0){
+      h+=`<div style="margin-bottom:16px;padding:16px;border-radius:14px;border:1px solid rgba(251,191,36,0.3);background:rgba(251,191,36,0.05)">`;
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:18px">⚠️</span><span style="font-size:13px;font-weight:800;color:#fbbf24">Alertas de Contratos y Exámenes (próximos 90 días)</span><span style="margin-left:auto;font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(251,191,36,0.15);color:#fbbf24;font-weight:700">${contractAlerts.length} alerta${contractAlerts.length>1?'s':''}</span></div>`;
+      h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">`;
+      contractAlerts.forEach(a=>{
+        const fechaFmt=new Date(a.date+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'short',year:'numeric'});
+        h+=`<div style="padding:10px 14px;border-radius:10px;border:1px solid ${a.cl}40;background:${a.bg};display:flex;align-items:center;gap:10px">`;
+        h+=`<span style="font-size:20px">${a.icon}</span>`;
+        h+=`<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.co}</div><div style="font-size:11px;color:var(--t2)">${a.label}</div><div style="font-size:10px;color:var(--t3);margin-top:1px">📅 ${fechaFmt}</div></div>`;
+        h+=`<span style="font-size:10px;font-weight:800;padding:4px 8px;border-radius:6px;background:${a.cl}18;color:${a.cl};white-space:nowrap">${a.level}</span>`;
+        h+=`</div>`;
+      });
+      h+=`</div></div>`;
+    }
+    h+=`<div class="gr g4" style="margin-bottom:16px"><div class="c"><div class="kl">Total Pendientes</div><div class="kv" style="color:#fbbf24">${items.length}</div></div><div class="c"><div class="kl">Este Mes</div><div class="kv" style="color:#60a5fa">${thisMonthCount}</div></div><div class="c"><div class="kl">Vencidas</div><div class="kv" style="color:#ef4444">${overdueCount}</div></div><div class="c"><div class="kl">Contratos/Exámenes</div><div class="kv" style="color:${contractAlerts.length>0?'#fbbf24':'#34d399'}">${contractAlerts.length}</div></div></div>`;
     if(items.length===0){
       h+='<div class="c" style="text-align:center;padding:40px"><div style="font-size:48px;margin-bottom:16px">🎉</div><div style="font-size:16px;font-weight:700;color:#34d399">¡Todo al día!</div><div style="color:var(--t3);margin-top:8px">No hay actividades pendientes para '+MF[cm]+'</div></div>';
     }else{
@@ -4207,7 +4314,7 @@ function logRender(){
 
   // Next trip banner for workers
   if(!isAdmin&&visibleTrips.length>0){
-    const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+    const today=new Date().toISOString().split('T')[0];
     const upcoming=visibleTrips.filter(t=>t.trip_date>=today&&t.status!=='cancelled').sort((a,b)=>a.trip_date.localeCompare(b.trip_date));
     if(upcoming.length>0){
       const next=upcoming[0];
@@ -4336,7 +4443,7 @@ function logNextWeek(){LOG.weekStart=new Date(LOG.weekStart);LOG.weekStart.setDa
 
 // ===== WEEKLY VIEW =====
 function logRenderWeek(isAdmin,visibleTrips){
-  if(!LOG.weekStart){const now=new Date();const day=now.getDay();const diff=day===0?6:day-1;LOG.weekStart=new Date(now);LOG.weekStart.setDate(now.getDate()-diff)}
+  if(!LOG.weekStart){const now=new Date();const day=now.getDay();LOG.weekStart=new Date(now);LOG.weekStart.setDate(now.getDate()-day)}
   const ws=new Date(LOG.weekStart);
   const we=new Date(ws);we.setDate(ws.getDate()+6);
   const mNames=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -4358,11 +4465,11 @@ function logRenderWeek(isAdmin,visibleTrips){
   }
   h+=`</div>`;
 
-  const _n=new Date();const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
+  const today=new Date().toISOString().split('T')[0];
   h+=`<div class="c">`;
   for(let i=0;i<7;i++){
     const d=new Date(ws);d.setDate(ws.getDate()+i);
-    const dateStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const dateStr=d.toISOString().split('T')[0];
     const isToday=dateStr===today;
     const dayTrips=visibleTrips.filter(t=>t.trip_date===dateStr).sort((a,b)=>(a.departure_time||'07:00').localeCompare(b.departure_time||'07:00'));
     const dayBg=isToday?`background:${LOG_COLOR}10;border:2px solid ${LOG_COLOR}40`:'background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06)';
@@ -4759,9 +4866,8 @@ async function genAgInformeDocx(){
   AG_DEPTS.forEach(d=>{
     let totalCos=0,agSi=0,visSi=0,infSi=0;
     allCos.forEach(co=>{
-      const est=agGetVal(co.id,d.id,'est');
       const ag=agGetVal(co.id,d.id,'ag');
-      if(ag==='N/A'||est==='INACTIVO')return;
+      if(ag==='N/A')return;
       totalCos++;
       if(ag==='SÍ')agSi++;
       if(agGetVal(co.id,d.id,'vis')==='SÍ')visSi++;
@@ -4993,51 +5099,22 @@ async function genAgInformePptx(){
   const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(allCos.length===0){alert("No hay empresas");return}
 
-  // Stats with detailed breakdown
+  // Stats
   const stats={};
-  const deptModMap={sst:'mod_seguridad',salud:'mod_salud',ambiente:'mod_ambiente',lopdpd:'mod_datos',tthh:'mod_tthh',dpd:'mod_datos'};
   AG_DEPTS.forEach(d=>{
-    let activas=0,bimensuales=0,noResponde=0,cancelado=0,reagendar=0,suspendido=0,ag=0,vis=0,inf=0;
-    let enviado=0,socializado=0;
-    const modKey=deptModMap[d.id];
+    let tot=0,ag=0,vis=0,inf=0;
     allCos.forEach(co=>{
-      // Only count companies that have this department's module active
-      if(modKey&&!co[modKey])return;
-      const _est=agGetVal(co.id,d.id,'est');
-      if(_est==='INACTIVO')return;
-      activas++;
-      const _ag=agGetVal(co.id,d.id,'ag');
-      const obs=agGetVal(co.id,d.id,'obs')||'';
-      // Check frequency
-      const freq=agGetFreq(co.id);
-      if(freq>1&&!agIsActiveMonth(freq,LOG.month,agGetFreqStart(co.id))&&_ag!=='SÍ'){bimensuales++;return}
-      // Check obs category
-      if(obs==='No responde'){noResponde++}
-      else if(obs==='Cancelado por empresa'){cancelado++}
-      else if(obs==='Reagendar'){reagendar++}
-      else if(obs==='Suspendido'){suspendido++}
-      if(_ag==='SÍ')ag++;
+      if(agGetVal(co.id,d.id,'ag')==='N/A')return;
+      tot++;
+      if(agGetVal(co.id,d.id,'ag')==='SÍ')ag++;
       if(agGetVal(co.id,d.id,'vis')==='SÍ')vis++;
       if(agGetVal(co.id,d.id,'inf')==='SÍ')inf++;
     });
-    // Enviado and socializado from _global
-    allCos.forEach(co=>{
-      if(modKey&&!co[modKey])return;
-      const _est=agGetVal(co.id,d.id,'est');
-      if(_est==='INACTIVO')return;
-      if(agGetVal(co.id,'_global','enviado')==='SÍ')enviado++;
-      if(agGetVal(co.id,'_global','socializado')==='SÍ')socializado++;
-    });
-    const aVisitar=activas-bimensuales;
-    const gestionables=aVisitar-noResponde-cancelado;
-    const cumplP=gestionables>0?Math.round(ag/gestionables*100):0;
-    const visP=gestionables>0?Math.round(vis/gestionables*100):0;
-    const infP=gestionables>0?Math.round(inf/gestionables*100):0;
-    stats[d.id]={activas,bimensuales,aVisitar,noResponde,cancelado,reagendar,suspendido,gestionables,ag,vis,inf,enviado,socializado,cumplP,visP,infP};
+    stats[d.id]={tot,ag,vis,inf,agP:tot?Math.round(ag/tot*100):0,visP:tot?Math.round(vis/tot*100):0,infP:tot?Math.round(inf/tot*100):0};
   });
   const numEmpresas=allCos.length;
-  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].activas>0);
-  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].cumplP,0)/depsWithData.length):0;
+  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].tot>0);
+  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agP,0)/depsWithData.length):0;
   const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visP,0)/depsWithData.length):0;
   const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infP,0)/depsWithData.length):0;
   let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
@@ -5103,69 +5180,53 @@ async function genAgInformePptx(){
   s3.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
 
   // Table
-  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:8}},{text:'ACTIVAS',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'BIMENS.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'NO RESP.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'GESTIÓN',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'ENVIAD.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}},{text:'SOCIAL.',options:{fill:DK,color:WH,bold:true,fontSize:8,align:'center'}}];
+  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:10}},{text:'TOTAL',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}}];
   const rows=[hdr];
   AG_DEPTS.forEach((d,i)=>{
     const s=stats[d.id];const bg=i%2?LG:WH;
-    const pc=v=>({text:v+'%',options:{fontSize:9,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
+    const pc=v=>({text:v+'%',options:{fontSize:11,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
     rows.push([
-      {text:d.icon+' '+d.label,options:{fontSize:9,bold:true,fill:bg}},
-      {text:String(s.activas),options:{fontSize:9,align:'center',fill:bg}},
-      {text:String(s.bimensuales),options:{fontSize:9,align:'center',fill:bg,color:s.bimensuales>0?YEL:'000000'}},
-      {text:String(s.noResponde+s.cancelado),options:{fontSize:9,align:'center',fill:bg,color:s.noResponde+s.cancelado>0?RED:'000000'}},
-      {text:String(s.gestionables),options:{fontSize:9,align:'center',fill:bg,bold:true}},
-      {text:String(s.ag),options:{fontSize:9,align:'center',fill:bg}},
-      pc(s.cumplP),
-      {text:String(s.vis),options:{fontSize:9,align:'center',fill:bg}},
+      {text:d.icon+' '+d.label,options:{fontSize:10,bold:true,fill:bg}},
+      {text:String(s.tot),options:{fontSize:10,align:'center',fill:bg}},
+      {text:String(s.ag),options:{fontSize:10,align:'center',fill:bg}},
+      pc(s.agP),
+      {text:String(s.vis),options:{fontSize:10,align:'center',fill:bg}},
       pc(s.visP),
-      {text:String(s.inf),options:{fontSize:9,align:'center',fill:bg}},
-      pc(s.infP),
-      {text:String(s.enviado),options:{fontSize:9,align:'center',fill:bg}},
-      {text:String(s.socializado),options:{fontSize:9,align:'center',fill:bg}}
+      {text:String(s.inf),options:{fontSize:10,align:'center',fill:bg}},
+      pc(s.infP)
     ]);
   });
-  s3.addTable(rows,{x:0.3,y:1.2,w:9.4,colW:[1.6,0.7,0.7,0.7,0.7,0.7,0.5,0.7,0.5,0.7,0.5,0.7,0.7],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.35});
+  // Total row
+  rows.push([
+    {text:'TOTAL',options:{fontSize:11,bold:true,fill:TEAL,color:WH}},
+    {text:String(numEmpresas),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gA+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gV+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
+    {text:gI+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
+  ]);
+  s3.addTable(rows,{x:0.5,y:1.2,w:9,colW:[2.2,0.9,0.9,0.8,0.9,0.8,0.9,0.8],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.4});
 
-  // ===== SLIDE 4: BARRAS TRIPLE (Agendamiento / Visita / Informe) =====
+  // ===== SLIDE 4: ANÁLISIS POR ÁREA (barras) =====
   const s4=pres.addSlide();
   s4.background={fill:DK};
-  s4.addText('CUMPLIMIENTO POR DEPARTAMENTO',{x:0.5,y:0.2,w:9,h:0.5,fontSize:24,fontFace:'Georgia',color:WH,bold:true});
-  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.65,w:2,h:0.04,fill:{color:TEAL}});
-  // Legend
-  s4.addShape(pres.shapes.RECTANGLE,{x:3.5,y:0.25,w:0.3,h:0.2,fill:{color:TEAL}});
-  s4.addText('Agendamiento',{x:3.85,y:0.2,w:1.3,h:0.3,fontSize:9,color:GY});
-  s4.addShape(pres.shapes.RECTANGLE,{x:5.2,y:0.25,w:0.3,h:0.2,fill:{color:GRN}});
-  s4.addText('Visita',{x:5.55,y:0.2,w:0.8,h:0.3,fontSize:9,color:GY});
-  s4.addShape(pres.shapes.RECTANGLE,{x:6.4,y:0.25,w:0.3,h:0.2,fill:{color:PURP}});
-  s4.addText('Informe',{x:6.75,y:0.2,w:0.8,h:0.3,fontSize:9,color:GY});
+  s4.addText('ANÁLISIS POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
+  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
 
-  const barMaxW=5.0;
-  const barH=0.18;
-  const groupH=0.85;
   AG_DEPTS.forEach((d,i)=>{
     const s=stats[d.id];
-    const yBase=1.0+i*groupH;
-    // Dept label
-    s4.addText(d.icon+' '+d.label,{x:0.3,y:yBase,w:2.0,h:groupH,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
-    // Gestionables label
-    s4.addText(s.gestionables+' emp.',{x:0.3,y:yBase+0.45,w:2.0,h:0.25,fontSize:8,fontFace:'Calibri',color:GY});
-    const xStart=2.5;
-    // Bar backgrounds
-    for(let b=0;b<3;b++){
-      s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+b*(barH+0.04),w:barMaxW,h:barH,fill:{color:'1E293B'}});
-    }
+    const y=1.2+i*0.7;
+    const barW=5.5;
+    // Label
+    s4.addText(d.icon+' '+d.label,{x:0.5,y,w:1.8,h:0.5,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
+    // Bar background
+    s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW,h:0.3,fill:{color:'1E293B'}});
     // Agendamiento bar
-    const agW=barMaxW*s.cumplP/100;
-    if(agW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05,w:agW,h:barH,fill:{color:TEAL}});
-    s4.addText(s.ag+'/'+s.gestionables+' ('+s.cumplP+'%)',{x:xStart+agW+0.1,y:yBase+0.02,w:2,h:barH+0.06,fontSize:8,color:TEAL,bold:true});
-    // Visita bar
-    const visW=barMaxW*s.visP/100;
-    if(visW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+barH+0.04,w:visW,h:barH,fill:{color:GRN}});
-    s4.addText(s.vis+'/'+s.gestionables+' ('+s.visP+'%)',{x:xStart+visW+0.1,y:yBase+0.02+barH+0.04,w:2,h:barH+0.06,fontSize:8,color:GRN,bold:true});
-    // Informe bar
-    const infW=barMaxW*s.infP/100;
-    if(infW>0)s4.addShape(pres.shapes.RECTANGLE,{x:xStart,y:yBase+0.05+2*(barH+0.04),w:infW,h:barH,fill:{color:PURP}});
-    s4.addText(s.inf+'/'+s.gestionables+' ('+s.infP+'%)',{x:xStart+infW+0.1,y:yBase+0.02+2*(barH+0.04),w:2,h:barH+0.06,fontSize:8,color:PURP,bold:true});
+    if(s.agP>0)s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW*s.agP/100,h:0.3,fill:{color:TEAL}});
+    // % label
+    s4.addText(s.agP+'%',{x:8.2,y,w:1.2,h:0.5,fontSize:14,fontFace:'Georgia',color:s.agP>=80?GRN:s.agP>=50?YEL:RED,bold:true,align:'center',valign:'middle'});
   });
 
   // ===== SLIDE 5: DETALLE POR EMPRESA =====
@@ -5248,25 +5309,6 @@ async function agLoad(){
     }else{
       LOG.agData=data||[];
     }
-    // Inherit est from previous month if not set for current month
-    if(LOG.month>0){
-      const prevMonth=LOG.month-1;
-      const{data:prevData}=await sb.from("agendamiento").select("*").eq("year",LOG.year).eq("month",prevMonth);
-      if(prevData){
-        prevData.forEach(pd=>{
-          if(pd.est&&pd.est==='INACTIVO'&&pd.dept!=='_global'&&pd.dept!=='_freq'){
-            const existing=LOG.agData.find(x=>x.company_id===pd.company_id&&x.dept===pd.dept);
-            if(!existing||(!existing.est||existing.est==='')){
-              // Copy INACTIVO to current month
-              if(existing){existing.est='INACTIVO'}
-              else{LOG.agData.push({...pd,month:LOG.month,id:undefined})}
-              // Also save to DB so it persists
-              sb.from("agendamiento").upsert({company_id:pd.company_id,dept:pd.dept,year:LOG.year,month:LOG.month,est:'INACTIVO'},{onConflict:"company_id,dept,year,month"});
-            }
-          }
-        });
-      }
-    }
     // Also load frequency records (dept='_freq') from any month this year
     try{
       const{data:freqData}=await sb.from("agendamiento").select("*").eq("year",LOG.year).eq("dept","_freq");
@@ -5344,21 +5386,17 @@ async function agSetFreq(companyId,freq){
 }
 
 function agGetVal(companyId,deptId,field){
-  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
-  // If there is a manual record, ALWAYS return its value (user's choice wins)
-  if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
-    return r[field];
-  }
-  // For enviado/socializado/inf_enviado on _global: default to NO if no record
-  if(deptId==='_global'&&(field==='enviado'||field==='socializado'||field==='inf_enviado')){
-    return 'NO';
-  }
-  // Check frequency - if not active this month, return N/A for ag/vis/inf (only if no manual value)
+  // Check frequency - if not active this month, return N/A for ag/vis/inf
   if(deptId!=='_global'&&deptId!=='_freq'&&(field==='ag'||field==='vis'||field==='inf')){
     const freq=agGetFreq(companyId);
     if(freq>1&&!agIsActiveMonth(freq,LOG.month,agGetFreqStart(companyId))){
       return 'N/A';
     }
+  }
+  const r=LOG.agData.find(x=>x.company_id===companyId&&x.dept===deptId);
+  // If there is a manual record, ALWAYS return its value (user's choice wins)
+  if(r&&r[field]!==undefined&&r[field]!==null&&r[field]!==''){
+    return r[field];
   }
   // For est field: check if inactive was set - default to ACTIVO
   if(field==='est')return 'ACTIVO';
@@ -5406,9 +5444,9 @@ function agGetVal(companyId,deptId,field){
   return 'NO';
 }
 
-function logCheckInfEnviado(companyId,currentlyChecked){
+function logCheckEnviado(companyId,currentlyChecked){
   if(currentlyChecked){
-    agSetVal(companyId,'_global','inf_enviado','NO');return;
+    agSetVal(companyId,'_global','enviado','NO');return;
   }
   const missing=[];
   AG_DEPTS.forEach(d=>{
@@ -5419,85 +5457,10 @@ function logCheckInfEnviado(companyId,currentlyChecked){
     }
   });
   if(missing.length>0){
-    alert('⚠️ No se puede marcar informes como enviados.\n\nFalta informe de:\n'+missing.join('\n'));
+    alert('⚠️ No se puede marcar como enviado.\n\nFalta informe de:\n'+missing.join('\n'));
     return;
   }
-  agSetVal(companyId,'_global','inf_enviado','SÍ');
-}
-
-function agSolicitarFecha(companyId){
-  const co=cos.find(c=>c.id===companyId);if(!co)return;
-  document.getElementById('agSolModal')?.remove();
-  const hoy=new Date();const hoyStr=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
-  let m='';
-  m+='<div id="agSolModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">';
-  m+='<div style="background:var(--bg2);border:2px solid #10b981;border-radius:16px;max-width:440px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">';
-  m+='<div style="padding:16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;background:rgba(16,185,129,0.06)">';
-  m+='<div><div style="font-size:16px;font-weight:800;color:#10b981">\u{1F4F2} Solicitar Fecha</div><div style="font-size:12px;color:var(--t2)">'+co.name+'</div></div>';
-  m+='<button onclick="document.getElementById(\'agSolModal\').remove()" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:8px;padding:5px 12px;cursor:pointer;font-weight:700">\u2715</button>';
-  m+='</div><div style="padding:16px">';
-  m+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
-  m+='<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:3px">FECHA PROPUESTA</label><input id="sf_fecha" type="date" value="'+hoyStr+'" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:rgba(255,255,255,0.04);color:var(--t1);font-size:12px"></div>';
-  m+='<div><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:3px">HORA PROPUESTA</label><input id="sf_hora" type="time" value="08:00" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--bd);background:rgba(255,255,255,0.04);color:var(--t1);font-size:12px"></div>';
-  m+='</div>';
-  m+='<div style="margin-bottom:12px"><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:6px">DEPARTAMENTOS</label><div style="display:flex;flex-wrap:wrap;gap:6px">';
-  [{id:'sst',l:'\u{1F527} SST'},{id:'salud',l:'\u{1FA7A} Salud'},{id:'ambiente',l:'\u{1F33F} Ambiente'},{id:'tthh',l:'\u{1F465} TTHH'},{id:'datos',l:'\u{1F6E1} Datos'},{id:'psico',l:'\u{1F9E0} Psicología'}].forEach(function(d){
-    m+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" class="sf_dept" value="'+d.id+'"> '+d.l+'</label>';
-  });
-  m+='</div></div>';
-  m+='<div style="margin-bottom:12px"><label style="font-size:9px;color:var(--t3);display:block;margin-bottom:6px">TIPO DE JORNADA</label><div style="display:flex;flex-wrap:wrap;gap:6px">';
-  [{id:'examenes',l:'\u{1F52C} Exámenes Ocupacionales'},{id:'medica',l:'\u{1FA7A} Jornada Médica'},{id:'socializacion',l:'\u{1F4CB} Socialización'},{id:'capacitacion',l:'\u{1F393} Capacitación'}].forEach(function(j){
-    m+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;padding:4px 8px;border:1px solid var(--bd);border-radius:6px"><input type="checkbox" class="sf_jornada" value="'+j.id+'"> '+j.l+'</label>';
-  });
-  m+='</div></div>';
-  m+='<button onclick="agEnviarSolicitud(\''+co.id+'\')" style="width:100%;padding:12px;border-radius:10px;border:none;background:#25D366;color:#fff;font-size:14px;font-weight:800;cursor:pointer">\u{1F4F2} Enviar por WhatsApp</button>';
-  m+='</div></div></div>';
-  document.body.insertAdjacentHTML('beforeend',m);
-}
-
-function agEnviarSolicitud(companyId){
-  const co=cos.find(c=>c.id===companyId);if(!co)return;
-  const phone=co.whatsapp||co.contact_phone||co.phone||'';
-  const contactName=co.whatsapp_contact||co.contact_name||co.rep_legal||'';
-  const fecha=document.getElementById('sf_fecha').value;
-  const hora=document.getElementById('sf_hora').value;
-  const depts=[...document.querySelectorAll('.sf_dept:checked')].map(c=>c.value);
-  const jornadas=[...document.querySelectorAll('.sf_jornada:checked')].map(c=>c.value);
-  const deptLabels={sst:'Seguridad Industrial',salud:'Salud Ocupacional',ambiente:'Seguridad Ambiental',tthh:'Talento Humano',datos:'Protección de Datos',psico:'Psicología Ocupacional'};
-  const jorLabels={examenes:'Jornada de Exámenes Ocupacionales',medica:'Jornada Médica Ocupacional',socializacion:'Socialización de Informe Mensual',capacitacion:'Capacitación'};
-  const d=new Date(fecha+'T12:00:00');
-  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const fechaStr=dias[d.getDay()]+' '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();
-  var msg='Estimado/a '+(contactName||'representante')+',\n\n';
-  msg+='Nos comunicamos para solicitar disponibilidad para agendar una visita a su empresa.\n\n';
-  msg+=String.fromCodePoint(0x1F4C5)+' *Fecha propuesta:* '+fechaStr+'\n';
-  msg+=String.fromCodePoint(0x1F552)+' *Hora propuesta:* '+hora+'\n';
-  if(depts.length>0){msg+='\n*DEPARTAMENTOS:*\n';depts.forEach(function(dd){msg+='   '+String.fromCodePoint(0x2705)+' '+(deptLabels[dd]||dd)+'\n'})}
-  if(jornadas.length>0){msg+='\n*ACTIVIDADES:*\n';jornadas.forEach(function(j){
-    if(j==='examenes')msg+=String.fromCodePoint(0x1F52C)+' '+jorLabels[j]+'\n';
-    else if(j==='medica')msg+=String.fromCodePoint(0x1FA7A)+' '+jorLabels[j]+'\n';
-    else if(j==='socializacion')msg+=String.fromCodePoint(0x1F4CB)+' '+jorLabels[j]+'\n';
-    else if(j==='capacitacion')msg+=String.fromCodePoint(0x1F393)+' '+jorLabels[j]+'\n';
-  })}
-  if(jornadas.includes('examenes'))msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
-  msg+='\nPor favor confirmar si la fecha es conveniente o sugerir una alternativa.\n\n';
-  msg+='Atentamente\n';
-  msg+='*Consultores Empresariales ALTAIR*';
-  if(phone){var cleanPhone=phone.replace(/[^0-9+]/g,'').replace(/^0/,'593');window.open('https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg),'whatsapp_tab')}
-  else{window.open('https://web.whatsapp.com/send?text='+encodeURIComponent(msg),'whatsapp_tab')}
-  document.getElementById('agSolModal').remove();
-}
-
-
-function agObsChange(companyId,deptId,val,sel){
-  if(val==='Otro'){
-    agSetVal(companyId,deptId,'obs','Otro');
-    logRender();
-  }else{
-    agSetVal(companyId,deptId,'obs',val);
-    sel.style.color=val==='No responde'||val==='Cancelado por empresa'?'#ef4444':val==='Reagendar'?'#f59e0b':val==='Sin novedad'?'#34d399':'var(--t3)';
-  }
+  agSetVal(companyId,'_global','enviado','SÍ');
 }
 async function agSetVal(companyId,deptId,field,val){
   if(!agCanEditDept(deptId)&&deptId!=='_global')return;
@@ -5518,38 +5481,31 @@ async function agSetVal(companyId,deptId,field,val){
     logRender();
     return;
   }
-  // Save to DB and re-render
-  if(field==='enviado'||field==='socializado'||field==='inf_enviado'||field==='cobro_obs'){
-    const agTable=document.getElementById('agTableWrap');
-    const st=agTable?agTable.scrollTop:0;
-    const sl=agTable?agTable.scrollLeft:0;
-    const ms=window.scrollY;
-    // Check if record exists, then update only the field (not upsert which replaces all)
+  if(field==='enviado'||field==='socializado'||field==='cobro_obs'){
+    // Save immediately for critical fields (no debounce)
     try{
-      const{data:existing}=await sb.from("agendamiento").select("id").eq("company_id",companyId).eq("dept",deptId).eq("year",LOG.year).eq("month",LOG.month).limit(1);
-      if(existing&&existing.length>0){
-        const{error}=await sb.from("agendamiento").update({[field]:val}).eq("id",existing[0].id);
-        if(error)console.error("agSetVal UPDATE ERROR:",field,error.message);
-        else console.log("agSetVal UPDATE OK:",companyId,field,val);
-      }else{
-        const{error}=await sb.from("agendamiento").insert({company_id:companyId,dept:deptId,year:LOG.year,month:LOG.month,[field]:val});
-        if(error)console.error("agSetVal INSERT ERROR:",field,error.message);
-        else console.log("agSetVal INSERT OK:",companyId,field,val);
-      }
+      const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
+      if(error)console.error("agSetVal ERROR:",field,error.message);
+      else console.log("agSetVal OK:",companyId,field,val);
     }catch(e){console.error("agSetVal CATCH:",e)}
-    if(field==='enviado'||field==='socializado'||field==='inf_enviado'){
-      logRender();
-      requestAnimationFrame(()=>{
-        const t=document.getElementById('agTableWrap');
-        if(t){t.scrollTop=st;t.scrollLeft=sl}
-        window.scrollTo(0,ms);
-        setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
-      });
-    }
   }else{
     dbs("ag-"+companyId+deptId+field,async()=>{
       const{error}=await sb.from("agendamiento").upsert(upd,{onConflict:"company_id,dept,year,month"});
       if(error)console.error("agSetVal:",error);
+    });
+  }
+  // Only do a full re-render for check buttons (enviado/socializado) that need visual update
+  if(field==='enviado'||field==='socializado'){
+    const agTable=document.getElementById('agTableWrap');
+    const st=agTable?agTable.scrollTop:0;
+    const sl=agTable?agTable.scrollLeft:0;
+    const ms=window.scrollY;
+    logRender();
+    requestAnimationFrame(()=>{
+      const t=document.getElementById('agTableWrap');
+      if(t){t.scrollTop=st;t.scrollLeft=sl}
+      window.scrollTo(0,ms);
+      setTimeout(()=>{const t2=document.getElementById('agTableWrap');if(t2){t2.scrollTop=st;t2.scrollLeft=sl}window.scrollTo(0,ms)},50);
     });
   }
 }
@@ -5603,7 +5559,7 @@ function logRenderAgendamiento(){
   filteredCos.forEach((co,idx)=>{
     h+=`<tr class="ag-row" style="border-bottom:1px solid rgba(255,255,255,0.04);${idx%2?'background:rgba(255,255,255,0.015)':''}">`;
     h+=`<td style="padding:4px 6px;color:var(--t3);font-family:var(--mn);font-size:9px;border:1px solid rgba(255,255,255,0.04)">${idx+1}</td>`;
-    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap"><span>${co.name}</span> <button onclick="event.stopPropagation();agSolicitarFecha('${co.id}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0 2px" title="Solicitar fecha por WhatsApp">📲</button></td>`;
+    h+=`<td class="ag-name" style="padding:4px 6px;font-weight:700;font-size:10px;border:1px solid rgba(255,255,255,0.04);white-space:nowrap">${co.name}</td>`;
     const canEditEnv=CURRENT_USER&&(CURRENT_USER.role==='admin'||IS_JEFE());
     // Frequency selector
     const coFreq=agGetFreq(co.id);
@@ -5622,7 +5578,7 @@ function logRenderAgendamiento(){
     const envChecked=envVal==='SÍ';
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${envChecked?'rgba(244,114,182,0.15)':'transparent'}">`;
     if(canEditEnv){
-      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="agSetVal('${co.id}','_global','enviado',${envChecked}?'NO':'SÍ')">${envChecked?'✓':''}</div>`;
+      h+=`<div class="cb ${envChecked?'dn':''}" style="${envChecked?'border-color:#f472b6;background:rgba(244,114,182,0.2);color:#f472b6':''}" onclick="logCheckEnviado('${co.id}',${envChecked})">${envChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${envChecked?'✅':'⬜'}</span>`;
     }
@@ -5632,7 +5588,7 @@ function logRenderAgendamiento(){
     const infEnvChecked=infEnvVal==='SÍ';
     h+=`<td style="text-align:center;border:1px solid rgba(255,255,255,0.04);background:${infEnvChecked?'rgba(45,212,191,0.15)':'transparent'}">`;
     if(canEditEnv){
-      h+=`<div class="cb ${infEnvChecked?'dn':''}" style="${infEnvChecked?'border-color:#2dd4bf;background:rgba(45,212,191,0.2);color:#2dd4bf':''}" onclick="logCheckInfEnviado('${co.id}',${infEnvChecked})">${infEnvChecked?'✓':''}</div>`;
+      h+=`<div class="cb ${infEnvChecked?'dn':''}" style="${infEnvChecked?'border-color:#2dd4bf;background:rgba(45,212,191,0.2);color:#2dd4bf':''}" onclick="agSetVal('${co.id}','_global','inf_enviado',${infEnvChecked}?'NO':'SÍ')">${infEnvChecked?'✓':''}</div>`;
     }else{
       h+=`<span style="font-size:12px">${infEnvChecked?'✅':'⬜'}</span>`;
     }
@@ -5652,23 +5608,8 @@ function logRenderAgendamiento(){
       AG_FIELDS.forEach(f=>{
         const val=agGetVal(co.id,d.id,f);
         if(f==='obs'){
-          // Observations: selector + optional text
-          const obsOpts=['','Sin novedad','Reagendar','No responde','Cancelado por empresa','Suspendido','Otro'];
-          const obsIcons={'':'','Sin novedad':'✅','Reagendar':'🔄','No responde':'📵','Cancelado por empresa':'❌','Suspendido':'⏸️','Otro':'📝'};
-          const obsColors={'':'var(--t3)','Sin novedad':'#34d399','Reagendar':'#f59e0b','No responde':'#ef4444','Cancelado por empresa':'#ef4444','Suspendido':'#94a3b8','Otro':'#60a5fa'};
-          const curObs=val||'';
-          const isPreset=obsOpts.includes(curObs);
-          const selVal=isPreset?curObs:(curObs?'Otro':'');
-          h+=`<td style="padding:2px;border:1px solid rgba(255,255,255,0.04)">`;
-          if(canEdit){
-            h+=`<select onchange="agObsChange('${co.id}','${d.id}',this.value,this)" style="padding:2px;border:none;background:transparent;color:${obsColors[selVal]||'var(--t3)'};font-size:8px;font-weight:700;cursor:pointer;outline:none;width:100%">`;
-            obsOpts.forEach(o=>{h+=`<option value="${o}" ${selVal===o?'selected':''}>${obsIcons[o]||''} ${o||'...'}</option>`});
-            h+=`</select>`;
-            if(selVal==='Otro'){h+=`<input value="${curObs==='Otro'?'':curObs.replace(/"/g,'&quot;')}" onchange="agSetVal('${co.id}','${d.id}','obs',this.value)" style="width:100%;padding:2px;border:none;border-top:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--t1);font-size:8px;outline:none" placeholder="Detalle...">`}
-          }else{
-            h+=`<span style="font-size:8px;color:${obsColors[selVal]||'var(--t3)'}">${obsIcons[selVal]||''} ${curObs||'—'}</span>`;
-          }
-          h+=`</td>`;
+          // Observations: text input
+          h+=`<td style="padding:2px;border:1px solid rgba(255,255,255,0.04)"><input value="${(val||'').replace(/"/g,'&quot;')}" ${canEdit?`onchange="agSetVal('${co.id}','${d.id}','obs',this.value)"`:'disabled'} style="width:100%;padding:3px;border:none;background:transparent;color:var(--t1);font-size:9px;outline:none;${!canEdit?'opacity:0.4;':''}" placeholder="..."></td>`;
         }else if(f==='est'){
           // Estado: ACTIVO/INACTIVO
           const isActive=val!=='INACTIVO';
@@ -6171,23 +6112,23 @@ async function logSendGroupWA(tipo){
   let titulo='';
 
   if(tipo==='hoy'){
-    const hoy=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+    const hoy=now.toISOString().split('T')[0];
     trips=LOG.trips.filter(t=>t.trip_date===hoy&&t.status!=='cancelled');
-    titulo='PLANIFICACIÓN DE HOY '+dias[now.getDay()].toUpperCase()+' '+now.getDate()+' de '+meses[now.getMonth()];
+    titulo='PLANIFICACION DE HOY '+dias[now.getDay()].toUpperCase()+' '+now.getDate()+' de '+meses[now.getMonth()];
   }else if(tipo==='manana'){
     const man=new Date(now);man.setDate(man.getDate()+1);
-    const manStr=man.getFullYear()+'-'+String(man.getMonth()+1).padStart(2,'0')+'-'+String(man.getDate()).padStart(2,'0');
+    const manStr=man.toISOString().split('T')[0];
     trips=LOG.trips.filter(t=>t.trip_date===manStr&&t.status!=='cancelled');
-    titulo='PLANIFICACIÓN DE MAÑANA '+dias[man.getDay()].toUpperCase()+' '+man.getDate()+' de '+meses[man.getMonth()];
+    titulo='PLANIFICACION DE MANANA '+dias[man.getDay()].toUpperCase()+' '+man.getDate()+' de '+meses[man.getMonth()];
   }else{
     // Semana: lunes a viernes de la semana actual
     const day=now.getDay();
     const lunes=new Date(now);lunes.setDate(now.getDate()-(day===0?6:day-1));
     const viernes=new Date(lunes);viernes.setDate(lunes.getDate()+4);
-    const lunesStr=lunes.getFullYear()+'-'+String(lunes.getMonth()+1).padStart(2,'0')+'-'+String(lunes.getDate()).padStart(2,'0');
-    const viernesStr=viernes.getFullYear()+'-'+String(viernes.getMonth()+1).padStart(2,'0')+'-'+String(viernes.getDate()).padStart(2,'0');
+    const lunesStr=lunes.toISOString().split('T')[0];
+    const viernesStr=viernes.toISOString().split('T')[0];
     trips=LOG.trips.filter(t=>t.trip_date>=lunesStr&&t.trip_date<=viernesStr&&t.status!=='cancelled');
-    titulo='PLANIFICACIÓN SEMANAL ('+lunes.getDate()+' al '+viernes.getDate()+' de '+meses[lunes.getMonth()]+')';
+    titulo='PLANIFICACION SEMANAL ('+lunes.getDate()+' al '+viernes.getDate()+' de '+meses[lunes.getMonth()]+')';
   }
 
   if(trips.length===0){alert('No hay viajes para '+tipo);return}
@@ -6208,7 +6149,7 @@ async function logSendGroupWA(tipo){
   const doc=String.fromCodePoint(0x1F4CB);
 
   let msg=star+' *'+titulo+'*\n';
-  msg+='*Consultores Empresariales ALTAIR*\n\n';
+  msg+='_Consultores Empresariales ALTAIR_\n\n';
 
   let currentDate='';
   trips.forEach(t=>{
@@ -6271,7 +6212,12 @@ async function logSendGroupWA(tipo){
     waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
   }
 
-  window.open(waUrl,'whatsapp_tab');
+  if(!window._waTab||window._waTab.closed){
+    window._waTab=window.open(waUrl,'_blank');
+  }else{
+    window._waTab.location.href=waUrl;
+    window._waTab.focus();
+  }
 }
 
 function logEditGroupWA(){
@@ -6372,13 +6318,17 @@ async function logSendWA(tripId){
     if(t.jornada_examenes)msg+=String.fromCodePoint(0x1F52C)+' Jornada de Examenes Ocupacionales\n';
     if(t.socializacion)msg+=String.fromCodePoint(0x1F4CB)+' Socializacion de Informe Mensual\n';
     msg+=String.fromCodePoint(0x1F4CD)+' *Modalidad:* '+(t.modalidad==='telematica'?'Telematica (Zoom)':'Presencial')+'\n';
-    if(t.jornada_examenes)msg+='\nPor favor indicar al personal acudir en ayunas y llevar una muestra de orina.\n';
     msg+='\nPor favor confirmar disponibilidad.\n\n';
     msg+='Atentamente\n';
-    msg+='*Consultores Empresariales ALTAIR*';
+    msg+='_Consultores Empresariales ALTAIR_';
 
     const waUrl='https://web.whatsapp.com/send?phone='+cleanPhone+'&text='+encodeURIComponent(msg);
-    window.open(waUrl,'whatsapp_tab');
+    if(!window._waTab||window._waTab.closed){
+      window._waTab=window.open(waUrl,'_blank');
+    }else{
+      window._waTab.location.href=waUrl;
+      window._waTab.focus();
+    }
   }
 }
 
@@ -7202,12 +7152,6 @@ function logRenderForm(){
   }
 
   // ACTIVITIES (admin sees all, read-only)
-  if(!isNew&&members.length>0){
-    h+=`<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">`;
-    h+=`<button onclick="genRegistroAsistencia('${e.id}','salud')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(45,212,191,0.4);background:rgba(45,212,191,0.1);color:#2dd4bf;font-size:11px;font-weight:700;cursor:pointer">🩺 Registro Asistencia Salud</button>`;
-    h+=`<button onclick="genRegistroAsistencia('${e.id}','seguridad')" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.1);color:#f59e0b;font-size:11px;font-weight:700;cursor:pointer">🔧 Registro Asistencia SST</button>`;
-    h+=`</div>`;
-  }
   if(!isNew){
     const acts=LOG.activities.filter(a=>a.trip_id===e.id);
     h+=`<div style="margin-bottom:16px"><div style="font-size:10px;color:var(--t3);font-weight:700;margin-bottom:6px">📋 ACTIVIDADES PLANIFICADAS</div>`;
@@ -7389,16 +7333,6 @@ async function logSaveTrip(){
         }
         if(rows.length>0)await sb.from("logistics_trip_companies").insert(rows);
       }
-      // Stay in form to add members immediately
-      await logLoad();
-      const newTrip=LOG.trips.find(t=>t.id===data.id);
-      if(newTrip){
-        const ms=LOG.members.filter(m=>m.trip_id===data.id);
-        LOG.editTrip={...newTrip,num_people:ms.length||1};
-        LOG.tab='form';
-        logRender();
-        return;
-      }
     }
     LOG.tab='calendar';
     await logLoad();
@@ -7528,7 +7462,6 @@ async function contLoad(){
   }
   contUpdateHeader();
   await contLoadCaja();
-  await contLoadDeudas();
   contRender();
 }
 
@@ -7719,8 +7652,7 @@ function contCajaSaldo(){
 
 function contRenderCaja(){
   const isAdmin=CURRENT_USER&&CURRENT_USER.role==='admin';
-  const isContador=CURRENT_USER&&CURRENT_USER.role==='contador';
-  if(!isAdmin&&!isContador)return '<div style="text-align:center;padding:40px;color:var(--t3)">⛔ Solo el administrador y contadora pueden acceder a Caja Chica</div>';
+  if(!isAdmin)return '<div style="text-align:center;padding:40px;color:var(--t3)">⛔ Solo el administrador puede acceder a Caja Chica</div>';
   
   if(!CONT.caja){contLoadCaja().then(()=>contRender());return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';}
   
@@ -7737,13 +7669,11 @@ function contRenderCaja(){
   h+=`<div class="c" style="border-color:rgba(239,68,68,0.2);text-align:center"><div class="kl">📤 Total Gastos</div><div class="kv" style="color:#ef4444">$${gastos.toFixed(2)}</div></div>`;
   h+=`</div>`;
   
-  // Buttons - only admin can add/delete
-  if(isAdmin){
+  // Buttons
   h+=`<div style="display:flex;gap:8px;margin-bottom:16px">`;
   h+=`<button onclick="contCajaNew('ingreso')" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(52,211,153,0.4);background:rgba(52,211,153,0.1);color:#34d399;font-size:13px;font-weight:700;cursor:pointer">📥 Registrar Ingreso</button>`;
   h+=`<button onclick="contCajaNew('gasto')" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#ef4444;font-size:13px;font-weight:700;cursor:pointer">📤 Registrar Gasto</button>`;
   h+=`</div>`;
-  }
   
   // Table
   h+=`<div class="c" style="overflow-x:auto">`;
@@ -7773,7 +7703,7 @@ function contRenderCaja(){
     h+=`<td style="font-size:10px;color:var(--t3)">${m.responsable||''}</td>`;
     h+=`<td style="text-align:right;font-weight:700;color:${color};font-family:var(--mn)">$${(m.monto||0).toFixed(2)}</td>`;
     h+=`<td style="text-align:right;font-weight:700;color:${runSaldo>=0?'#34d399':'#ef4444'};font-family:var(--mn)">$${runSaldo.toFixed(2)}</td>`;
-    h+=`<td style="text-align:center">${CURRENT_USER&&CURRENT_USER.role==='admin'?`<button onclick="contCajaDel('${m.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button>`:''}</td>`;
+    h+=`<td style="text-align:center"><button onclick="contCajaDel('${m.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button></td>`;
     h+=`</tr>`;
   });
   
@@ -7822,178 +7752,6 @@ async function contCajaDel(id){
   }catch(e){alert('Error: '+e.message)}
 }
 // ========== FIN CAJA CHICA ==========
-
-
-// ========== PROVEEDORES / DEUDAS ==========
-async function contLoadDeudas(){
-  if(!sb)return;
-  try{
-    const{data}=await sb.from("deudas_proveedores").select("*").order("fecha",{ascending:false});
-    CONT.deudas=data||[];
-    const{data:p}=await sb.from("deudas_config").select("*");
-    CONT.deudasConfig=p||[];
-  }catch(e){CONT.deudas=[];CONT.deudasConfig=[];console.error("Deudas load:",e)}
-}
-
-function contRenderDeudas(){
-  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
-  if(!isAdmin)return '<div style="text-align:center;padding:40px;color:var(--t3)">⛔ Solo administrador y contadora</div>';
-  if(!CONT.deudas){contLoadDeudas().then(()=>contRender());return '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';}
-  
-  // Config: proveedores dinámicos
-  const defaultProvs=[
-    {id:'laboratorio',name:'Laboratorio',pConvenio:7.30,pVenta:14.00,icon:'🧪'},
-    {id:'rayosx',name:'Rayos X',pConvenio:14.50,pVenta:24.00,icon:'📡'}
-  ];
-  const extraProvs=(CONT.deudasConfig||[]).map(p=>({id:p.id,name:p.name,pConvenio:p.precio_convenio||0,pVenta:p.precio_venta||0,icon:p.icon||'🏢'}));
-  const provs=[...defaultProvs,...extraProvs];
-  
-  let h='';
-  // Cards por proveedor
-  h+=`<div class="gr g3" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-bottom:16px">`;
-  provs.forEach(p=>{
-    const movs=(CONT.deudas||[]).filter(d=>d.proveedor===p.id);
-    const deudaInicial=movs.filter(d=>d.tipo==='deuda_inicial').reduce((a,d)=>a+(d.monto||0),0);
-    const abonos=movs.filter(d=>d.tipo==='abono').reduce((a,d)=>a+(d.monto||0),0);
-    const pagosConvenio=movs.filter(d=>d.tipo==='pago_convenio').reduce((a,d)=>a+(d.cantidad||0),0);
-    const pagosVenta=movs.filter(d=>d.tipo==='pago_venta').reduce((a,d)=>a+(d.cantidad||0),0);
-    const abonoAutoVenta=movs.filter(d=>d.tipo==='pago_venta').reduce((a,d)=>a+((d.precio_venta-d.precio_convenio)*(d.cantidad||0)),0);
-    const totalAbonos=abonos+abonoAutoVenta;
-    const saldoDeuda=deudaInicial-totalAbonos;
-    const sColor=saldoDeuda>0?'#ef4444':'#34d399';
-    
-    h+=`<div class="c" style="border-color:${saldoDeuda>0?'rgba(239,68,68,0.3)':'rgba(52,211,153,0.3)'}">`;
-    h+=`<div style="font-size:18px;font-weight:800;margin-bottom:8px">${p.icon} ${p.name}</div>`;
-    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">`;
-    h+=`<div style="color:var(--t3)">Deuda inicial:</div><div style="font-weight:700;color:#ef4444">$${deudaInicial.toFixed(2)}</div>`;
-    h+=`<div style="color:var(--t3)">Total abonado:</div><div style="font-weight:700;color:#34d399">$${totalAbonos.toFixed(2)}</div>`;
-    h+=`<div style="color:var(--t3)">Precio convenio:</div><div style="font-weight:700">$${p.pConvenio}</div>`;
-    h+=`<div style="color:var(--t3)">Precio venta:</div><div style="font-weight:700">$${p.pVenta}</div>`;
-    h+=`<div style="color:var(--t3)">Jornadas convenio:</div><div style="font-weight:700">${pagosConvenio} exámenes</div>`;
-    h+=`<div style="color:var(--t3)">Jornadas venta:</div><div style="font-weight:700">${pagosVenta} exámenes</div>`;
-    h+=`</div>`;
-    h+=`<div style="margin-top:10px;padding:10px;border-radius:8px;background:${sColor}15;border:1px solid ${sColor}30;text-align:center">`;
-    h+=`<div style="font-size:10px;color:var(--t3)">SALDO DEUDA</div>`;
-    h+=`<div style="font-size:24px;font-weight:900;color:${sColor}">$${saldoDeuda.toFixed(2)}</div>`;
-    h+=`</div>`;
-    h+=`</div>`;
-  });
-  h+=`</div>`;
-  
-  // Buttons
-  h+=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">`;
-  h+=`<button onclick="contDeudaNew('deuda_inicial')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);color:#ef4444;font-size:12px;font-weight:700;cursor:pointer">📋 Registrar Deuda Inicial</button>`;
-  h+=`<button onclick="contDeudaNew('pago_convenio')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(52,211,153,0.4);background:rgba(52,211,153,0.1);color:#34d399;font-size:12px;font-weight:700;cursor:pointer">💚 Jornada Precio Convenio</button>`;
-  h+=`<button onclick="contDeudaNew('pago_venta')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.1);color:#fbbf24;font-size:12px;font-weight:700;cursor:pointer">💛 Jornada Precio Venta (abona deuda)</button>`;
-  h+=`<button onclick="contDeudaNew('abono')" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(96,165,250,0.4);background:rgba(96,165,250,0.1);color:#60a5fa;font-size:12px;font-weight:700;cursor:pointer">💵 Abono Directo</button>`;
-  h+=`<button onclick="contAddProveedor()" style="padding:10px 16px;border-radius:10px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#a855f7;font-size:12px;font-weight:700;cursor:pointer">➕ Agregar Proveedor</button>`;
-  h+=`</div>`;
-  
-  // History tables - separated by provider
-  function _renderProvTable(provId,provName,provIcon,provColor){
-    const _tipoOrder={deuda_inicial:0,pago_convenio:1,pago_venta:1,abono:2};const all=[...(CONT.deudas||[])].filter(d=>d.proveedor===provId).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)||(_tipoOrder[a.tipo]||9)-(_tipoOrder[b.tipo]||9)||(new Date(a.created_at)-new Date(b.created_at)));
-    let saldo=0;
-    all.forEach(d=>{
-      if(d.tipo==='deuda_inicial')saldo+=(d.monto||0);
-      else if(d.tipo==='abono')saldo-=(d.monto||0);
-      else if(d.tipo==='pago_venta')saldo-=((d.precio_venta-d.precio_convenio)*(d.cantidad||0));
-      d._saldo=saldo;
-    });
-    all.reverse();
-    let t=`<div class="c" style="border-color:${provColor}40;overflow-x:auto;margin-bottom:16px">`;
-    t+=`<div style="font-size:14px;font-weight:800;margin-bottom:10px;color:${provColor}">${provIcon} ${provName}</div>`;
-    t+=`<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Cant.</th><th style="text-align:right">P.Unit</th><th style="text-align:right">Total</th><th style="text-align:right">Abono</th><th style="text-align:right">Adicional</th><th style="text-align:right">Saldo</th><th>Nota</th><th>Acc.</th></tr></thead><tbody>`;
-    all.forEach(d=>{
-      const tipo=d.tipo==='deuda_inicial'?'📋 Deuda':d.tipo==='pago_convenio'?'💚 Convenio':d.tipo==='pago_venta'?'💛 Venta':'💵 Abono';
-      const tColor=d.tipo==='deuda_inicial'?'#ef4444':d.tipo==='pago_venta'?'#fbbf24':d.tipo==='abono'?'#60a5fa':'#34d399';
-      const abono=d.tipo==='pago_venta'?((d.precio_venta-d.precio_convenio)*(d.cantidad||0)):d.tipo==='abono'?(d.monto||0):0;
-      const totalPagado=d.tipo==='deuda_inicial'?d.monto:(d.tipo==='abono'?d.monto:((d.tipo==='pago_venta'?d.precio_venta:d.precio_convenio)*(d.cantidad||0))+(d.extra_cost||0));
-      t+=`<tr>`;
-      t+=`<td style="font-family:var(--mn);font-size:11px">${d.fecha||''}</td>`;
-      t+=`<td><span style="font-size:9px;padding:2px 8px;border-radius:4px;font-weight:700;background:${tColor}15;color:${tColor};border:1px solid ${tColor}30">${tipo}</span></td>`;
-      t+=`<td style="text-align:center;font-size:11px">${d.cantidad||'-'}</td>`;
-      t+=`<td style="text-align:right;font-family:var(--mn);font-size:11px">$${(d.tipo==='pago_venta'?d.precio_venta:d.tipo==='pago_convenio'?d.precio_convenio:d.monto||0).toFixed(2)}</td>`;
-      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px">$${totalPagado.toFixed(2)}</td>`;
-      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${abono>0?'#34d399':'var(--t3)'}">${abono>0?'$'+abono.toFixed(2):'-'}</td>`;
-      t+=`<td style="text-align:right;font-family:var(--mn);font-size:11px;color:${(d.extra_cost||0)>0?'#fb923c':'var(--t3)'}">${(d.extra_cost||0)>0?'$'+(d.extra_cost).toFixed(2):'-'}</td>`;
-      t+=`<td style="text-align:right;font-weight:700;font-family:var(--mn);font-size:11px;color:${d._saldo>0?'#ef4444':'#34d399'}">$${(d._saldo||0).toFixed(2)}</td>`;
-      t+=`<td style="font-size:10px;color:var(--t3)">${d.nota||''}</td>`;
-      t+=`<td style="text-align:center"><button onclick="contDeudaDel('${d.id}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:6px;padding:3px 8px;font-size:9px;cursor:pointer">🗑</button></td>`;
-      t+=`</tr>`;
-    });
-    if(all.length===0)t+=`<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--t3)">No hay movimientos</td></tr>`;
-    t+=`</tbody></table></div>`;
-    return t;
-  }
-  const provColors=['#2dd4bf','#818cf8','#f59e0b','#f472b6','#34d399','#60a5fa','#a855f7'];
-  h+=`<div class="gr" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px">`;
-  provs.forEach((p,i)=>{
-    h+=_renderProvTable(p.id,p.name,p.icon,provColors[i%provColors.length]);
-  });
-  h+=`</div>`;
-  return h;
-}
-
-async function contDeudaNew(tipo){
-  const defaultProvs2=[{id:'laboratorio',name:'Laboratorio',pConvenio:7.30,pVenta:14.00},{id:'rayosx',name:'Rayos X',pConvenio:14.50,pVenta:24.00}];
-  const extraProvs2=(CONT.deudasConfig||[]).map(p=>({id:p.id,name:p.name,pConvenio:p.precio_convenio||0,pVenta:p.precio_venta||0}));
-  const allProvs=[...defaultProvs2,...extraProvs2];
-  const provList=allProvs.map((p,i)=>(i+1)+'. '+p.name).join('\n');
-  const provSel=prompt('Proveedor:\n'+provList,'1');
-  const provIdx=parseInt(provSel)-1;
-  if(isNaN(provIdx)||provIdx<0||provIdx>=allProvs.length)return;
-  const selProv=allProvs[provIdx];
-  const prov=selProv.id;
-  const precios={conv:selProv.pConvenio,venta:selProv.pVenta};
-  const hoy=new Date().toISOString().split('T')[0];
-  const fecha=prompt('Fecha (AAAA-MM-DD):',hoy)||hoy;
-  let row={proveedor:prov,tipo:tipo,fecha:fecha,created_by:CURRENT_USER?.id,precio_convenio:precios.conv,precio_venta:precios.venta};
-  
-  if(tipo==='deuda_inicial'){
-    const m=prompt('Monto de la deuda ($):');if(!m)return;
-    row.monto=parseFloat(m);if(isNaN(row.monto))return;
-  }else if(tipo==='abono'){
-    const m=prompt('Monto del abono ($):');if(!m)return;
-    row.monto=parseFloat(m);if(isNaN(row.monto))return;
-  }else{
-    const c=prompt('Cantidad de exámenes:');if(!c)return;
-    row.cantidad=parseInt(c);if(isNaN(row.cantidad)||row.cantidad<=0)return;
-    const extra=prompt('Valor adicional ($) - movilización, agujas, etc. (0 si no hay):','0');
-    row.extra_cost=parseFloat(extra)||0;
-  }
-  const nota=prompt('Nota (opcional):','')||'';
-  row.nota=nota;
-  try{
-    const{data,error}=await sb.from("deudas_proveedores").insert(row).select().single();
-    if(error)throw error;
-    CONT.deudas.push(data);
-    contRender();
-  }catch(e){alert('Error: '+e.message)}
-}
-
-
-async function contAddProveedor(){
-  const name=prompt('Nombre del proveedor:');if(!name||!name.trim())return;
-  const icon=prompt('Emoji/icono:','🏢')||'🏢';
-  const pc=prompt('Precio convenio ($):','0');
-  const pv=prompt('Precio venta ($):','0');
-  const id=name.trim().toLowerCase().replace(/[^a-z0-9]/g,'_');
-  try{
-    const{data,error}=await sb.from("deudas_config").insert({id:id,name:name.trim(),icon:icon,precio_convenio:parseFloat(pc)||0,precio_venta:parseFloat(pv)||0}).select().single();
-    if(error)throw error;
-    CONT.deudasConfig.push(data);
-    contRender();
-  }catch(e){alert('Error: '+e.message)}
-}
-async function contDeudaDel(id){
-  if(!confirm('¿Eliminar este registro?'))return;
-  try{
-    await sb.from("deudas_proveedores").delete().eq("id",id);
-    CONT.deudas=CONT.deudas.filter(d=>d.id!==id);
-    contRender();
-  }catch(e){alert('Error: '+e.message)}
-}
-// ========== FIN PROVEEDORES ==========
 
 function contRenderConfig(){
   const co=CONT.companies.find(c=>c.id===CONT.companyId);
@@ -8076,7 +7834,7 @@ async function contDelLogo(){
 function contRender(){
   const mc=document.getElementById("contMc");if(!mc)return;
   // Nav
-  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'deudas',l:'🏥 Proveedores'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
   const nv=document.getElementById("contNv");
   if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
 
@@ -8087,7 +7845,6 @@ function contRender(){
   else if(CONT.tab==='payments'){h=contPayments()}
   else if(CONT.tab==='expenses'){h=contExpenses()}
   else if(CONT.tab==='caja'){h=contRenderCaja()}
-  else if(CONT.tab==='deudas'){h=contRenderDeudas()}
   else if(CONT.tab==='clients'){h=contRenderClients()}
   else if(CONT.tab==='reports'){h=contReports()}
   else if(CONT.tab==='config'){h=contRenderConfig()}
@@ -8510,18 +8267,7 @@ async function contNewExpense(){
   }catch(e){alert("Error: "+e.message)}
 }
 
-async function contDelInv(id){
-  const inv=CONT.invoices.find(i=>String(i.id)===String(id));
-  if(!inv){alert("⚠️ Factura no encontrada");return}
-  if(!confirm(`¿Eliminar la factura ${inv.invoice_number||'S/N'}?\n\nEmpresa: ${inv.company_name||'—'}\nTotal: $${(inv.total||0).toFixed(2)}\n\nEsta acción no se puede deshacer.`))return;
-  try{
-    const{error}=await sb.from("cont_invoices").delete().eq("id",id);
-    if(error)throw error;
-    // También eliminar cobros asociados (si los hay)
-    await sb.from("cont_payments").delete().eq("invoice_id",id);
-    await contLoad();
-  }catch(e){alert("❌ Error al eliminar: "+e.message)}
-}
+async function contDelInv(id){if(!confirm("¿Eliminar factura?"))return;await sb.from("cont_invoices").delete().eq("id",id);await contLoad()}
 
 // === EMAIL SENDING ===
 const RESEND_KEY='re_EB3P43R6_91dVid7ooji47X6SZyfdbsNS';
@@ -8663,58 +8409,19 @@ async function contDelExp(id){if(!confirm("¿Eliminar gasto?"))return;await sb.f
 async function contImportSRIXml(files){
   if(!files||files.length===0)return;
   let imported=0,errors=0,duplicates=0;
-  const errDetails=[];
   const existingNums=new Set(CONT.invoices.map(i=>i.invoice_number));
-
-  // Helper: extrae el XML real del comprobante (maneja XMLs "autorizados" del SRI)
-  function extractComprobante(xmlText){
-    if(xmlText.charCodeAt(0)===0xFEFF)xmlText=xmlText.slice(1);
-    xmlText=xmlText.trim();
-
-    const parser=new DOMParser();
-    let doc=parser.parseFromString(xmlText,'text/xml');
-
-    // Caso 1: XML envuelto en <autorizacion>...<comprobante>CDATA</comprobante>...</autorizacion>
-    let compNode=doc.querySelector('autorizacion > comprobante, comprobante');
-    if(compNode){
-      const inner=compNode.textContent.trim();
-      if(inner.startsWith('<?xml')||inner.startsWith('<factura')||inner.startsWith('<notaCredito')||inner.startsWith('<comprobanteRetencion')||inner.startsWith('<liquidacionCompra')||inner.startsWith('<notaDebito')){
-        doc=parser.parseFromString(inner,'text/xml');
-      }
-    }
-
-    // Caso 2: entidades HTML escapadas
-    if(!doc.querySelector('factura')&&!doc.querySelector('notaCredito')&&!doc.querySelector('comprobanteRetencion')){
-      const decoded=xmlText
-        .replace(/&lt;/g,'<')
-        .replace(/&gt;/g,'>')
-        .replace(/&quot;/g,'"')
-        .replace(/&amp;/g,'&');
-      if(decoded.includes('<factura')||decoded.includes('<notaCredito')||decoded.includes('<comprobanteRetencion')){
-        const startIdx=Math.max(
-          decoded.indexOf('<factura'),
-          decoded.indexOf('<notaCredito'),
-          decoded.indexOf('<comprobanteRetencion')
-        );
-        if(startIdx>=0){
-          const sub=decoded.substring(startIdx);
-          doc=parser.parseFromString(sub,'text/xml');
-        }
-      }
-    }
-    return doc;
-  }
 
   for(const file of files){
     try{
       let xmlTexts=[];
-      if(file.name.toLowerCase().endsWith('.zip')){
+      if(file.name.endsWith('.zip')){
+        // ZIP file with multiple XMLs
         if(typeof JSZip==='undefined'){
           await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
         }
         const zip=await JSZip.loadAsync(file);
         for(const[name,entry] of Object.entries(zip.files)){
-          if(name.toLowerCase().endsWith('.xml')&&!entry.dir){
+          if(name.endsWith('.xml')&&!entry.dir){
             xmlTexts.push(await entry.async('text'));
           }
         }
@@ -8722,54 +8429,43 @@ async function contImportSRIXml(files){
         xmlTexts.push(await file.text());
       }
 
-      if(xmlTexts.length===0){
-        errDetails.push(`${file.name}: no se encontraron XMLs dentro del archivo`);
-        errors++;continue;
-      }
-
       for(const xmlText of xmlTexts){
         try{
-          const doc=extractComprobante(xmlText);
-
+          const parser=new DOMParser();
+          const doc=parser.parseFromString(xmlText,'text/xml');
+          
+          // Detect document type
           const factura=doc.querySelector('factura');
           const notaCredito=doc.querySelector('notaCredito');
           const retencion=doc.querySelector('comprobanteRetencion');
           const root=factura||notaCredito||retencion;
-          if(!root){
-            errDetails.push(`${file.name}: no se detectó factura/nota de crédito/retención`);
-            errors++;continue;
-          }
+          if(!root){errors++;continue}
 
+          // Extract infoTributaria
           const infoTrib=root.querySelector('infoTributaria');
-          if(!infoTrib){
-            errDetails.push(`${file.name}: falta infoTributaria`);
-            errors++;continue;
-          }
-
-          const getTag=(parent,tag)=>{const el=parent&&parent.querySelector(tag);return el?el.textContent.trim():''};
-
+          if(!infoTrib){errors++;continue}
+          
+          const getTag=(parent,tag)=>{const el=parent.querySelector(tag);return el?el.textContent.trim():''};
+          
           const ruc=getTag(infoTrib,'ruc');
-          const razonSocial=getTag(infoTrib,'razonSocial')||getTag(infoTrib,'nombreComercial');
+          const razonSocial=getTag(infoTrib,'razonSocial');
           const estab=getTag(infoTrib,'estab');
           const ptoEmi=getTag(infoTrib,'ptoEmi');
           const secuencial=getTag(infoTrib,'secuencial');
           const numFact=estab+'-'+ptoEmi+'-'+secuencial;
           const claveAcceso=getTag(infoTrib,'claveAcceso');
-          const codDoc=getTag(infoTrib,'codDoc');
+          const codDoc=getTag(infoTrib,'codDoc'); // 01=factura, 04=NC, 07=retencion
 
-          if(!estab||!ptoEmi||!secuencial){
-            errDetails.push(`${file.name}: falta número de comprobante (estab/ptoEmi/secuencial)`);
-            errors++;continue;
-          }
-
+          // Check duplicate
           if(existingNums.has(numFact)){duplicates++;continue}
 
-          let tipo='compra';
+          let tipo='compra'; // default: it's a purchase (received)
           let companyName='',companyRuc='',concept='',subtotal=0,iva=0,total=0,fecha='';
 
           if(factura){
             const infoFact=factura.querySelector('infoFactura');
             if(infoFact){
+              // Parse date (DD/MM/YYYY -> YYYY-MM-DD)
               const fechaRaw=getTag(infoFact,'fechaEmision');
               if(fechaRaw.includes('/')){
                 const p=fechaRaw.split('/');
@@ -8780,6 +8476,7 @@ async function contImportSRIXml(files){
               total=parseFloat(getTag(infoFact,'importeTotal'))||0;
               iva=total-subtotal;
 
+              // Check IVA from totalConImpuestos
               const impuestos=infoFact.querySelectorAll('totalImpuesto');
               let ivaSum=0;
               impuestos.forEach(imp=>{
@@ -8788,11 +8485,19 @@ async function contImportSRIXml(files){
               });
               if(ivaSum>0)iva=ivaSum;
 
-              companyName=razonSocial;
+              // Determine if we emitted or received
+              const rucComprador=getTag(infoFact,'identificacionComprador');
+              const nombreComprador=getTag(infoFact,'razonSocialComprador');
+              
+              // If the emisor RUC is our company, it's a SALE (venta)
+              // If the comprador RUC is our company, it's a PURCHASE (compra)
+              // Default: treat as compra (received invoice)
+              companyName=razonSocial; // The emisor
               companyRuc=ruc;
               tipo='compra';
             }
 
+            // Get concept from first detail
             const det=factura.querySelector('detalle');
             if(det)concept=getTag(det,'descripcion');
             if(!concept){
@@ -8806,7 +8511,7 @@ async function contImportSRIXml(files){
               const fechaRaw=getTag(infoNC,'fechaEmision');
               if(fechaRaw.includes('/')){const p=fechaRaw.split('/');fecha=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0')}else fecha=fechaRaw;
               subtotal=parseFloat(getTag(infoNC,'totalSinImpuestos'))||0;
-              total=parseFloat(getTag(infoNC,'valorModificacion'))||parseFloat(getTag(infoNC,'totalConImpuestos'))||0;
+              total=parseFloat(getTag(infoNC,'valorModificacion'))||0;
               iva=total-subtotal;
               companyName=razonSocial;companyRuc=ruc;
             }
@@ -8826,18 +8531,19 @@ async function contImportSRIXml(files){
             concept='Retención en la fuente';
           }
 
-          const matchCo=cos.find(c=>c.ruc===ruc);
+          // Match company
+          const matchCo=cos.find(c=>c.ruc===companyRuc);
+
           const ivaRate=subtotal>0?Math.round(iva/subtotal*100):15;
 
-          const payload={
-            cont_company_id:CONT.companyId,
+          // Insert
+          const{error}=await sb.from("cont_invoices").insert({
             company_id:matchCo?.id||null,
             company_name:companyName,
-            company_ruc:ruc,
             invoice_number:numFact,
-            concept:(concept||'').substring(0,200),
+            concept:concept.substring(0,200),
             subtotal,iva,iva_rate:ivaRate,total,
-            invoice_date:fecha||new Date().toISOString().split('T')[0],
+            invoice_date:fecha,
             status:'emitida',
             type:tipo,
             sri_clave_acceso:claveAcceso,
@@ -8845,65 +8551,28 @@ async function contImportSRIXml(files){
             sri_cod_doc:codDoc,
             year:fecha?parseInt(fecha.split('-')[0]):new Date().getFullYear(),
             created_by:CURRENT_USER?.id
-          };
-
-          const{error}=await sb.from("cont_invoices").insert(payload);
-          if(error){
-            console.error("Import error:",error.message,payload);
-            errDetails.push(`${numFact}: ${error.message}`);
-            errors++;
-          }else{
-            imported++;
-            existingNums.add(numFact);
-          }
-        }catch(e){
-          console.error("XML parse error:",e);
-          errDetails.push(`${file.name}: ${e.message}`);
-          errors++;
-        }
+          });
+          if(error){console.error("Import error:",error.message);errors++}
+          else{imported++;existingNums.add(numFact)}
+        }catch(e){console.error("XML parse error:",e);errors++}
       }
-    }catch(e){
-      console.error("File error:",e);
-      errDetails.push(`${file.name}: ${e.message}`);
-      errors++;
-    }
+    }catch(e){console.error("File error:",e);errors++}
   }
 
-  let msg=`📥 Importación completada:\n\n✅ ${imported} comprobantes importados`;
+  let msg=`✅ Importación completada:\n\n📄 ${imported} comprobantes importados`;
   if(duplicates>0)msg+=`\n⚠️ ${duplicates} duplicados (ya existían)`;
-  if(errors>0){
-    msg+=`\n❌ ${errors} errores`;
-    if(errDetails.length>0)msg+=`\n\nDetalles:\n• `+errDetails.slice(0,5).join('\n• ');
-    if(errDetails.length>5)msg+=`\n• ...y ${errDetails.length-5} más (ver consola)`;
-  }
+  if(errors>0)msg+=`\n❌ ${errors} errores`;
   alert(msg);
-  const inp=document.getElementById('sriXmlInput');
-  if(inp)inp.value='';
+  document.getElementById('sriXmlInput').value='';
   await contLoad();
-  contRender();
 }
 
 async function contEditInv(id){
-  const inv=CONT.invoices.find(i=>String(i.id)===String(id));
-  if(!inv){alert("⚠️ Factura no encontrada");return}
-  // Cargar datos de la factura al formulario
-  CONT._editInv=inv.id;
-  CONT._invForm={
-    company_id:inv.company_id||null,
-    company_name:inv.company_name||'',
-    ruc:inv.company_ruc||'',
-    _coSearch:'',
-    invoice_number:inv.invoice_number||'',
-    concept:inv.concept||'',
-    subtotal:inv.subtotal||0,
-    iva_rate:inv.iva_rate||0,
-    registra_iva:(inv.iva_rate||0)>0,
-    type:inv.type||'venta',
-    invoice_date:inv.invoice_date||new Date().toISOString().split('T')[0],
-    items:inv.items||[{desc:inv.concept||'',qty:1,price:inv.subtotal||0}]
-  };
-  CONT.tab='inv_form';
-  contRender();
+  const inv=CONT.invoices.find(i=>i.id===id);if(!inv)return;
+  const newSt=prompt("Nuevo estado (emitida/pagada/parcial/vencida/anulada):",inv.status);
+  if(!newSt||newSt===inv.status)return;
+  await sb.from("cont_invoices").update({status:newSt}).eq("id",id);
+  await contLoad();
 }
 
 // === Word Report - follows model INFORME_MENSUAL_MEDICO.docx exactly ===
@@ -9070,139 +8739,6 @@ async function genTripReportDocx(tripId){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }catch(e){alert("Error: "+e.message);console.error(e)}
-}
-async function genRegistroAsistencia(tripId,dept){
-  const trip=LOG.trips.find(t=>String(t.id)===String(tripId));if(!trip)return;
-  const tCos=LOG.tripCompanies.filter(tc=>tc.trip_id===tripId);
-  const coId=tCos[0]?.company_id;
-  const co=cos.find(c=>c.id===coId);
-  const coName=tCos[0]?.custom_name||co?.name||'EMPRESA';
-  // Check if nomina exists for this company
-  let nomina=[];
-  if(coId){
-    try{
-      const{data}=await sb.from("nomina").select("*").eq("company_id",coId).order("nombre");
-      nomina=data||[];
-    }catch(e){nomina=[]}
-  }
-  if(nomina.length===0){
-    // No nomina - ask to upload
-    const upload=confirm('📋 No hay nómina cargada para '+coName+'.\n\n¿Desea subir el archivo de nómina del IESS?');
-    if(upload){subirNomina(coId,coName,tripId,dept)}
-    return;
-  }
-  // Generate Excel with nomina data
-  generarExcelAsistencia(trip,tCos,co,coName,nomina,dept);
-}
-
-function subirNomina(companyId,companyName,tripId,dept){
-  const input=document.createElement('input');
-  input.type='file';
-  input.accept='.xlsx,.xls';
-  input.onchange=async function(e){
-    const file=e.target.files[0];if(!file)return;
-    try{
-      const ab=await file.arrayBuffer();
-      const wb=XLSX.read(ab);
-      // Find the sheet with worker data (Table 3 or first sheet with N°, Nombre, Cédula)
-      let workers=[];
-      for(const sn of wb.SheetNames){
-        const ws=wb.Sheets[sn];
-        const data=XLSX.utils.sheet_to_json(ws,{header:1});
-        for(let i=0;i<data.length;i++){
-          const row=data[i];
-          if(!row)continue;
-          const r=row.map(c=>String(c||'').trim());
-          // Detect header row
-          if(r.some(c=>c.toLowerCase().includes('nombre'))&&r.some(c=>c.toLowerCase().includes('dula'))){
-            // Found header - parse subsequent rows
-            const nameIdx=r.findIndex(c=>c.toLowerCase().includes('nombre'));
-            const cedIdx=r.findIndex(c=>c.toLowerCase().includes('dula'));
-            const actIdx=r.findIndex(c=>c.toLowerCase().includes('actividad'));
-            for(let j=i+1;j<data.length;j++){
-              const dr=data[j];
-              if(!dr||!dr[nameIdx])continue;
-              const nombre=String(dr[nameIdx]||'').trim();
-              const cedula=String(dr[cedIdx]||'').trim();
-              const cargo=String(dr[actIdx]||'').trim();
-              if(nombre&&nombre!=='Total Rol'&&!nombre.includes('Total')){
-                workers.push({nombre,cedula,cargo});
-              }
-            }
-            break;
-          }
-        }
-        if(workers.length>0)break;
-      }
-      if(workers.length===0){alert('No se encontraron trabajadores en el archivo. Asegúrese de que tenga columnas: Nombre, Cédula, Actividad');return}
-      // Save to Supabase
-      const now=new Date().toISOString();
-      const userName=CURRENT_USER?.name||'';
-      // Delete old nomina for this company
-      await sb.from("nomina").delete().eq("company_id",companyId);
-      // Insert new
-      const rows=workers.map(w=>({company_id:companyId,nombre:w.nombre,cedula:w.cedula,cargo:w.cargo,uploaded_by:CURRENT_USER?.id,uploaded_at:now,uploaded_by_name:userName}));
-      for(let i=0;i<rows.length;i+=50){
-        await sb.from("nomina").insert(rows.slice(i,i+50));
-      }
-      alert('✅ Nómina cargada: '+workers.length+' trabajadores para '+companyName+'\n\nSubido por: '+userName+'\nFecha: '+new Date().toLocaleDateString('es-EC'));
-      // Now generate the register
-      if(tripId){
-        const trip=LOG.trips.find(t=>String(t.id)===String(tripId));
-        const tCos=LOG.tripCompanies.filter(tc=>tc.trip_id===tripId);
-        const co=cos.find(c=>c.id===companyId);
-        generarExcelAsistencia(trip,tCos,co,companyName,workers.map((w,i)=>({...w,id:i})),dept);
-      }
-    }catch(err){alert('Error leyendo archivo: '+err.message)}
-  };
-  input.click();
-}
-
-function generarExcelAsistencia(trip,tCos,co,coName,nomina,dept){
-  const td=new Date(trip.trip_date+'T12:00:00');
-  const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
-  const dias=['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
-  const mesNum=String(td.getMonth()+1).padStart(3,'0');
-  const anio=td.getFullYear();
-  const fechaStr=dias[td.getDay()]+', '+td.getDate()+' DE '+meses[td.getMonth()]+' DE '+anio;
-  const codigo='ANU-'+mesNum+'-'+anio;
-  const tema=prompt('Tema de la capacitación:','')||'';
-  const hora=trip.departure_time||'08:00';
-  const responsable=CURRENT_USER?.name||'';
-  const wb=XLSX.utils.book_new();
-  const rows=[];
-  rows.push([]);rows.push([]);rows.push([]);
-  rows.push(['','',dept==='salud'?'PLAN DE PROMOCIÓN DE LA SALUD EN EL TRABAJO':'PLAN DE SEGURIDAD Y SALUD EN EL TRABAJO']);
-  rows.push([]);rows.push([]);
-  rows.push(['REGISTRO DE PARTICIPANTES','','','','','','','','',codigo]);
-  rows.push(['FECHA: '+fechaStr,'','','HORA: '+hora,'','','','','EMPRESA: '+coName]);
-  rows.push(['RESPONSABLE: '+responsable]);
-  rows.push(['TEMA: '+tema]);
-  rows.push(['Nro.','Nombres y Apellidos','AUTOIDENTIFICACIÓN ÉTNICA','','','','','','','','PARTICIPANTES','','','','','','','','ACTIVIDAD','Nro. Cédula','FIRMA']);
-  rows.push(['','','Indígena','Afroecuatoriano','Negro/a','Mulato/a','Montubio/a','Mestizo/a','Otro/a','No sabe','ADOLESCENTES (18-19)','','','ADULTOS (20-64)','','','ADULTOS MAYORES (65+)','','','','']);
-  rows.push(['','','','','','','','','','','M','H','LGBTI','M','H','LGBTI','M','H','LGBTIQ+','','']);
-  // Fill with nomina data
-  nomina.forEach((w,i)=>{
-    rows.push([i+1,w.nombre,'','','','','','','','','','','','','','','','',w.cargo,w.cedula,'']);
-  });
-  // Add extra empty rows for visitors
-  const extra=Math.max(5,25-nomina.length);
-  for(let i=0;i<extra;i++){
-    rows.push([nomina.length+i+1,'','','','','','','','','','','','','','','','','','','','']);
-  }
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:5},{wch:35},{wch:9},{wch:14},{wch:9},{wch:9},{wch:11},{wch:11},{wch:7},{wch:8},{wch:5},{wch:6},{wch:6},{wch:5},{wch:6},{wch:6},{wch:5},{wch:6},{wch:30},{wch:12},{wch:15}];
-  ws['!merges']=[
-    {s:{r:3,c:2},e:{r:3,c:8}},
-    {s:{r:6,c:0},e:{r:6,c:2}},{s:{r:6,c:9},e:{r:6,c:10}},
-    {s:{r:7,c:0},e:{r:7,c:2}},{s:{r:7,c:3},e:{r:7,c:5}},{s:{r:7,c:8},e:{r:7,c:10}},
-    {s:{r:8,c:0},e:{r:8,c:8}},{s:{r:9,c:0},e:{r:9,c:8}},
-    {s:{r:10,c:2},e:{r:10,c:9}},{s:{r:10,c:10},e:{r:10,c:17}},
-    {s:{r:11,c:10},e:{r:11,c:12}},{s:{r:11,c:13},e:{r:11,c:15}},{s:{r:11,c:16},e:{r:11,c:18}},
-  ];
-  XLSX.utils.book_append_sheet(wb,ws,'Registro');
-  const fileName='Registro_'+(dept==='salud'?'Salud':'SST')+'_'+coName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+codigo+'.xlsx';
-  XLSX.writeFile(wb,fileName);
 }
 async function logTogInforme(memberId){
   const m=LOG.members.find(x=>String(x.id)===String(memberId));if(!m)return;
