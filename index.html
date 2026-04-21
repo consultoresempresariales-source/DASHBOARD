@@ -113,6 +113,7 @@ canvas{width:100%!important;max-height:220px}
 
   <div style="flex:1"></div>
   <div class="sb-item" onclick="switchModule('pendientes')" id="sb-pendientes" style="display:none"><span class="sb-icon">📋</span><span class="sb-label">TAREAS</span></div>
+  <div class="sb-item" onclick="switchModule('renovaciones')" id="sb-renovaciones" style="display:none"><span class="sb-icon">🔔</span><span class="sb-label">RENOV.</span></div>
   <div class="sb-item" onclick="switchModule('config')" id="sb-config"><span class="sb-icon">⚙️</span><span class="sb-label">CONFIG</span></div>
   <div style="flex:1"></div>
   <div class="sb-item" id="sb-user" style="cursor:default"></div>
@@ -193,6 +194,12 @@ canvas{width:100%!important;max-height:220px}
 <button class="add-btn" style="font-size:12px;padding:8px 16px" onclick="showNc()">+ Nueva Empresa</button>
 </div>
 <div class="mn" id="configMc"></div>
+</div>
+<div id="renovacionesModule" style="display:none">
+<div class="hd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+<div style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:linear-gradient(135deg,#fbbf24,#f59e0b)">🔔</div><div class="bn"><h1 style="background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Renovaciones</h1><p style="color:var(--t3)">Contratos y Exámenes — Seguimiento de vencimientos</p></div><div class="mod-badge" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)">🔔 Renovaciones</div></div>
+</div>
+<div class="mn" id="renovMc"></div>
 </div>
 <div id="pendientesModule" style="display:none">
 <div class="hd" style="display:flex;align-items:center;gap:12px"><div class="lg" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:20px">📋</div><div class="bn"><h1 style="background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Panel de Pendientes</h1><p id="pendMes" style="color:var(--t3)"></p></div></div>
@@ -431,7 +438,7 @@ function applyUserRole(){
   if(!isAdmin&&!IS_JEFE()){setTimeout(()=>showPostLoginNotifications(),800)}
 }
 function doLogout(){CURRENT_USER=null;localStorage.removeItem("poa_user");document.body.classList.remove('jefe-readonly');
-  ["salud","seguridad","talento","datos","config","pendientes","logistica"].forEach(m=>{const el=document.getElementById("sb-"+m);if(el)el.style.display="none"});
+  ["salud","seguridad","talento","datos","config","pendientes","renovaciones","logistica"].forEach(m=>{const el=document.getElementById("sb-"+m);if(el)el.style.display="none"});
   document.getElementById("sb-logout").style.display="none";document.getElementById("sb-switch").style.display="none";
   document.getElementById("lgCed").value="";document.getElementById("lgPwd").value="";document.getElementById("lgErr").textContent="";
   showLogin()}
@@ -589,7 +596,7 @@ async function forgotPassword(){
   await sb.from("app_users").update({password_reset_requested:true}).eq("id",data[0].id);
   errEl.style.color="#34d399";errEl.textContent="✅ Solicitud enviada. El administrador restablecerá su contraseña pronto."
 }
-function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","talentoModule","datosModule","ambienteModule","logisticaModule","contableModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule",contable:"contableModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}else if(m==="contable"){contLoad()}}
+function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","renovacionesModule","talentoModule","datosModule","ambienteModule","logisticaModule","contableModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",renovaciones:"renovacionesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule",contable:"contableModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}else if(m==="contable"){contLoad()}}
 const MO=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"],MF=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS=[{id:"admin",name:"G. Administrativa",color:"#2dd4bf",icon:"🏛"},{id:"tecnica",name:"G. Técnica",color:"#818cf8",icon:"⚙️"},{id:"talento",name:"G. Talento Humano",color:"#f472b6",icon:"👥"},{id:"operativos",name:"Proc. Operativos",color:"#fb923c",icon:"📋"},{id:"psicosocial",name:"R. Psicosociales",color:"#a78bfa",icon:"🧠"},{id:"drogas",name:"Prev. Drogas",color:"#34d399",icon:"🛡"},{id:"servicios",name:"Serv. Permanentes",color:"#fbbf24",icon:"🔧"}];
 const EXT=[{id:"ingreso",label:"Ex. Ingreso",color:"#2dd4bf"},{id:"periodico",label:"Ex. Periódico",color:"#818cf8"},{id:"reintegro",label:"Ex. Reintegro",color:"#f472b6"},{id:"egreso",label:"Ex. Egreso",color:"#fb923c"}];
@@ -7437,6 +7444,113 @@ async function _getTripData(tripId){
   return{t,members,acts,tcs,dd,dateStr,comp,companies,logoB64,pvLogoB64,completed,notCompleted,pending,pctDone,byDept,devItems,objGeneral,objEspecificos,conclusion,tema,depts};
 }
 
+
+// ===== MÓDULO RENOVACIONES (Sidebar) =====
+async function renovLoad(){
+  const mc=document.getElementById("renovMc");
+  if(!mc)return;
+  mc.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Cargando...</div>';
+  await loadCos();
+  mc.innerHTML=renovRender();
+}
+
+function renovRender(){
+  const isAdmin=CURRENT_USER&&CURRENT_USER.role==="admin";
+  const today=new Date();today.setHours(0,0,0,0);
+  const allCos=[...cos].sort((a,b)=>a.name.localeCompare(b.name));
+
+  function daysDiff(dateStr){
+    if(!dateStr)return null;
+    const d=new Date(dateStr);d.setHours(0,0,0,0);
+    return Math.round((d-today)/(1000*60*60*24));
+  }
+
+  function statusBadge(diff){
+    if(diff===null)return '<span style="font-size:10px;color:var(--t3);font-style:italic">Sin fecha</span>';
+    if(diff<0)      return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(239,68,68,0.15);color:#ef4444">⛔ VENCIDO hace ${Math.abs(diff)}d</span>`;
+    if(diff<=30)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(239,68,68,0.12);color:#ef4444">🚨 ${diff} días</span>`;
+    if(diff<=60)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(251,191,36,0.12);color:#fbbf24">⚠️ ${diff} días</span>`;
+    if(diff<=90)    return `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:6px;background:rgba(251,146,60,0.10);color:#fb923c">🔔 ${diff} días</span>`;
+    return `<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(52,211,153,0.08);color:#34d399">✅ ${diff} días</span>`;
+  }
+
+  // Métricas resumen
+  const vencidos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)<0)).length;
+  const criticos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)>=0&&daysDiff(d)<=30)).length;
+  const proximos=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)>30&&daysDiff(d)<=90)).length;
+  const ok=allCos.filter(c=>[c.contract_end_date,c.exam_renewal_date,c.sst_contract_end_date].some(d=>d&&daysDiff(d)>90)).length;
+
+  let h='';
+
+  // Tarjetas resumen
+  h+=`<div class="gr g4" style="margin-bottom:20px">`;
+  h+=`<div class="c"><div class="ib">⛔</div><div class="kl">Vencidos</div><div class="kv" style="color:#ef4444">${vencidos}</div><div class="ks">acción inmediata</div></div>`;
+  h+=`<div class="c"><div class="ib">🚨</div><div class="kl">Críticos ≤30d</div><div class="kv" style="color:#ef4444">${criticos}</div><div class="ks">menos de 30 días</div></div>`;
+  h+=`<div class="c"><div class="ib">⚠️</div><div class="kl">Próximos ≤90d</div><div class="kv" style="color:#fb923c">${proximos}</div><div class="ks">entre 31 y 90 días</div></div>`;
+  h+=`<div class="c"><div class="ib">✅</div><div class="kl">Al día</div><div class="kv" style="color:#34d399">${ok}</div><div class="ks">más de 90 días</div></div>`;
+  h+=`</div>`;
+
+  // Nota si es jefe
+  if(!isAdmin){
+    h+=`<div style="padding:10px 14px;border-radius:8px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);font-size:11px;color:#fbbf24;margin-bottom:14px">✏️ Puedes editar las fechas directamente en la tabla — se guardan automáticamente al cambiar.</div>`;
+  }
+
+  // Tabla
+  h+=`<div class="tw"><table>`;
+  h+=`<thead>`;
+  h+=`<tr><th style="text-align:left;min-width:200px;position:sticky;left:0;z-index:3;background:#0f172a">🏢 Empresa</th>`;
+  h+=`<th style="text-align:center;min-width:230px">🩺 Contrato Salud</th>`;
+  h+=`<th style="text-align:center;min-width:230px">🔬 Exámenes Médicos</th>`;
+  h+=`<th style="text-align:center;min-width:230px">🔧 Contrato Seguridad</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  allCos.forEach(co=>{
+    const d1=daysDiff(co.contract_end_date);
+    const d2=daysDiff(co.exam_renewal_date);
+    const d3=daysDiff(co.sst_contract_end_date);
+    const hasCrit=[d1,d2,d3].some(d=>d!==null&&d<=30);
+    const hasVenc=[d1,d2,d3].some(d=>d!==null&&d<0);
+    const rowBg=hasVenc?'background:rgba(239,68,68,0.04)':hasCrit?'background:rgba(251,191,36,0.03)':'';
+
+    h+=`<tr class="ra" style="border-bottom:1px solid rgba(255,255,255,0.05);${rowBg}">`;
+
+    // Empresa
+    h+=`<td style="padding:12px 10px;position:sticky;left:0;background:#0f172a;z-index:2">`;
+    h+=`<div style="font-size:12px;font-weight:700;color:var(--t1)">${co.name}</div>`;
+    h+=`<div style="font-size:10px;color:var(--t3);margin-top:2px">${co.ruc||'Sin RUC'}</div>`;
+    h+=`</td>`;
+
+    // Helper celda fecha editable
+    function cellFecha(field, dateVal, diff, borderColor, bgColor){
+      let cell=`<td style="padding:10px 8px;text-align:center">`;
+      cell+=`<input type="date" value="${dateVal||''}" onchange="renovSaveDate('${co.id}','${field}',this.value)" style="width:135px;padding:5px 8px;border-radius:7px;border:1px solid ${borderColor};background:${bgColor};color:var(--t1);font-size:11px;font-family:var(--mn);display:block;margin:0 auto 6px;cursor:pointer">`;
+      cell+=`<div>${statusBadge(diff)}</div>`;
+      cell+=`</td>`;
+      return cell;
+    }
+
+    h+=cellFecha('contract_end_date',    co.contract_end_date,    d1, 'rgba(45,212,191,0.3)',  'rgba(45,212,191,0.06)');
+    h+=cellFecha('exam_renewal_date',    co.exam_renewal_date,    d2, 'rgba(244,114,182,0.3)', 'rgba(244,114,182,0.06)');
+    h+=cellFecha('sst_contract_end_date',co.sst_contract_end_date,d3, 'rgba(245,158,11,0.3)',  'rgba(245,158,11,0.06)');
+
+    h+=`</tr>`;
+  });
+
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
+async function renovSaveDate(coId, field, value){
+  try{
+    await sb.from("companies").update({[field]: value||null}).eq("id", coId);
+    // Actualizar localmente sin recargar toda la tabla
+    const co=cos.find(c=>c.id===coId);
+    if(co)co[field]=value||null;
+    // Actualizar solo los badges sin rerenderizar toda la tabla
+    renovLoad();
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
 // ===== MÓDULO CONTABLE =====
 const CONT={invoices:[],payments:[],expenses:[],companies:[],tab:'dashboard',editInv:null,editExp:null,companyId:null,_invTab:'ventas'};
 const CONT_COLOR='#eab308';
@@ -7592,7 +7706,7 @@ async function checkRenovacionesNotification(){
       const fechaFmt=new Date(u.date+'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
       const urgColor=u.diff<0?'#ef4444':u.diff<=7?'#ef4444':u.diff<=15?'#fbbf24':'#fb923c';
       const urgLabel=u.diff<0?`⛔ VENCIDO hace ${Math.abs(u.diff)}d`:u.diff===0?'🚨 VENCE HOY':`🚨 ${u.diff} días`;
-      h+=`<div onclick="document.getElementById('renovNotifPopup').remove();switchModule('contable');setTimeout(()=>{CONT.tab='renovaciones';contRender()},300)" style="background:${urgColor}10;border:1px solid ${urgColor}30;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='${urgColor}20'" onmouseout="this.style.background='${urgColor}10'">`;
+      h+=`<div onclick="document.getElementById('renovNotifPopup').remove();switchModule('renovaciones')" style="background:${urgColor}10;border:1px solid ${urgColor}30;border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:background 0.2s" onmouseover="this.style.background='${urgColor}20'" onmouseout="this.style.background='${urgColor}10'">`;
       h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">`;
       h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">${u.icon} ${u.co}</div>`;
       h+=`<span style="background:${urgColor};color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px">${urgLabel}</span>`;
