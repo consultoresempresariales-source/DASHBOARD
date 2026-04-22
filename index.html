@@ -7765,6 +7765,7 @@ async function contLoad(){
   }
   contUpdateHeader();
   await contLoadCaja();
+  await pvLoad();
   contRender();
 }
 
@@ -8134,10 +8135,595 @@ async function contDelLogo(){
   }catch(e){alert("Error: "+e.message)}
 }
 
+// ===== MÓDULO PROVEEDORES (LABORATORIO / RADIOGRAFÍAS) =====
+// Sincronizado con Supabase (tablas: cont_providers y cont_provider_movements)
+// Con respaldo automático en localStorage
+// ============================================================
+
+function pvKey(){return 'cont_providers_'+(CONT.companyId||'default')}
+
+function pvUid(){return 'pv_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)}
+
+// Carga proveedores desde Supabase (con fallback a localStorage)
+async function pvLoad(){
+  if(!CONT.companyId){CONT.providers=[];return []}
+  try{
+    const{data:provs,error}=await sb.from("cont_providers").select("*").eq("cont_company_id",CONT.companyId).eq("active",true).order("name");
+    if(error)throw error;
+    const{data:movs,error:e2}=await sb.from("cont_provider_movements").select("*").eq("cont_company_id",CONT.companyId).order("movement_date",{ascending:false});
+    if(e2)throw e2;
+    const list=(provs||[]).map(p=>{
+      const services={};
+      if(p.lab_convenio!=null||p.lab_venta!=null){
+        services.lab={convenio:parseFloat(p.lab_convenio)||0,venta:parseFloat(p.lab_venta)||0};
+      }
+      if(p.rx_convenio!=null||p.rx_venta!=null){
+        services.rx={convenio:parseFloat(p.rx_convenio)||0,venta:parseFloat(p.rx_venta)||0};
+      }
+      const myMovs=(movs||[]).filter(m=>m.provider_id===p.id).map(m=>({
+        id:m.id,
+        type:m.type,
+        service:m.service,
+        qty:m.qty,
+        amount:parseFloat(m.amount)||0,
+        ventaTotal:parseFloat(m.venta_total)||0,
+        convenioTotal:parseFloat(m.convenio_total)||0,
+        description:m.description||'',
+        patient:m.patient||'',
+        date:m.movement_date,
+        createdAt:new Date(m.created_at).getTime()
+      }));
+      return{
+        id:p.id,
+        name:p.name,
+        ruc:p.ruc||'',
+        phone:p.phone||'',
+        email:p.email||'',
+        address:p.address||'',
+        notes:p.notes||'',
+        services:services,
+        movements:myMovs
+      };
+    });
+    CONT.providers=list;
+    try{localStorage.setItem(pvKey(),JSON.stringify(list))}catch(e){}
+    return list;
+  }catch(e){
+    console.error("pvLoad Supabase error, usando localStorage:",e);
+    try{
+      const raw=localStorage.getItem(pvKey());
+      CONT.providers=raw?JSON.parse(raw):[];
+    }catch(e2){CONT.providers=[]}
+    return CONT.providers;
+  }
+}
+
+function pvSave(){
+  try{localStorage.setItem(pvKey(),JSON.stringify(CONT.providers||[]))}
+  catch(e){}
+}
+
+// Calcula saldo (deuda) actual del proveedor
+function pvSaldo(pv){
+  if(!pv||!pv.movements)return 0;
+  let s=0;
+  pv.movements.forEach(m=>{
+    if(m.type==='cargo')s+=(m.amount||0);
+    else if(m.type==='abono_efectivo')s-=(m.amount||0);
+    else if(m.type==='abono_venta')s-=(m.amount||0);
+    else if(m.type==='ajuste')s+=(m.amount||0);
+  });
+  return s;
+}
+
+function pvTotales(){
+  const list=CONT.providers||[];
+  let deuda=0, cargos=0, abonos=0;
+  list.forEach(p=>{
+    deuda+=pvSaldo(p);
+    (p.movements||[]).forEach(m=>{
+      if(m.type==='cargo')cargos+=(m.amount||0);
+      else if(m.type==='abono_efectivo'||m.type==='abono_venta')abonos+=(m.amount||0);
+    });
+  });
+  return{deuda,cargos,abonos,count:list.length};
+}
+
+// ===== VISTA PRINCIPAL: LISTA DE PROVEEDORES =====
+function contRenderProviders(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  const list=CONT.providers||[];
+  const tot=pvTotales();
+
+  let h='';
+
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">`;
+  h+=`<div class="c"><div class="ib">📦</div><div class="kl">Proveedores</div><div class="kv" style="color:#60a5fa">${tot.count}</div><div class="ks">registrados</div></div>`;
+  h+=`<div class="c"><div class="ib">⚠️</div><div class="kl">Deuda Total</div><div class="kv" style="color:#ef4444">$${tot.deuda.toFixed(2)}</div><div class="ks">por pagar</div></div>`;
+  h+=`<div class="c"><div class="ib">📥</div><div class="kl">Cargos Acum.</div><div class="kv" style="color:#fbbf24">$${tot.cargos.toFixed(2)}</div><div class="ks">servicios recibidos</div></div>`;
+  h+=`<div class="c"><div class="ib">✅</div><div class="kl">Abonos Acum.</div><div class="kv" style="color:#34d399">$${tot.abonos.toFixed(2)}</div><div class="ks">pagado</div></div>`;
+  h+=`</div>`;
+
+  if(isAdmin){
+    h+=`<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">`;
+    h+=`<button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button>`;
+    h+=`<button onclick="pvExport()" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📤 Exportar JSON</button>`;
+    h+=`<button onclick="pvImport()" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📥 Importar JSON</button>`;
+    h+=`</div>`;
+  }
+
+  h+=`<div class="c"><div class="st">📦 Mis Proveedores (${list.length})</div>`;
+  if(list.length===0){
+    h+=`<div style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
+  }else{
+    h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+    h+=`<th style="padding:8px;text-align:left">Proveedor</th>`;
+    h+=`<th style="padding:8px;text-align:center">Tipo</th>`;
+    h+=`<th style="padding:8px;text-align:right">Lab. Conv.</th>`;
+    h+=`<th style="padding:8px;text-align:right">Lab. Venta</th>`;
+    h+=`<th style="padding:8px;text-align:right">RX Conv.</th>`;
+    h+=`<th style="padding:8px;text-align:right">RX Venta</th>`;
+    h+=`<th style="padding:8px;text-align:right">Saldo</th>`;
+    h+=`<th style="padding:8px;text-align:center">Acciones</th>`;
+    h+=`</tr></thead><tbody>`;
+
+    const sorted=[...list].sort((a,b)=>pvSaldo(b)-pvSaldo(a));
+    sorted.forEach(pv=>{
+      const s=pvSaldo(pv);
+      const sColor=s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)');
+      const tipoLab=pv.services&&pv.services.lab?'Lab':'';
+      const tipoRx=pv.services&&pv.services.rx?'RX':'';
+      const tipo=[tipoLab,tipoRx].filter(Boolean).join('+')||'—';
+      h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="pvOpen('${pv.id}')">`;
+      h+=`<td style="padding:8px;font-weight:700">${pv.name||'—'}<div style="font-size:10px;color:var(--t3);font-weight:400">${pv.ruc||''} ${pv.phone?'· '+pv.phone:''}</div></td>`;
+      h+=`<td style="padding:8px;text-align:center"><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(234,179,8,0.15);color:${CONT_COLOR};font-weight:700">${tipo}</span></td>`;
+      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn)">${pv.services&&pv.services.lab?'$'+(pv.services.lab.convenio||0).toFixed(2):'—'}</td>`;
+      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);color:var(--t3)">${pv.services&&pv.services.lab?'$'+(pv.services.lab.venta||0).toFixed(2):'—'}</td>`;
+      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn)">${pv.services&&pv.services.rx?'$'+(pv.services.rx.convenio||0).toFixed(2):'—'}</td>`;
+      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);color:var(--t3)">${pv.services&&pv.services.rx?'$'+(pv.services.rx.venta||0).toFixed(2):'—'}</td>`;
+      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);font-weight:800;color:${sColor}">$${s.toFixed(2)}</td>`;
+      h+=`<td style="padding:8px;text-align:center" onclick="event.stopPropagation()">`;
+      h+=`<button onclick="pvOpen('${pv.id}')" title="Ver detalle" style="background:none;border:none;cursor:pointer;font-size:14px">👁</button>`;
+      if(isAdmin){
+        h+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:14px">✏️</button>`;
+        h+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:14px">🗑</button>`;
+      }
+      h+=`</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  h+=`</div>`;
+
+  h+=`<div class="c" style="margin-top:16px;background:rgba(234,179,8,0.04);border-left:3px solid ${CONT_COLOR}">`;
+  h+=`<div style="font-size:11px;font-weight:700;color:${CONT_COLOR};margin-bottom:6px">💡 ¿Cómo funciona?</div>`;
+  h+=`<div style="font-size:11px;color:var(--t2);line-height:1.6">`;
+  h+=`• <b>Cargo:</b> cuando recibes un examen del proveedor, se suma a la deuda al <b>precio de convenio</b>.<br>`;
+  h+=`• <b>Abono en efectivo:</b> pagas directamente al proveedor, se resta de la deuda.<br>`;
+  h+=`• <b>Abono a precio de venta:</b> el paciente paga al proveedor el precio de venta. El proveedor se cobra el convenio y <b>la diferencia se descuenta de tu deuda anterior</b>.<br>`;
+  h+=`• <b>Ejemplo:</b> Lab convenio $7.30, venta $14. Si pagas a precio de venta, el proveedor cobra $7.30 y te descuenta $6.70 de deuda.`;
+  h+=`</div></div>`;
+
+  return h;
+}
+
+// ===== VISTA DETALLE: MOVIMIENTOS DEL PROVEEDOR =====
+function contRenderProviderDetail(){
+  const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
+  const pv=(CONT.providers||[]).find(p=>p.id===CONT._pvId);
+  if(!pv){
+    CONT.tab='providers';contRender();return '';
+  }
+  const s=pvSaldo(pv);
+  const sColor=s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)');
+  const movs=[...(pv.movements||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0));
+
+  let h='';
+
+  h+=`<div style="margin-bottom:12px"><button onclick="CONT.tab='providers';contRender()" style="background:rgba(255,255,255,0.06);color:var(--t1);border:1px solid var(--bd);border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer">← Volver a Proveedores</button></div>`;
+
+  h+=`<div class="c" style="margin-bottom:16px">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">`;
+  h+=`<div>`;
+  h+=`<div style="font-size:18px;font-weight:800;color:var(--t1)">📦 ${pv.name||''}</div>`;
+  h+=`<div style="font-size:11px;color:var(--t3);margin-top:4px">${pv.ruc?'RUC: '+pv.ruc+' · ':''}${pv.phone||''} ${pv.email?'· '+pv.email:''}</div>`;
+  if(pv.services&&pv.services.lab)h+=`<div style="font-size:10px;color:var(--t2);margin-top:6px">🧪 <b>Laboratorio:</b> convenio $${(pv.services.lab.convenio||0).toFixed(2)} / venta $${(pv.services.lab.venta||0).toFixed(2)} (diferencia $${((pv.services.lab.venta||0)-(pv.services.lab.convenio||0)).toFixed(2)})</div>`;
+  if(pv.services&&pv.services.rx)h+=`<div style="font-size:10px;color:var(--t2);margin-top:2px">🩻 <b>Radiografías:</b> convenio $${(pv.services.rx.convenio||0).toFixed(2)} / venta $${(pv.services.rx.venta||0).toFixed(2)} (diferencia $${((pv.services.rx.venta||0)-(pv.services.rx.convenio||0)).toFixed(2)})</div>`;
+  h+=`</div>`;
+  h+=`<div style="text-align:right">`;
+  h+=`<div style="font-size:10px;color:var(--t3);font-weight:700">SALDO ACTUAL</div>`;
+  h+=`<div style="font-size:28px;font-weight:800;font-family:var(--mn);color:${sColor}">$${s.toFixed(2)}</div>`;
+  h+=`<div style="font-size:10px;color:var(--t3)">${s>0.01?'Debes al proveedor':(s<-0.01?'A tu favor':'Al día')}</div>`;
+  h+=`</div>`;
+  h+=`</div></div>`;
+
+  if(isAdmin){
+    h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">`;
+    h+=`<button onclick="pvAddCargo('${pv.id}')" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer">➕ Cargo (Examen recibido)</button>`;
+    h+=`<button onclick="pvAddAbonoEfectivo('${pv.id}')" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer">💵 Abono en Efectivo</button>`;
+    h+=`<button onclick="pvAddAbonoVenta('${pv.id}')" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer">💰 Abono a Precio de Venta</button>`;
+    h+=`<button onclick="pvAjuste('${pv.id}')" style="background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid #94a3b840;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer">⚙️ Ajuste Manual</button>`;
+    h+=`</div>`;
+  }
+
+  h+=`<div class="c"><div class="st">📋 Historial de Movimientos (${movs.length})</div>`;
+  if(movs.length===0){
+    h+=`<div style="padding:30px;text-align:center;color:var(--t3);font-size:12px">Sin movimientos. Registra un cargo o abono para empezar.</div>`;
+  }else{
+    h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
+    h+=`<th style="padding:8px;text-align:left">Fecha</th>`;
+    h+=`<th style="padding:8px;text-align:center">Tipo</th>`;
+    h+=`<th style="padding:8px;text-align:left">Descripción</th>`;
+    h+=`<th style="padding:8px;text-align:center">Cant.</th>`;
+    h+=`<th style="padding:8px;text-align:right">Monto</th>`;
+    h+=`<th style="padding:8px;text-align:right">Saldo Corrido</th>`;
+    if(isAdmin)h+=`<th style="padding:8px;text-align:center">Acc.</th>`;
+    h+=`</tr></thead><tbody>`;
+
+    const asc=[...movs].reverse();
+    let running=0;
+    const withRunning=asc.map(m=>{
+      if(m.type==='cargo')running+=(m.amount||0);
+      else if(m.type==='abono_efectivo'||m.type==='abono_venta')running-=(m.amount||0);
+      else if(m.type==='ajuste')running+=(m.amount||0);
+      return{...m,running};
+    }).reverse();
+
+    withRunning.forEach(m=>{
+      let tipoLabel='', tipoColor='#94a3b8', signo='';
+      if(m.type==='cargo'){tipoLabel='➕ Cargo';tipoColor='#ef4444';signo='+'}
+      else if(m.type==='abono_efectivo'){tipoLabel='💵 Abono Ef.';tipoColor='#34d399';signo='−'}
+      else if(m.type==='abono_venta'){tipoLabel='💰 Abono Vta.';tipoColor='#a855f7';signo='−'}
+      else if(m.type==='ajuste'){tipoLabel='⚙️ Ajuste';tipoColor='#94a3b8';signo=(m.amount||0)>=0?'+':'−'}
+
+      h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+      h+=`<td style="padding:6px 8px;font-family:var(--mn);font-size:10px">${m.date||''}</td>`;
+      h+=`<td style="padding:6px 8px;text-align:center"><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:${tipoColor}22;color:${tipoColor};font-weight:700">${tipoLabel}</span></td>`;
+      h+=`<td style="padding:6px 8px">${m.description||''}${m.service?`<div style="font-size:9px;color:var(--t3)">${m.service==='lab'?'🧪 Laboratorio':'🩻 Radiografía'}${m.patient?' · '+m.patient:''}</div>`:''}${m.type==='abono_venta'&&m.ventaTotal?`<div style="font-size:9px;color:var(--t3)">Vta: $${m.ventaTotal.toFixed(2)} − Conv: $${m.convenioTotal.toFixed(2)}</div>`:''}</td>`;
+      h+=`<td style="padding:6px 8px;text-align:center;font-family:var(--mn)">${m.qty||'—'}</td>`;
+      h+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mn);font-weight:700;color:${tipoColor}">${signo}$${Math.abs(m.amount||0).toFixed(2)}</td>`;
+      h+=`<td style="padding:6px 8px;text-align:right;font-family:var(--mn);color:${m.running>0.01?'#ef4444':(m.running<-0.01?'#34d399':'var(--t3)')}">$${m.running.toFixed(2)}</td>`;
+      if(isAdmin)h+=`<td style="padding:6px 8px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar movimiento" style="background:none;border:none;cursor:pointer;font-size:12px">🗑</button></td>`;
+      h+=`</tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  h+=`</div>`;
+
+  return h;
+}
+
+// ===== ACCIONES =====
+function pvOpen(id){
+  CONT._pvId=id;
+  CONT.tab='pv_detail';
+  contRender();
+}
+
+async function pvNew(){
+  if(!CONT.companyId){alert("Selecciona una empresa contable primero");return}
+  const name=prompt("Nombre del proveedor:");if(!name||!name.trim())return;
+  const ruc=prompt("RUC/Cédula (opcional):")||'';
+  const phone=prompt("Teléfono (opcional):")||'';
+  const email=prompt("Email (opcional):")||'';
+
+  const tieneLab=confirm("¿Este proveedor ofrece EXÁMENES DE LABORATORIO?\n\n✅ Sí\n❌ No");
+  const payload={cont_company_id:CONT.companyId,name:name.trim(),ruc:ruc.trim(),phone:phone.trim(),email:email.trim(),active:true};
+  if(tieneLab){
+    payload.lab_convenio=parseFloat(prompt("Precio CONVENIO de laboratorio (lo que pagas al proveedor):","7.30"))||0;
+    payload.lab_venta=parseFloat(prompt("Precio VENTA de laboratorio (lo que cobras al cliente):","14.00"))||0;
+  }
+  const tieneRx=confirm("¿Este proveedor ofrece RADIOGRAFÍAS?\n\n✅ Sí\n❌ No");
+  if(tieneRx){
+    payload.rx_convenio=parseFloat(prompt("Precio CONVENIO de radiografía (lo que pagas al proveedor):","14.50"))||0;
+    payload.rx_venta=parseFloat(prompt("Precio VENTA de radiografía (lo que cobras al cliente):","24.00"))||0;
+  }
+
+  try{
+    const{error}=await sb.from("cont_providers").insert(payload);
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+async function pvEdit(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const name=prompt("Nombre:",pv.name);if(name===null)return;
+  const ruc=prompt("RUC/Cédula:",pv.ruc||'');if(ruc===null)return;
+  const phone=prompt("Teléfono:",pv.phone||'');if(phone===null)return;
+  const email=prompt("Email:",pv.email||'');if(email===null)return;
+
+  const payload={name:name.trim(),ruc:ruc.trim(),phone:phone.trim(),email:email.trim(),updated_at:new Date().toISOString()};
+
+  if(confirm("¿Editar precios de LABORATORIO?")){
+    const has=confirm("¿Este proveedor ofrece laboratorio?\n✅ Sí / ❌ No (eliminar servicio)");
+    if(has){
+      payload.lab_convenio=parseFloat(prompt("Precio CONVENIO laboratorio:",pv.services&&pv.services.lab?pv.services.lab.convenio:'7.30'))||0;
+      payload.lab_venta=parseFloat(prompt("Precio VENTA laboratorio:",pv.services&&pv.services.lab?pv.services.lab.venta:'14.00'))||0;
+    }else{
+      payload.lab_convenio=null;payload.lab_venta=null;
+    }
+  }
+  if(confirm("¿Editar precios de RADIOGRAFÍAS?")){
+    const has=confirm("¿Este proveedor ofrece radiografías?\n✅ Sí / ❌ No (eliminar servicio)");
+    if(has){
+      payload.rx_convenio=parseFloat(prompt("Precio CONVENIO radiografía:",pv.services&&pv.services.rx?pv.services.rx.convenio:'14.50'))||0;
+      payload.rx_venta=parseFloat(prompt("Precio VENTA radiografía:",pv.services&&pv.services.rx?pv.services.rx.venta:'24.00'))||0;
+    }else{
+      payload.rx_convenio=null;payload.rx_venta=null;
+    }
+  }
+
+  try{
+    const{error}=await sb.from("cont_providers").update(payload).eq("id",id);
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+  }catch(e){alert("Error al actualizar: "+e.message)}
+}
+
+async function pvDel(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const s=pvSaldo(pv);
+  let msg=`¿Eliminar el proveedor "${pv.name}"?\n\nTiene ${(pv.movements||[]).length} movimiento(s).`;
+  if(Math.abs(s)>0.01)msg+=`\n\n⚠️ Saldo actual: $${s.toFixed(2)}`;
+  msg+=`\n\nEsta acción no se puede deshacer.`;
+  if(!confirm(msg))return;
+  try{
+    await sb.from("cont_provider_movements").delete().eq("provider_id",id);
+    const{error}=await sb.from("cont_providers").delete().eq("id",id);
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+  }catch(e){alert("Error al eliminar: "+e.message)}
+}
+
+// Registrar un cargo (examen recibido)
+async function pvAddCargo(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const services=[];
+  if(pv.services&&pv.services.lab)services.push({k:'lab',label:'🧪 Laboratorio',price:pv.services.lab.convenio});
+  if(pv.services&&pv.services.rx)services.push({k:'rx',label:'🩻 Radiografía',price:pv.services.rx.convenio});
+
+  if(services.length===0){alert("Este proveedor no tiene servicios configurados. Edítalo primero.");return}
+
+  let svcKey='lab';
+  if(services.length>1){
+    const opts=services.map((s,i)=>`${i+1}. ${s.label} ($${s.price.toFixed(2)})`).join('\n');
+    const choice=prompt(`Tipo de servicio:\n${opts}\n\nEscribe el número:`);
+    if(choice===null)return;
+    const idx=parseInt(choice)-1;
+    if(idx<0||idx>=services.length){alert("Opción inválida");return}
+    svcKey=services[idx].k;
+  }else{
+    svcKey=services[0].k;
+  }
+  const svc=pv.services[svcKey];
+  const qty=parseInt(prompt("Cantidad de exámenes:","1"))||1;
+  if(qty<=0){alert("Cantidad inválida");return}
+  const defaultDesc=svcKey==='lab'?'Exámenes de laboratorio':'Radiografías';
+  const desc=prompt("Descripción:",defaultDesc)||defaultDesc;
+  const patient=prompt("Paciente/Empresa (opcional):")||'';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+  const amount=svc.convenio*qty;
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'cargo',
+      service:svcKey,
+      qty:qty,
+      amount:amount,
+      description:desc,
+      patient:patient,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Cargo registrado: ${qty} × $${svc.convenio.toFixed(2)} = $${amount.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+// Abono en efectivo
+async function pvAddAbonoEfectivo(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const s=pvSaldo(pv);
+  const amount=parseFloat(prompt(`Monto del abono en efectivo:\n(Deuda actual: $${s.toFixed(2)})`,"0"))||0;
+  if(amount<=0){alert("Monto inválido");return}
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha del abono (YYYY-MM-DD):",today)||today;
+  const method=prompt("Método (Efectivo/Transferencia/Cheque):","Efectivo")||'Efectivo';
+  const note=prompt("Nota (opcional):")||'';
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'abono_efectivo',
+      amount:amount,
+      description:`Abono ${method}${note?' — '+note:''}`,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Abono registrado: $${amount.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+// Abono a precio de venta
+async function pvAddAbonoVenta(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+
+  const services=[];
+  if(pv.services&&pv.services.lab)services.push({k:'lab',label:'🧪 Laboratorio',conv:pv.services.lab.convenio,venta:pv.services.lab.venta});
+  if(pv.services&&pv.services.rx)services.push({k:'rx',label:'🩻 Radiografía',conv:pv.services.rx.convenio,venta:pv.services.rx.venta});
+  if(services.length===0){alert("Sin servicios configurados");return}
+
+  let svcKey='lab';
+  if(services.length>1){
+    const opts=services.map((s,i)=>`${i+1}. ${s.label} (conv $${s.conv.toFixed(2)} / vta $${s.venta.toFixed(2)})`).join('\n');
+    const choice=prompt(`Tipo de servicio pagado a precio de venta:\n${opts}\n\nEscribe el número:`);
+    if(choice===null)return;
+    const idx=parseInt(choice)-1;
+    if(idx<0||idx>=services.length){alert("Opción inválida");return}
+    svcKey=services[idx].k;
+  }else{
+    svcKey=services[0].k;
+  }
+  const svc=pv.services[svcKey];
+  const qty=parseInt(prompt("Cantidad de exámenes pagados a precio de venta:","1"))||1;
+  if(qty<=0){alert("Cantidad inválida");return}
+
+  const convenioTotal=svc.convenio*qty;
+  const ventaTotal=svc.venta*qty;
+  const diferencia=ventaTotal-convenioTotal;
+
+  const msg=`💰 ABONO A PRECIO DE VENTA\n\n${qty} × ${svcKey==='lab'?'Laboratorio':'Radiografía'}\nPrecio convenio: $${svc.convenio.toFixed(2)} × ${qty} = $${convenioTotal.toFixed(2)}\nPrecio venta:    $${svc.venta.toFixed(2)} × ${qty} = $${ventaTotal.toFixed(2)}\n\nEl proveedor se cobra:         $${convenioTotal.toFixed(2)}\nDIFERENCIA a tu favor (deuda): $${diferencia.toFixed(2)}\n\nSaldo actual: $${pvSaldo(pv).toFixed(2)}\nSaldo después: $${(pvSaldo(pv)-diferencia).toFixed(2)}\n\n¿Confirmar?`;
+  if(!confirm(msg))return;
+
+  const patient=prompt("Paciente/Empresa (opcional):")||'';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'abono_venta',
+      service:svcKey,
+      qty:qty,
+      amount:diferencia,
+      venta_total:ventaTotal,
+      convenio_total:convenioTotal,
+      description:`Pago a precio de venta (${qty} × ${svcKey==='lab'?'lab':'rx'})`,
+      patient:patient,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Abono a precio de venta registrado\nDescuento aplicado: $${diferencia.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+// Ajuste manual
+async function pvAjuste(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const signo=confirm("¿Qué tipo de ajuste?\n\n✅ Sí = SUMAR a la deuda (+)\n❌ No = RESTAR de la deuda (−)")?1:-1;
+  const monto=Math.abs(parseFloat(prompt("Monto del ajuste:","0"))||0);
+  if(monto<=0){alert("Monto inválido");return}
+  const desc=prompt("Razón del ajuste:","Ajuste manual")||'Ajuste manual';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'ajuste',
+      amount:signo*monto,
+      description:desc,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+  }catch(e){alert("Error al guardar: "+e.message)}
+}
+
+async function pvDelMov(pvId,movId){
+  if(!confirm("¿Eliminar este movimiento? Esta acción no se puede deshacer."))return;
+  try{
+    const{error}=await sb.from("cont_provider_movements").delete().eq("id",movId);
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+  }catch(e){alert("Error al eliminar: "+e.message)}
+}
+
+// Exportar / Importar JSON (respaldo local adicional)
+function pvExport(){
+  const data=JSON.stringify(CONT.providers||[],null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`proveedores_${CONT.companyId||'default'}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function pvImport(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.json,application/json';
+  input.onchange=async(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    try{
+      const txt=await f.text();
+      const data=JSON.parse(txt);
+      if(!Array.isArray(data)){alert("Archivo inválido");return}
+      if(!confirm(`Importar ${data.length} proveedor(es) a Supabase? Los proveedores con el mismo nombre podrían duplicarse.`))return;
+
+      let ok=0, err=0;
+      for(const pv of data){
+        try{
+          const payload={
+            cont_company_id:CONT.companyId,
+            name:pv.name,
+            ruc:pv.ruc||'',
+            phone:pv.phone||'',
+            email:pv.email||'',
+            active:true
+          };
+          if(pv.services&&pv.services.lab){payload.lab_convenio=pv.services.lab.convenio;payload.lab_venta=pv.services.lab.venta}
+          if(pv.services&&pv.services.rx){payload.rx_convenio=pv.services.rx.convenio;payload.rx_venta=pv.services.rx.venta}
+          const{data:newPv,error}=await sb.from("cont_providers").insert(payload).select().single();
+          if(error)throw error;
+
+          if(pv.movements&&pv.movements.length){
+            const movsPayload=pv.movements.map(m=>({
+              provider_id:newPv.id,
+              cont_company_id:CONT.companyId,
+              type:m.type,
+              service:m.service||null,
+              qty:m.qty||null,
+              amount:m.amount,
+              venta_total:m.ventaTotal||null,
+              convenio_total:m.convenioTotal||null,
+              description:m.description||'',
+              patient:m.patient||'',
+              movement_date:m.date
+            }));
+            await sb.from("cont_provider_movements").insert(movsPayload);
+          }
+          ok++;
+        }catch(err2){err++;console.error("Error importando",pv.name,err2)}
+      }
+      await pvLoad();
+      contRender();
+      alert(`Importación completa\n✅ ${ok} proveedores importados\n${err?'❌ '+err+' con error':''}`);
+    }catch(err){alert("Error al importar: "+err.message)}
+  };
+  input.click();
+}
+
+
 function contRender(){
   const mc=document.getElementById("contMc");if(!mc)return;
   // Nav
-  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'renovaciones',l:'🔔 Renovaciones'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
+  const tabs=[{k:'dashboard',l:'📊 Panel'},{k:'invoices',l:'📄 Facturas'},{k:'payments',l:'💵 Cobros'},{k:'expenses',l:'📤 Gastos'},{k:'caja',l:'💰 Caja Chica'},{k:'clients',l:'👥 Clientes'},{k:'providers',l:'📦 Proveedores'},{k:'renovaciones',l:'🔔 Renovaciones'},{k:'reports',l:'📈 Reportes'},{k:'config',l:'⚙️ Config'}];
   const nv=document.getElementById("contNv");
   if(nv)nv.innerHTML=tabs.map(t=>`<button class="nb${CONT.tab===t.k?' on':''}" onclick="CONT.tab='${t.k}';contRender()">${t.l}</button>`).join('');
 
@@ -8153,6 +8739,8 @@ function contRender(){
   else if(CONT.tab==='config'){h=contRenderConfig()}
   else if(CONT.tab==='co_form'){h=contRenderCoForm()}
   else if(CONT.tab==='renovaciones'){h=contRenderRenovaciones()}
+  else if(CONT.tab==='providers'){h=contRenderProviders()}
+  else if(CONT.tab==='pv_detail'){h=contRenderProviderDetail()}
   mc.innerHTML=h;
 }
 
