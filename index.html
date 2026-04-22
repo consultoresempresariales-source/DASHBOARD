@@ -8229,147 +8229,213 @@ function pvTotales(){
   return{deuda,cargos,abonos,count:list.length};
 }
 
-// ===== VISTA PRINCIPAL: TOTALES + TARJETAS POR PROVEEDOR =====
+// ===== VISTA PRINCIPAL: 2 COLUMNAS (LAB | RX) =====
 function contRenderProviders(){
   const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
   const list=CONT.providers||[];
 
-  // Calcular deuda separada por tipo de servicio
-  let deudaLab=0, deudaRx=0;
-  list.forEach(pv=>{
-    (pv.movements||[]).forEach(m=>{
-      if(m.service==='lab'){
-        if(m.type==='cargo')deudaLab+=(m.amount||0);
-        else if(m.type==='abono_venta')deudaLab-=(m.amount||0);
-      }else if(m.service==='rx'){
-        if(m.type==='cargo')deudaRx+=(m.amount||0);
-        else if(m.type==='abono_venta')deudaRx-=(m.amount||0);
+  // Separar proveedores por tipo de servicio
+  const labProvs=list.filter(p=>p.services&&p.services.lab);
+  const rxProvs=list.filter(p=>p.services&&p.services.rx);
+
+  // Calcular saldo por tipo de servicio (para proveedores que tienen ambos)
+  function saldoPorServicio(pv,svc){
+    if(!pv.movements||pv.movements.length===0)return 0;
+    const tieneLab=pv.services&&pv.services.lab;
+    const tieneRx=pv.services&&pv.services.rx;
+    if(svc==='lab'&&tieneLab&&!tieneRx)return pvSaldo(pv);
+    if(svc==='rx'&&tieneRx&&!tieneLab)return pvSaldo(pv);
+    // Ambos servicios: calcular proporcional
+    let svcDebe=0,svcHaber=0,otherDebe=0,genAbono=0;
+    pv.movements.forEach(m=>{
+      if(m.service===svc){
+        if(m.type==='cargo')svcDebe+=(m.amount||0);
+        else if(m.type==='abono_venta')svcHaber+=(m.amount||0);
+      }else if(m.service){
+        if(m.type==='cargo')otherDebe+=(m.amount||0);
+      }else{
+        if(m.type==='abono_efectivo')genAbono+=(m.amount||0);
+        else if(m.type==='ajuste')genAbono-=(m.amount||0);
       }
     });
-    // Abonos en efectivo y ajustes: restar proporcionalmente al tipo de servicio
-    // Para simplificar, se aplican al saldo general (ver pvSaldo)
-  });
-  // La deuda "real" total que debe coincidir con la suma de saldos de proveedores
-  // Los abonos en efectivo y ajustes se distribuyen en la vista por proveedor
+    const totalCargos=svcDebe+otherDebe;
+    if(totalCargos<=0)return svcDebe-svcHaber;
+    const prop=svcDebe/totalCargos;
+    return (svcDebe-svcHaber)-(genAbono*prop);
+  }
+
+  let deudaLab=0,deudaRx=0;
+  labProvs.forEach(pv=>{deudaLab+=saldoPorServicio(pv,'lab')});
+  rxProvs.forEach(pv=>{deudaRx+=saldoPorServicio(pv,'rx')});
+  if(Math.abs(deudaLab)<0.005)deudaLab=0;
+  if(Math.abs(deudaRx)<0.005)deudaRx=0;
+
+  // Función para renderizar una tarjeta de proveedor con estado de cuenta
+  function renderPvCard(pv,mainColor){
+    const s=pvSaldo(pv);
+    let hh='';
+    hh+=`<div class="c" style="background:rgba(0,0,0,0.2);border:1px solid ${mainColor}40;padding:0;margin-bottom:12px;overflow:hidden">`;
+
+    // Header: nombre + saldo
+    hh+=`<div style="padding:12px 14px;background:rgba(0,0,0,0.2);border-bottom:1px solid ${mainColor}30;display:flex;justify-content:space-between;align-items:flex-start;gap:10px">`;
+    hh+=`<div style="flex:1;min-width:0">`;
+    hh+=`<div style="font-size:13px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pv.name||'—'}</div>`;
+    const infoParts=[];
+    if(pv.ruc)infoParts.push(`RUC: ${pv.ruc}`);
+    if(pv.phone)infoParts.push(`📞 ${pv.phone}`);
+    if(infoParts.length)hh+=`<div style="font-size:9px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${infoParts.join(' · ')}</div>`;
+    hh+=`</div>`;
+    hh+=`<div style="text-align:right;flex-shrink:0">`;
+    hh+=`<div style="font-size:8px;color:var(--t3);font-weight:700">${s>0.01?'DEBE':(s<-0.01?'A FAVOR':'AL DÍA')}</div>`;
+    hh+=`<div style="font-size:18px;font-weight:900;font-family:var(--mn);color:${s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)')};line-height:1">$${Math.abs(s).toFixed(2)}</div>`;
+    hh+=`</div>`;
+    hh+=`</div>`;
+
+    // Tabla de movimientos
+    const movs=[...(pv.movements||[])].sort((a,b)=>{
+      const cmp=(a.date||'').localeCompare(b.date||'');
+      return cmp!==0?cmp:(a.createdAt||0)-(b.createdAt||0);
+    });
+
+    let running=0;
+    const withSaldo=movs.map(m=>{
+      let debe=0,haber=0;
+      if(m.type==='cargo'){debe=m.amount||0;running+=debe}
+      else if(m.type==='abono_efectivo'||m.type==='abono_venta'){haber=m.amount||0;running-=haber}
+      else if(m.type==='ajuste'){
+        if((m.amount||0)>=0){debe=m.amount||0;running+=debe}
+        else{haber=Math.abs(m.amount||0);running-=haber}
+      }
+      return{...m,debe,haber,running};
+    });
+    const display=[...withSaldo].reverse();
+
+    hh+=`<div style="padding:8px 12px">`;
+    if(display.length===0){
+      hh+=`<div style="padding:16px;text-align:center;color:var(--t3);font-size:10px;font-style:italic">Sin movimientos aún</div>`;
+    }else{
+      hh+=`<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse">`;
+      hh+=`<thead><tr style="border-bottom:2px solid ${mainColor}40;color:var(--t3);font-size:9px;font-weight:700">`;
+      hh+=`<th style="padding:6px 4px;text-align:left">FECHA</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:left">CONCEPTO</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right">DEBE</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right">HABER</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right">SALDO</th>`;
+      if(isAdmin)hh+=`<th style="padding:6px 4px;text-align:center"></th>`;
+      hh+=`</tr></thead><tbody>`;
+
+      display.forEach(m=>{
+        let ico='',tipoTxt='';
+        if(m.type==='cargo'){ico='➕';tipoTxt=m.service==='lab'?'Lab':(m.service==='rx'?'RX':'Cargo')}
+        else if(m.type==='abono_efectivo'){ico='💵';tipoTxt='Abono'}
+        else if(m.type==='abono_venta'){ico='💰';tipoTxt='Pago vta'}
+        else if(m.type==='ajuste'){ico='⚙️';tipoTxt='Ajuste'}
+
+        hh+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
+        hh+=`<td style="padding:5px 4px;font-family:var(--mn);font-size:9px;color:var(--t2);white-space:nowrap">${(m.date||'').slice(5)}</td>`;
+        hh+=`<td style="padding:5px 4px;font-size:10px">${ico} ${tipoTxt}${m.qty?` <span style="color:var(--t3)">×${m.qty}</span>`:''}</td>`;
+        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);color:${m.debe>0?'#ef4444':'var(--t3)'}">${m.debe>0?m.debe.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);color:${m.haber>0?'#34d399':'var(--t3)'}">${m.haber>0?m.haber.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);font-weight:700;color:${m.running>0.01?'#ef4444':(m.running<-0.01?'#34d399':'var(--t3)')}">${m.running.toFixed(2)}</td>`;
+        if(isAdmin)hh+=`<td style="padding:5px 4px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--t3)">🗑</button></td>`;
+        hh+=`</tr>`;
+      });
+
+      hh+=`</tbody></table></div>`;
+    }
+
+    // Botones de acción
+    if(isAdmin){
+      hh+=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid ${mainColor}30">`;
+      hh+=`<button onclick="pvAddCargo('${pv.id}')" style="flex:1;min-width:70px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">➕ Cargo</button>`;
+      hh+=`<button onclick="pvAddAbonoEfectivo('${pv.id}')" style="flex:1;min-width:70px;background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">💵 Pagar</button>`;
+      hh+=`<button onclick="pvAddAbonoVenta('${pv.id}')" style="flex:1;min-width:70px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">💰 Vta</button>`;
+      hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:7px 8px;font-size:11px;cursor:pointer;color:var(--t3)">✏️</button>`;
+      hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:7px 8px;font-size:11px;cursor:pointer;color:var(--t3)">🗑</button>`;
+      hh+=`</div>`;
+    }
+
+    hh+=`</div>`; // cierre padding
+    hh+=`</div>`; // cierre tarjeta
+
+    return hh;
+  }
 
   let h='';
-
-  // ═══ 2 CUADROS GRANDES: LAB Y RX ═══
-  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px">`;
-
-  // Cuadro LABORATORIO
-  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(96,165,250,0.12),rgba(96,165,250,0.04));border:2px solid rgba(96,165,250,0.3);padding:24px">`;
-  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">`;
-  h+=`<div style="font-size:40px">🧪</div>`;
-  h+=`<div>`;
-  h+=`<div style="font-size:12px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON LABORATORIOS</div>`;
-  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#60a5fa;line-height:1.1">$${deudaLab.toFixed(2)}</div>`;
-  h+=`</div></div>`;
-  const labProvs=list.filter(p=>p.services&&p.services.lab).length;
-  h+=`<div style="font-size:11px;color:var(--t2)">${labProvs} proveedor${labProvs!==1?'es':''} de laboratorio</div>`;
-  h+=`</div>`;
-
-  // Cuadro RADIOGRAFÍAS
-  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(168,85,247,0.12),rgba(168,85,247,0.04));border:2px solid rgba(168,85,247,0.3);padding:24px">`;
-  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">`;
-  h+=`<div style="font-size:40px">🩻</div>`;
-  h+=`<div>`;
-  h+=`<div style="font-size:12px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON RADIÓLOGOS</div>`;
-  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#a855f7;line-height:1.1">$${deudaRx.toFixed(2)}</div>`;
-  h+=`</div></div>`;
-  const rxProvs=list.filter(p=>p.services&&p.services.rx).length;
-  h+=`<div style="font-size:11px;color:var(--t2)">${rxProvs} proveedor${rxProvs!==1?'es':''} de radiografías</div>`;
-  h+=`</div>`;
-
-  h+=`</div>`;
 
   // ═══ BOTÓN NUEVO PROVEEDOR ═══
   if(isAdmin){
     h+=`<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center">`;
-    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">📦 Proveedores (${list.length})</div>`;
+    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">📦 Cuentas por pagar a proveedores</div>`;
     h+=`<div style="display:flex;gap:8px;flex-wrap:wrap">`;
     h+=`<button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button>`;
-    h+=`<button onclick="pvExport()" title="Descargar respaldo JSON" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">📤</button>`;
+    h+=`<button onclick="pvExport()" title="Respaldo JSON" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">📤</button>`;
     h+=`</div>`;
     h+=`</div>`;
   }
 
-  // ═══ TARJETAS POR PROVEEDOR ═══
-  if(list.length===0){
-    h+=`<div class="c" style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
+  // ═══ 2 COLUMNAS LADO A LADO ═══
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px">`;
+
+  // ───── COLUMNA LABORATORIOS ─────
+  h+=`<div>`;
+  // Cuadro total LAB
+  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(96,165,250,0.15),rgba(96,165,250,0.05));border:2px solid rgba(96,165,250,0.4);padding:20px;margin-bottom:16px">`;
+  h+=`<div style="display:flex;align-items:center;gap:12px">`;
+  h+=`<div style="font-size:36px">🧪</div>`;
+  h+=`<div style="flex:1">`;
+  h+=`<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON LABORATORIOS</div>`;
+  h+=`<div style="font-size:28px;font-weight:900;font-family:var(--mn);color:#60a5fa;line-height:1.1">$${deudaLab.toFixed(2)}</div>`;
+  h+=`<div style="font-size:10px;color:var(--t2);margin-top:4px">${labProvs.length} proveedor${labProvs.length!==1?'es':''} de laboratorio</div>`;
+  h+=`</div>`;
+  h+=`</div>`;
+  h+=`</div>`;
+
+  // Lista de laboratorios
+  if(labProvs.length===0){
+    h+=`<div class="c" style="padding:24px;text-align:center;color:var(--t3);font-size:11px;border:1px dashed rgba(96,165,250,0.3)">No hay laboratorios registrados.<br>Crea un proveedor con servicio de laboratorio.</div>`;
   }else{
-    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">`;
-
-    // Ordenar: primero los que tienen más deuda
-    const sorted=[...list].sort((a,b)=>pvSaldo(b)-pvSaldo(a));
-
-    sorted.forEach(pv=>{
-      const s=pvSaldo(pv);
-      const tieneLab=pv.services&&pv.services.lab;
-      const tieneRx=pv.services&&pv.services.rx;
-      // Color según tipo principal de servicio
-      const color=tieneLab&&!tieneRx?'#60a5fa':(tieneRx&&!tieneLab?'#a855f7':CONT_COLOR);
-      const bgGrad=tieneLab&&!tieneRx?'rgba(96,165,250,0.08)':(tieneRx&&!tieneLab?'rgba(168,85,247,0.08)':'rgba(234,179,8,0.05)');
-
-      h+=`<div class="c" style="background:${bgGrad};border:1px solid ${color}40;padding:16px;display:flex;flex-direction:column;gap:10px">`;
-
-      // Header: nombre + saldo
-      h+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">`;
-      h+=`<div style="flex:1;min-width:0">`;
-      h+=`<div style="font-size:14px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pv.name||'—'}</div>`;
-      const tags=[];
-      if(tieneLab)tags.push(`<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(96,165,250,0.15);color:#60a5fa;font-weight:700">🧪 LAB</span>`);
-      if(tieneRx)tags.push(`<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#a855f7;font-weight:700">🩻 RX</span>`);
-      h+=`<div style="margin-top:4px;display:flex;gap:4px">${tags.join('')}</div>`;
-      if(pv.phone)h+=`<div style="font-size:10px;color:var(--t3);margin-top:3px">📞 ${pv.phone}</div>`;
-      h+=`</div>`;
-      h+=`<div style="text-align:right">`;
-      h+=`<div style="font-size:9px;color:var(--t3);font-weight:700">LE DEBO</div>`;
-      h+=`<div style="font-size:22px;font-weight:900;font-family:var(--mn);color:${s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)')};line-height:1">$${s.toFixed(2)}</div>`;
-      h+=`</div>`;
-      h+=`</div>`;
-
-      // Info de precios (compacto)
-      const priceInfo=[];
-      if(tieneLab)priceInfo.push(`🧪 $${pv.services.lab.convenio.toFixed(2)} / $${pv.services.lab.venta.toFixed(2)}`);
-      if(tieneRx)priceInfo.push(`🩻 $${pv.services.rx.convenio.toFixed(2)} / $${pv.services.rx.venta.toFixed(2)}`);
-      if(priceInfo.length)h+=`<div style="font-size:10px;color:var(--t3);font-family:var(--mn);padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px">conv/vta: ${priceInfo.join(' · ')}</div>`;
-
-      // Últimos 3 movimientos (mini historial)
-      const recentMovs=[...(pv.movements||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
-      if(recentMovs.length>0){
-        h+=`<div style="background:rgba(0,0,0,0.15);border-radius:6px;padding:8px;font-size:10px">`;
-        h+=`<div style="color:var(--t3);font-weight:700;margin-bottom:4px">Últimos movimientos:</div>`;
-        recentMovs.forEach(m=>{
-          let ico='',color='#94a3b8',txt='';
-          if(m.type==='cargo'){ico='➕';color='#ef4444';txt=`+$${(m.amount||0).toFixed(2)}`}
-          else if(m.type==='abono_efectivo'){ico='💵';color='#34d399';txt=`−$${(m.amount||0).toFixed(2)}`}
-          else if(m.type==='abono_venta'){ico='💰';color='#a855f7';txt=`−$${(m.amount||0).toFixed(2)}`}
-          else if(m.type==='ajuste'){ico='⚙️';color='#94a3b8';txt=`${(m.amount||0)>=0?'+':'−'}$${Math.abs(m.amount||0).toFixed(2)}`}
-          h+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)"><span>${ico} ${m.date||''} <span style="color:var(--t3)">${(m.description||'').slice(0,22)}</span></span><span style="color:${color};font-weight:700;font-family:var(--mn)">${txt}</span></div>`;
-        });
-        h+=`</div>`;
-      }
-
-      // Botones de acción
-      if(isAdmin){
-        h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">`;
-        h+=`<button onclick="pvAddCargo('${pv.id}')" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">➕ Cargo</button>`;
-        h+=`<button onclick="pvAddAbonoEfectivo('${pv.id}')" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">💵 Pagar</button>`;
-        h+=`<button onclick="pvAddAbonoVenta('${pv.id}')" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">💰 Pago Venta</button>`;
-        h+=`<button onclick="pvOpen('${pv.id}')" style="background:rgba(255,255,255,0.06);color:var(--t2);border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Ver todo</button>`;
-        h+=`</div>`;
-        h+=`<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:2px">`;
-        h+=`<button onclick="pvEdit('${pv.id}')" title="Editar proveedor" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--t3)">✏️</button>`;
-        h+=`<button onclick="pvDel('${pv.id}')" title="Eliminar proveedor" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--t3)">🗑</button>`;
-        h+=`</div>`;
-      }else{
-        h+=`<button onclick="pvOpen('${pv.id}')" style="background:rgba(255,255,255,0.06);color:var(--t2);border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px">📋 Ver historial</button>`;
-      }
-
-      h+=`</div>`;
+    // Ordenar por deuda descendente
+    const sortedLab=[...labProvs].sort((a,b)=>saldoPorServicio(b,'lab')-saldoPorServicio(a,'lab'));
+    sortedLab.forEach(pv=>{
+      h+=renderPvCard(pv,'#60a5fa');
     });
-    h+=`</div>`;
+  }
+  h+=`</div>`;
+
+  // ───── COLUMNA RADIOGRAFÍAS ─────
+  h+=`<div>`;
+  // Cuadro total RX
+  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(168,85,247,0.05));border:2px solid rgba(168,85,247,0.4);padding:20px;margin-bottom:16px">`;
+  h+=`<div style="display:flex;align-items:center;gap:12px">`;
+  h+=`<div style="font-size:36px">🩻</div>`;
+  h+=`<div style="flex:1">`;
+  h+=`<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON RADIÓLOGOS</div>`;
+  h+=`<div style="font-size:28px;font-weight:900;font-family:var(--mn);color:#a855f7;line-height:1.1">$${deudaRx.toFixed(2)}</div>`;
+  h+=`<div style="font-size:10px;color:var(--t2);margin-top:4px">${rxProvs.length} proveedor${rxProvs.length!==1?'es':''} de radiografías</div>`;
+  h+=`</div>`;
+  h+=`</div>`;
+  h+=`</div>`;
+
+  // Lista de radiólogos
+  if(rxProvs.length===0){
+    h+=`<div class="c" style="padding:24px;text-align:center;color:var(--t3);font-size:11px;border:1px dashed rgba(168,85,247,0.3)">No hay radiólogos registrados.<br>Crea un proveedor con servicio de radiografía.</div>`;
+  }else{
+    const sortedRx=[...rxProvs].sort((a,b)=>saldoPorServicio(b,'rx')-saldoPorServicio(a,'rx'));
+    sortedRx.forEach(pv=>{
+      h+=renderPvCard(pv,'#a855f7');
+    });
+  }
+  h+=`</div>`;
+
+  h+=`</div>`; // cierre grid
+
+  // Si no hay ningún proveedor
+  if(list.length===0){
+    h=`<div class="c" style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
+    if(isAdmin){
+      h=`<div style="margin-bottom:16px"><button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button></div>`+h;
+    }
   }
 
   return h;
