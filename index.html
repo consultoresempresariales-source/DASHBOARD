@@ -8346,12 +8346,15 @@ function contRenderProviders(){
 
     // Botones de acción
     if(isAdmin){
-      hh+=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid ${mainColor}30">`;
-      hh+=`<button onclick="pvAddCargo('${pv.id}')" style="flex:1;min-width:70px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">➕ Cargo</button>`;
-      hh+=`<button onclick="pvAddAbonoEfectivo('${pv.id}')" style="flex:1;min-width:70px;background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">💵 Pagar</button>`;
-      hh+=`<button onclick="pvAddAbonoVenta('${pv.id}')" style="flex:1;min-width:70px;background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:5px;padding:7px 4px;font-size:10px;font-weight:700;cursor:pointer">💰 Vta</button>`;
-      hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:7px 8px;font-size:11px;cursor:pointer;color:var(--t3)">✏️</button>`;
-      hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:7px 8px;font-size:11px;cursor:pointer;color:var(--t3)">🗑</button>`;
+      hh+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid ${mainColor}30">`;
+      hh+=`<button onclick="pvAddDeuda('${pv.id}')" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">➕ Agregar Deuda</button>`;
+      hh+=`<button onclick="pvAddAbono('${pv.id}')" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">💵 Registrar Abono</button>`;
+      hh+=`<button onclick="pvJornadaConvenio('${pv.id}')" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid #fbbf2440;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">🗓️ Jornada Convenio</button>`;
+      hh+=`<button onclick="pvJornadaVenta('${pv.id}')" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">🎯 Jornada Venta</button>`;
+      hh+=`</div>`;
+      hh+=`<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">`;
+      hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:5px 10px;font-size:10px;cursor:pointer;color:var(--t3)">✏️ Editar</button>`;
+      hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:5px 10px;font-size:10px;cursor:pointer;color:var(--t3)">🗑 Eliminar</button>`;
       hh+=`</div>`;
     }
 
@@ -8606,6 +8609,236 @@ async function pvDel(id){
 }
 
 // Registrar un cargo (examen recibido)
+// Agregar deuda directa (sin cálculos complejos)
+async function pvAddDeuda(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const amount=parseFloat(prompt(`💰 AGREGAR DEUDA a ${pv.name}\n\nMonto que le debes (ej: 350.00):`,"0"))||0;
+  if(amount<=0){alert("Monto inválido");return}
+  const concepto=prompt("Concepto (ej: Exámenes de marzo, Radiografías abril):","Deuda")||'Deuda';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  // Determinar service si tiene uno solo
+  let svc=null;
+  const tieneLab=pv.services&&pv.services.lab;
+  const tieneRx=pv.services&&pv.services.rx;
+  if(tieneLab&&!tieneRx)svc='lab';
+  else if(tieneRx&&!tieneLab)svc='rx';
+  else if(tieneLab&&tieneRx){
+    const ch=prompt("¿De qué servicio es esta deuda?\n1. Laboratorio\n2. Radiografía\n\nEscribe 1 o 2:","1");
+    if(ch==='1')svc='lab';else if(ch==='2')svc='rx';
+  }
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'cargo',
+      service:svc,
+      amount:amount,
+      description:concepto,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Deuda agregada: $${amount.toFixed(2)}\nDeuda actual: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// Registrar abono/pago directo
+async function pvAddAbono(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const s=pvSaldo(pv);
+  const amount=parseFloat(prompt(`💵 REGISTRAR ABONO a ${pv.name}\n(Deuda actual: $${s.toFixed(2)})\n\nMonto del abono:`,"0"))||0;
+  if(amount<=0){alert("Monto inválido");return}
+  const concepto=prompt("Concepto (ej: Abono efectivo, Transferencia, Pago a cuenta):","Abono")||'Abono';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,
+      cont_company_id:CONT.companyId,
+      type:'abono_efectivo',
+      amount:amount,
+      description:concepto,
+      movement_date:date,
+      created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();
+    contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Abono registrado: $${amount.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// ===== FUNCIONES SIMPLIFICADAS: deudas, abonos y jornadas =====
+
+// Agregar deuda directa (monto + concepto)
+async function pvAddDeuda(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const amount=parseFloat(prompt(`➕ AGREGAR DEUDA a ${pv.name}\n\nMonto que le debes (ej: 350.00):`,"0"))||0;
+  if(amount<=0){alert("Monto inválido");return}
+  const concepto=prompt("Concepto (ej: Exámenes marzo, Deuda anterior):","Deuda")||'Deuda';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  let svc=null;
+  const tieneLab=pv.services&&pv.services.lab;
+  const tieneRx=pv.services&&pv.services.rx;
+  if(tieneLab&&!tieneRx)svc='lab';
+  else if(tieneRx&&!tieneLab)svc='rx';
+  else if(tieneLab&&tieneRx){
+    const ch=prompt("¿De qué servicio?\n1. Laboratorio\n2. Radiografía\n\nEscribe 1 o 2:","1");
+    if(ch==='1')svc='lab';else if(ch==='2')svc='rx';
+  }
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,cont_company_id:CONT.companyId,
+      type:'cargo',service:svc,amount:amount,description:concepto,
+      movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Deuda agregada: $${amount.toFixed(2)}\nDeuda actual: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// Registrar abono simple (efectivo)
+async function pvAddAbono(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  const s=pvSaldo(pv);
+  const amount=parseFloat(prompt(`💵 REGISTRAR ABONO a ${pv.name}\n(Deuda actual: $${s.toFixed(2)})\n\nMonto del abono:`,"0"))||0;
+  if(amount<=0){alert("Monto inválido");return}
+  const concepto=prompt("Concepto (ej: Abono efectivo, Transferencia):","Abono")||'Abono';
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha (YYYY-MM-DD):",today)||today;
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,cont_company_id:CONT.companyId,
+      type:'abono_efectivo',amount:amount,description:concepto,
+      movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Abono registrado: $${amount.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// JORNADA A PRECIO DE CONVENIO
+// (pagas al proveedor el precio convenio por la cantidad de exámenes de la jornada)
+async function pvJornadaConvenio(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+
+  const services=[];
+  if(pv.services&&pv.services.lab)services.push({k:'lab',label:'🧪 Laboratorio',conv:pv.services.lab.convenio});
+  if(pv.services&&pv.services.rx)services.push({k:'rx',label:'🩻 Radiografía',conv:pv.services.rx.convenio});
+  if(services.length===0){alert("Este proveedor no tiene precios configurados. Edítalo primero.");return}
+
+  let svcKey;
+  if(services.length>1){
+    const opts=services.map((s,i)=>`${i+1}. ${s.label} (conv $${s.conv.toFixed(2)})`).join('\n');
+    const choice=prompt(`🗓️ JORNADA A PRECIO CONVENIO\n\n${opts}\n\nEscribe el número:`);
+    if(choice===null)return;
+    const idx=parseInt(choice)-1;
+    if(idx<0||idx>=services.length){alert("Opción inválida");return}
+    svcKey=services[idx].k;
+  }else svcKey=services[0].k;
+
+  const svc=pv.services[svcKey];
+  const qty=parseInt(prompt(`Cantidad de ${svcKey==='lab'?'exámenes':'radiografías'} en la jornada:`,"1"))||0;
+  if(qty<=0){alert("Cantidad inválida");return}
+  const convenioTotal=svc.convenio*qty;
+
+  const msg=`🗓️ JORNADA A PRECIO CONVENIO\n\n${qty} × ${svcKey==='lab'?'Laboratorio':'Radiografía'} × $${svc.convenio.toFixed(2)} = $${convenioTotal.toFixed(2)}\n\nLe pagas al proveedor: $${convenioTotal.toFixed(2)}\n(No afecta la deuda anterior)\n\n¿Confirmar?`;
+  if(!confirm(msg))return;
+
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha de la jornada (YYYY-MM-DD):",today)||today;
+  const note=prompt("Nota/lugar (opcional):")||'';
+
+  try{
+    // Registramos: cargo (por la jornada) + abono efectivo (pagado ese mismo día)
+    // Resultado neto: la deuda NO cambia, pero queda registrada la operación
+    const{error:e1}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,cont_company_id:CONT.companyId,
+      type:'cargo',service:svcKey,qty:qty,amount:convenioTotal,
+      description:`Jornada convenio${note?' — '+note:''}`,
+      movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(e1)throw e1;
+    const{error:e2}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,cont_company_id:CONT.companyId,
+      type:'abono_efectivo',amount:convenioTotal,
+      description:`Pago jornada convenio${note?' — '+note:''}`,
+      movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(e2)throw e2;
+    await pvLoad();contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Jornada convenio registrada\nPagado al proveedor: $${convenioTotal.toFixed(2)}\nDeuda sin cambios: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// JORNADA A PRECIO DE VENTA
+// (pagas el precio venta, el proveedor cobra convenio y la diferencia baja la deuda)
+async function pvJornadaVenta(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+
+  const services=[];
+  if(pv.services&&pv.services.lab)services.push({k:'lab',label:'🧪 Laboratorio',conv:pv.services.lab.convenio,venta:pv.services.lab.venta});
+  if(pv.services&&pv.services.rx)services.push({k:'rx',label:'🩻 Radiografía',conv:pv.services.rx.convenio,venta:pv.services.rx.venta});
+  if(services.length===0){alert("Este proveedor no tiene precios configurados. Edítalo primero.");return}
+
+  let svcKey;
+  if(services.length>1){
+    const opts=services.map((s,i)=>`${i+1}. ${s.label} (conv $${s.conv.toFixed(2)} / vta $${s.venta.toFixed(2)})`).join('\n');
+    const choice=prompt(`🎯 JORNADA A PRECIO VENTA\n\n${opts}\n\nEscribe el número:`);
+    if(choice===null)return;
+    const idx=parseInt(choice)-1;
+    if(idx<0||idx>=services.length){alert("Opción inválida");return}
+    svcKey=services[idx].k;
+  }else svcKey=services[0].k;
+
+  const svc=pv.services[svcKey];
+  const qty=parseInt(prompt(`Cantidad de ${svcKey==='lab'?'exámenes':'radiografías'} en la jornada:`,"1"))||0;
+  if(qty<=0){alert("Cantidad inválida");return}
+
+  const convenioTotal=svc.convenio*qty;
+  const ventaTotal=svc.venta*qty;
+  const diferencia=ventaTotal-convenioTotal;
+  const s=pvSaldo(pv);
+
+  const msg=`🎯 JORNADA A PRECIO VENTA\n\n${qty} × ${svcKey==='lab'?'Laboratorio':'Radiografía'}\n\nPrecio convenio: $${svc.convenio.toFixed(2)} × ${qty} = $${convenioTotal.toFixed(2)}\nPrecio venta:    $${svc.venta.toFixed(2)} × ${qty} = $${ventaTotal.toFixed(2)}\n\nEl proveedor cobra:       $${convenioTotal.toFixed(2)}\nDIFERENCIA (baja deuda):  $${diferencia.toFixed(2)}\n\nDeuda actual: $${s.toFixed(2)}\nDeuda después: $${(s-diferencia).toFixed(2)}\n\n¿Confirmar?`;
+  if(!confirm(msg))return;
+
+  const today=new Date().toISOString().slice(0,10);
+  const date=prompt("Fecha de la jornada (YYYY-MM-DD):",today)||today;
+  const note=prompt("Nota/lugar (opcional):")||'';
+
+  try{
+    const{error}=await sb.from("cont_provider_movements").insert({
+      provider_id:id,cont_company_id:CONT.companyId,
+      type:'abono_venta',service:svcKey,qty:qty,amount:diferencia,
+      venta_total:ventaTotal,convenio_total:convenioTotal,
+      description:`Jornada a precio venta${note?' — '+note:''}`,
+      movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
+    });
+    if(error)throw error;
+    await pvLoad();contRender();
+    const pv2=(CONT.providers||[]).find(p=>p.id===id);
+    alert(`✅ Jornada a precio venta registrada\nPagado al proveedor: $${convenioTotal.toFixed(2)}\nDescuento a tu deuda: $${diferencia.toFixed(2)}\nNueva deuda: $${pvSaldo(pv2).toFixed(2)}`);
+  }catch(e){alert("Error: "+e.message)}
+}
+
 async function pvAddCargo(id){
   const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
   const services=[];
