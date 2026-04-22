@@ -8229,79 +8229,148 @@ function pvTotales(){
   return{deuda,cargos,abonos,count:list.length};
 }
 
-// ===== VISTA PRINCIPAL: LISTA DE PROVEEDORES =====
+// ===== VISTA PRINCIPAL: TOTALES + TARJETAS POR PROVEEDOR =====
 function contRenderProviders(){
   const isAdmin=CURRENT_USER&&(CURRENT_USER.role==='admin'||CURRENT_USER.role==='contador');
   const list=CONT.providers||[];
-  const tot=pvTotales();
+
+  // Calcular deuda separada por tipo de servicio
+  let deudaLab=0, deudaRx=0;
+  list.forEach(pv=>{
+    (pv.movements||[]).forEach(m=>{
+      if(m.service==='lab'){
+        if(m.type==='cargo')deudaLab+=(m.amount||0);
+        else if(m.type==='abono_venta')deudaLab-=(m.amount||0);
+      }else if(m.service==='rx'){
+        if(m.type==='cargo')deudaRx+=(m.amount||0);
+        else if(m.type==='abono_venta')deudaRx-=(m.amount||0);
+      }
+    });
+    // Abonos en efectivo y ajustes: restar proporcionalmente al tipo de servicio
+    // Para simplificar, se aplican al saldo general (ver pvSaldo)
+  });
+  // La deuda "real" total que debe coincidir con la suma de saldos de proveedores
+  // Los abonos en efectivo y ajustes se distribuyen en la vista por proveedor
 
   let h='';
 
-  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">`;
-  h+=`<div class="c"><div class="ib">📦</div><div class="kl">Proveedores</div><div class="kv" style="color:#60a5fa">${tot.count}</div><div class="ks">registrados</div></div>`;
-  h+=`<div class="c"><div class="ib">⚠️</div><div class="kl">Deuda Total</div><div class="kv" style="color:#ef4444">$${tot.deuda.toFixed(2)}</div><div class="ks">por pagar</div></div>`;
-  h+=`<div class="c"><div class="ib">📥</div><div class="kl">Cargos Acum.</div><div class="kv" style="color:#fbbf24">$${tot.cargos.toFixed(2)}</div><div class="ks">servicios recibidos</div></div>`;
-  h+=`<div class="c"><div class="ib">✅</div><div class="kl">Abonos Acum.</div><div class="kv" style="color:#34d399">$${tot.abonos.toFixed(2)}</div><div class="ks">pagado</div></div>`;
+  // ═══ 2 CUADROS GRANDES: LAB Y RX ═══
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px">`;
+
+  // Cuadro LABORATORIO
+  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(96,165,250,0.12),rgba(96,165,250,0.04));border:2px solid rgba(96,165,250,0.3);padding:24px">`;
+  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">`;
+  h+=`<div style="font-size:40px">🧪</div>`;
+  h+=`<div>`;
+  h+=`<div style="font-size:12px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON LABORATORIOS</div>`;
+  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#60a5fa;line-height:1.1">$${deudaLab.toFixed(2)}</div>`;
+  h+=`</div></div>`;
+  const labProvs=list.filter(p=>p.services&&p.services.lab).length;
+  h+=`<div style="font-size:11px;color:var(--t2)">${labProvs} proveedor${labProvs!==1?'es':''} de laboratorio</div>`;
   h+=`</div>`;
 
+  // Cuadro RADIOGRAFÍAS
+  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(168,85,247,0.12),rgba(168,85,247,0.04));border:2px solid rgba(168,85,247,0.3);padding:24px">`;
+  h+=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">`;
+  h+=`<div style="font-size:40px">🩻</div>`;
+  h+=`<div>`;
+  h+=`<div style="font-size:12px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON RADIÓLOGOS</div>`;
+  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#a855f7;line-height:1.1">$${deudaRx.toFixed(2)}</div>`;
+  h+=`</div></div>`;
+  const rxProvs=list.filter(p=>p.services&&p.services.rx).length;
+  h+=`<div style="font-size:11px;color:var(--t2)">${rxProvs} proveedor${rxProvs!==1?'es':''} de radiografías</div>`;
+  h+=`</div>`;
+
+  h+=`</div>`;
+
+  // ═══ BOTÓN NUEVO PROVEEDOR ═══
   if(isAdmin){
-    h+=`<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">`;
-    h+=`<button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button>`;
-    h+=`<button onclick="pvExport()" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📤 Exportar JSON</button>`;
-    h+=`<button onclick="pvImport()" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📥 Importar JSON</button>`;
+    h+=`<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center">`;
+    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">📦 Proveedores (${list.length})</div>`;
+    h+=`<div style="display:flex;gap:8px;flex-wrap:wrap">`;
+    h+=`<button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button>`;
+    h+=`<button onclick="pvExport()" title="Descargar respaldo JSON" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">📤</button>`;
+    h+=`</div>`;
     h+=`</div>`;
   }
 
-  h+=`<div class="c"><div class="st">📦 Mis Proveedores (${list.length})</div>`;
+  // ═══ TARJETAS POR PROVEEDOR ═══
   if(list.length===0){
-    h+=`<div style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
+    h+=`<div class="c" style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
   }else{
-    h+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:rgba(255,255,255,0.04)">`;
-    h+=`<th style="padding:8px;text-align:left">Proveedor</th>`;
-    h+=`<th style="padding:8px;text-align:center">Tipo</th>`;
-    h+=`<th style="padding:8px;text-align:right">Lab. Conv.</th>`;
-    h+=`<th style="padding:8px;text-align:right">Lab. Venta</th>`;
-    h+=`<th style="padding:8px;text-align:right">RX Conv.</th>`;
-    h+=`<th style="padding:8px;text-align:right">RX Venta</th>`;
-    h+=`<th style="padding:8px;text-align:right">Saldo</th>`;
-    h+=`<th style="padding:8px;text-align:center">Acciones</th>`;
-    h+=`</tr></thead><tbody>`;
+    h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">`;
 
+    // Ordenar: primero los que tienen más deuda
     const sorted=[...list].sort((a,b)=>pvSaldo(b)-pvSaldo(a));
+
     sorted.forEach(pv=>{
       const s=pvSaldo(pv);
-      const sColor=s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)');
-      const tipoLab=pv.services&&pv.services.lab?'Lab':'';
-      const tipoRx=pv.services&&pv.services.rx?'RX':'';
-      const tipo=[tipoLab,tipoRx].filter(Boolean).join('+')||'—';
-      h+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="pvOpen('${pv.id}')">`;
-      h+=`<td style="padding:8px;font-weight:700">${pv.name||'—'}<div style="font-size:10px;color:var(--t3);font-weight:400">${pv.ruc||''} ${pv.phone?'· '+pv.phone:''}</div></td>`;
-      h+=`<td style="padding:8px;text-align:center"><span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(234,179,8,0.15);color:${CONT_COLOR};font-weight:700">${tipo}</span></td>`;
-      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn)">${pv.services&&pv.services.lab?'$'+(pv.services.lab.convenio||0).toFixed(2):'—'}</td>`;
-      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);color:var(--t3)">${pv.services&&pv.services.lab?'$'+(pv.services.lab.venta||0).toFixed(2):'—'}</td>`;
-      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn)">${pv.services&&pv.services.rx?'$'+(pv.services.rx.convenio||0).toFixed(2):'—'}</td>`;
-      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);color:var(--t3)">${pv.services&&pv.services.rx?'$'+(pv.services.rx.venta||0).toFixed(2):'—'}</td>`;
-      h+=`<td style="padding:8px;text-align:right;font-family:var(--mn);font-weight:800;color:${sColor}">$${s.toFixed(2)}</td>`;
-      h+=`<td style="padding:8px;text-align:center" onclick="event.stopPropagation()">`;
-      h+=`<button onclick="pvOpen('${pv.id}')" title="Ver detalle" style="background:none;border:none;cursor:pointer;font-size:14px">👁</button>`;
-      if(isAdmin){
-        h+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:14px">✏️</button>`;
-        h+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:14px">🗑</button>`;
-      }
-      h+=`</td></tr>`;
-    });
-    h+=`</tbody></table></div>`;
-  }
-  h+=`</div>`;
+      const tieneLab=pv.services&&pv.services.lab;
+      const tieneRx=pv.services&&pv.services.rx;
+      // Color según tipo principal de servicio
+      const color=tieneLab&&!tieneRx?'#60a5fa':(tieneRx&&!tieneLab?'#a855f7':CONT_COLOR);
+      const bgGrad=tieneLab&&!tieneRx?'rgba(96,165,250,0.08)':(tieneRx&&!tieneLab?'rgba(168,85,247,0.08)':'rgba(234,179,8,0.05)');
 
-  h+=`<div class="c" style="margin-top:16px;background:rgba(234,179,8,0.04);border-left:3px solid ${CONT_COLOR}">`;
-  h+=`<div style="font-size:11px;font-weight:700;color:${CONT_COLOR};margin-bottom:6px">💡 ¿Cómo funciona?</div>`;
-  h+=`<div style="font-size:11px;color:var(--t2);line-height:1.6">`;
-  h+=`• <b>Cargo:</b> cuando recibes un examen del proveedor, se suma a la deuda al <b>precio de convenio</b>.<br>`;
-  h+=`• <b>Abono en efectivo:</b> pagas directamente al proveedor, se resta de la deuda.<br>`;
-  h+=`• <b>Abono a precio de venta:</b> el paciente paga al proveedor el precio de venta. El proveedor se cobra el convenio y <b>la diferencia se descuenta de tu deuda anterior</b>.<br>`;
-  h+=`• <b>Ejemplo:</b> Lab convenio $7.30, venta $14. Si pagas a precio de venta, el proveedor cobra $7.30 y te descuenta $6.70 de deuda.`;
-  h+=`</div></div>`;
+      h+=`<div class="c" style="background:${bgGrad};border:1px solid ${color}40;padding:16px;display:flex;flex-direction:column;gap:10px">`;
+
+      // Header: nombre + saldo
+      h+=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">`;
+      h+=`<div style="flex:1;min-width:0">`;
+      h+=`<div style="font-size:14px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pv.name||'—'}</div>`;
+      const tags=[];
+      if(tieneLab)tags.push(`<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(96,165,250,0.15);color:#60a5fa;font-weight:700">🧪 LAB</span>`);
+      if(tieneRx)tags.push(`<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(168,85,247,0.15);color:#a855f7;font-weight:700">🩻 RX</span>`);
+      h+=`<div style="margin-top:4px;display:flex;gap:4px">${tags.join('')}</div>`;
+      if(pv.phone)h+=`<div style="font-size:10px;color:var(--t3);margin-top:3px">📞 ${pv.phone}</div>`;
+      h+=`</div>`;
+      h+=`<div style="text-align:right">`;
+      h+=`<div style="font-size:9px;color:var(--t3);font-weight:700">LE DEBO</div>`;
+      h+=`<div style="font-size:22px;font-weight:900;font-family:var(--mn);color:${s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)')};line-height:1">$${s.toFixed(2)}</div>`;
+      h+=`</div>`;
+      h+=`</div>`;
+
+      // Info de precios (compacto)
+      const priceInfo=[];
+      if(tieneLab)priceInfo.push(`🧪 $${pv.services.lab.convenio.toFixed(2)} / $${pv.services.lab.venta.toFixed(2)}`);
+      if(tieneRx)priceInfo.push(`🩻 $${pv.services.rx.convenio.toFixed(2)} / $${pv.services.rx.venta.toFixed(2)}`);
+      if(priceInfo.length)h+=`<div style="font-size:10px;color:var(--t3);font-family:var(--mn);padding:6px 8px;background:rgba(0,0,0,0.2);border-radius:6px">conv/vta: ${priceInfo.join(' · ')}</div>`;
+
+      // Últimos 3 movimientos (mini historial)
+      const recentMovs=[...(pv.movements||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+      if(recentMovs.length>0){
+        h+=`<div style="background:rgba(0,0,0,0.15);border-radius:6px;padding:8px;font-size:10px">`;
+        h+=`<div style="color:var(--t3);font-weight:700;margin-bottom:4px">Últimos movimientos:</div>`;
+        recentMovs.forEach(m=>{
+          let ico='',color='#94a3b8',txt='';
+          if(m.type==='cargo'){ico='➕';color='#ef4444';txt=`+$${(m.amount||0).toFixed(2)}`}
+          else if(m.type==='abono_efectivo'){ico='💵';color='#34d399';txt=`−$${(m.amount||0).toFixed(2)}`}
+          else if(m.type==='abono_venta'){ico='💰';color='#a855f7';txt=`−$${(m.amount||0).toFixed(2)}`}
+          else if(m.type==='ajuste'){ico='⚙️';color='#94a3b8';txt=`${(m.amount||0)>=0?'+':'−'}$${Math.abs(m.amount||0).toFixed(2)}`}
+          h+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)"><span>${ico} ${m.date||''} <span style="color:var(--t3)">${(m.description||'').slice(0,22)}</span></span><span style="color:${color};font-weight:700;font-family:var(--mn)">${txt}</span></div>`;
+        });
+        h+=`</div>`;
+      }
+
+      // Botones de acción
+      if(isAdmin){
+        h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">`;
+        h+=`<button onclick="pvAddCargo('${pv.id}')" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">➕ Cargo</button>`;
+        h+=`<button onclick="pvAddAbonoEfectivo('${pv.id}')" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">💵 Pagar</button>`;
+        h+=`<button onclick="pvAddAbonoVenta('${pv.id}')" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">💰 Pago Venta</button>`;
+        h+=`<button onclick="pvOpen('${pv.id}')" style="background:rgba(255,255,255,0.06);color:var(--t2);border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">📋 Ver todo</button>`;
+        h+=`</div>`;
+        h+=`<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:2px">`;
+        h+=`<button onclick="pvEdit('${pv.id}')" title="Editar proveedor" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--t3)">✏️</button>`;
+        h+=`<button onclick="pvDel('${pv.id}')" title="Eliminar proveedor" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--t3)">🗑</button>`;
+        h+=`</div>`;
+      }else{
+        h+=`<button onclick="pvOpen('${pv.id}')" style="background:rgba(255,255,255,0.06);color:var(--t2);border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px">📋 Ver historial</button>`;
+      }
+
+      h+=`</div>`;
+    });
+    h+=`</div>`;
+  }
 
   return h;
 }
