@@ -8430,14 +8430,6 @@ function contRenderProviders(){
 
   h+=`</div>`; // cierre grid
 
-  // Si no hay ningún proveedor
-  if(list.length===0){
-    h=`<div class="c" style="padding:40px;text-align:center;color:var(--t3);font-size:13px">No hay proveedores registrados.<br><br>Haz clic en "+ Nuevo Proveedor" para agregar tu primer laboratorio o radiólogo.</div>`;
-    if(isAdmin){
-      h=`<div style="margin-bottom:16px"><button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button></div>`+h;
-    }
-  }
-
   return h;
 }
 
