@@ -8291,11 +8291,9 @@ function contRenderProviders(){
     hh+=`</div>`;
     hh+=`</div>`;
 
-    // Tabla de movimientos
-    const movs=[...(pv.movements||[])].sort((a,b)=>{
-      const cmp=(a.date||'').localeCompare(b.date||'');
-      return cmp!==0?cmp:(a.createdAt||0)-(b.createdAt||0);
-    });
+    // Tabla de movimientos: ordenados por fecha de registro (createdAt)
+    // → aparecen en el orden que las vas anotando
+    const movs=[...(pv.movements||[])].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 
     let running=0;
     const withSaldo=movs.map(m=>{
@@ -8308,36 +8306,50 @@ function contRenderProviders(){
       }
       return{...m,debe,haber,running};
     });
+    // Más reciente arriba (último anotado)
     const display=[...withSaldo].reverse();
 
     hh+=`<div style="padding:8px 12px">`;
     if(display.length===0){
-      hh+=`<div style="padding:16px;text-align:center;color:var(--t3);font-size:10px;font-style:italic">Sin movimientos aún</div>`;
+      hh+=`<div style="padding:16px;text-align:center;color:var(--t3);font-size:10px;font-style:italic">Sin movimientos aún. Usa los botones de abajo para empezar.</div>`;
     }else{
       hh+=`<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse">`;
       hh+=`<thead><tr style="border-bottom:2px solid ${mainColor}40;color:var(--t3);font-size:9px;font-weight:700">`;
-      hh+=`<th style="padding:6px 4px;text-align:left">FECHA</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:left">CONCEPTO</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right">DEBE</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right">HABER</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right">SALDO</th>`;
-      if(isAdmin)hh+=`<th style="padding:6px 4px;text-align:center"></th>`;
+      hh+=`<th style="padding:6px 4px;text-align:left;width:55px">FECHA</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:left">CONCEPTO / NOTAS</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right;width:55px">DEBE</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right;width:55px">HABER</th>`;
+      hh+=`<th style="padding:6px 4px;text-align:right;width:60px">SALDO</th>`;
+      if(isAdmin)hh+=`<th style="padding:6px 4px;text-align:center;width:24px"></th>`;
       hh+=`</tr></thead><tbody>`;
 
       display.forEach(m=>{
-        let ico='',tipoTxt='';
-        if(m.type==='cargo'){ico='➕';tipoTxt=m.service==='lab'?'Lab':(m.service==='rx'?'RX':'Cargo')}
-        else if(m.type==='abono_efectivo'){ico='💵';tipoTxt='Abono'}
-        else if(m.type==='abono_venta'){ico='💰';tipoTxt='Pago vta'}
-        else if(m.type==='ajuste'){ico='⚙️';tipoTxt='Ajuste'}
+        let ico='',tipoTxt='',tipoColor='var(--t2)';
+        if(m.type==='cargo'){ico='➕';tipoTxt=m.service==='lab'?'Cargo Lab':(m.service==='rx'?'Cargo RX':'Cargo');tipoColor='#ef4444'}
+        else if(m.type==='abono_efectivo'){ico='💵';tipoTxt='Abono';tipoColor='#34d399'}
+        else if(m.type==='abono_venta'){ico='💰';tipoTxt='Pago a precio venta';tipoColor='#a855f7'}
+        else if(m.type==='ajuste'){ico='⚙️';tipoTxt='Ajuste';tipoColor='#94a3b8'}
 
-        hh+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">`;
-        hh+=`<td style="padding:5px 4px;font-family:var(--mn);font-size:9px;color:var(--t2);white-space:nowrap">${(m.date||'').slice(5)}</td>`;
-        hh+=`<td style="padding:5px 4px;font-size:10px">${ico} ${tipoTxt}${m.qty?` <span style="color:var(--t3)">×${m.qty}</span>`:''}</td>`;
-        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);color:${m.debe>0?'#ef4444':'var(--t3)'}">${m.debe>0?m.debe.toFixed(2):'—'}</td>`;
-        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);color:${m.haber>0?'#34d399':'var(--t3)'}">${m.haber>0?m.haber.toFixed(2):'—'}</td>`;
-        hh+=`<td style="padding:5px 4px;text-align:right;font-family:var(--mn);font-weight:700;color:${m.running>0.01?'#ef4444':(m.running<-0.01?'#34d399':'var(--t3)')}">${m.running.toFixed(2)}</td>`;
-        if(isAdmin)hh+=`<td style="padding:5px 4px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--t3)">🗑</button></td>`;
+        // Construir nota completa
+        const desc=m.description||'';
+        // No duplicar si la descripción ya empieza con el tipo
+        const showDesc=desc&&!desc.toLowerCase().startsWith(tipoTxt.toLowerCase())&&desc.toLowerCase()!==tipoTxt.toLowerCase();
+        const extras=[];
+        if(m.qty)extras.push('×'+m.qty);
+        if(m.patient)extras.push('👤 '+m.patient);
+
+        hh+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">`;
+        hh+=`<td style="padding:6px 4px;font-family:var(--mn);font-size:9px;color:var(--t2);white-space:nowrap">${m.date||''}</td>`;
+        hh+=`<td style="padding:6px 4px;font-size:10px">`;
+        hh+=`<div style="font-weight:700;color:${tipoColor}">${ico} ${tipoTxt}${extras.length?' <span style="color:var(--t3);font-weight:400">('+extras.join(', ')+')</span>':''}</div>`;
+        if(showDesc){
+          hh+=`<div style="font-size:10px;color:var(--t1);margin-top:3px;padding:4px 8px;background:rgba(255,255,255,0.04);border-left:2px solid ${tipoColor}40;border-radius:3px;font-style:italic;white-space:pre-wrap;word-break:break-word">📝 ${desc}</div>`;
+        }
+        hh+=`</td>`;
+        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);color:${m.debe>0?'#ef4444':'var(--t3)'};font-weight:${m.debe>0?'700':'400'}">${m.debe>0?'$'+m.debe.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);color:${m.haber>0?'#34d399':'var(--t3)'};font-weight:${m.haber>0?'700':'400'}">${m.haber>0?'$'+m.haber.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);font-weight:800;color:${m.running>0.01?'#ef4444':(m.running<-0.01?'#34d399':'var(--t3)')}">$${m.running.toFixed(2)}</td>`;
+        if(isAdmin)hh+=`<td style="padding:6px 4px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--t3)">🗑</button></td>`;
         hh+=`</tr>`;
       });
 
