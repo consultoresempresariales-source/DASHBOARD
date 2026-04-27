@@ -8273,21 +8273,36 @@ function contRenderProviders(){
   // Función para renderizar una tarjeta de proveedor con estado de cuenta
   function renderPvCard(pv,mainColor){
     const s=pvSaldo(pv);
+    const saldoColor=s>0.01?'#ef4444':(s<-0.01?'#34d399':'#94a3b8');
+    const saldoLabel=s>0.01?'POR PAGAR':(s<-0.01?'A FAVOR':'AL DÍA');
+    const saldoIcon=s>0.01?'⚠':(s<-0.01?'✓':'•');
     let hh='';
-    hh+=`<div class="c" style="background:rgba(0,0,0,0.2);border:1px solid ${mainColor}40;padding:0;margin-bottom:12px;overflow:hidden">`;
+    // Tarjeta moderna con sombra y borde sutil
+    hh+=`<div style="position:relative;background:linear-gradient(180deg,rgba(30,41,59,0.6),rgba(15,23,42,0.6));border:1px solid ${mainColor}33;border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.04);transition:all 0.2s ease">`;
 
-    // Header: nombre + saldo
-    hh+=`<div style="padding:12px 14px;background:rgba(0,0,0,0.2);border-bottom:1px solid ${mainColor}30;display:flex;justify-content:space-between;align-items:flex-start;gap:10px">`;
+    // Línea de color en el borde superior
+    hh+=`<div style="height:3px;background:linear-gradient(90deg,${mainColor},${mainColor}66,transparent)"></div>`;
+
+    // Header: nombre + saldo (más espacio, mejor jerarquía)
+    hh+=`<div style="padding:18px 20px 14px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px">`;
     hh+=`<div style="flex:1;min-width:0">`;
-    hh+=`<div style="font-size:13px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pv.name||'—'}</div>`;
-    const infoParts=[];
-    if(pv.ruc)infoParts.push(`RUC: ${pv.ruc}`);
-    if(pv.phone)infoParts.push(`📞 ${pv.phone}`);
-    if(infoParts.length)hh+=`<div style="font-size:9px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${infoParts.join(' · ')}</div>`;
+    // Nombre con avatar circular
+    hh+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">`;
+    const initial=(pv.name||'?').charAt(0).toUpperCase();
+    hh+=`<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,${mainColor}33,${mainColor}11);border:1px solid ${mainColor}44;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:${mainColor};flex-shrink:0">${initial}</div>`;
+    hh+=`<div style="flex:1;min-width:0">`;
+    hh+=`<div style="font-size:15px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.01em">${pv.name||'—'}</div>`;
+    const metaParts=[];
+    if(pv.ruc)metaParts.push(pv.ruc);
+    if(pv.phone)metaParts.push(pv.phone);
+    if(metaParts.length)hh+=`<div style="font-size:11px;color:var(--t3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${metaParts.join(' • ')}</div>`;
     hh+=`</div>`;
+    hh+=`</div>`;
+    hh+=`</div>`;
+    // Pill de saldo
     hh+=`<div style="text-align:right;flex-shrink:0">`;
-    hh+=`<div style="font-size:8px;color:var(--t3);font-weight:700">${s>0.01?'DEBE':(s<-0.01?'A FAVOR':'AL DÍA')}</div>`;
-    hh+=`<div style="font-size:18px;font-weight:900;font-family:var(--mn);color:${s>0.01?'#ef4444':(s<-0.01?'#34d399':'var(--t3)')};line-height:1">$${Math.abs(s).toFixed(2)}</div>`;
+    hh+=`<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;background:${saldoColor}22;border:1px solid ${saldoColor}44;font-size:9px;font-weight:800;color:${saldoColor};letter-spacing:.06em;margin-bottom:4px">${saldoIcon} ${saldoLabel}</div>`;
+    hh+=`<div style="font-size:24px;font-weight:900;font-family:var(--mn);color:${saldoColor};line-height:1;letter-spacing:-0.02em">$${Math.abs(s).toFixed(2)}</div>`;
     hh+=`</div>`;
     hh+=`</div>`;
 
@@ -8309,64 +8324,73 @@ function contRenderProviders(){
     // Más reciente arriba (último anotado)
     const display=[...withSaldo].reverse();
 
-    hh+=`<div style="padding:8px 12px">`;
+    hh+=`<div style="padding:0 20px 18px 20px">`;
     if(display.length===0){
-      hh+=`<div style="padding:16px;text-align:center;color:var(--t3);font-size:10px;font-style:italic">Sin movimientos aún. Usa los botones de abajo para empezar.</div>`;
+      hh+=`<div style="padding:24px 16px;text-align:center;color:var(--t3);font-size:11px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.08);border-radius:10px;margin-top:6px"><div style="font-size:24px;margin-bottom:6px;opacity:0.5">📋</div>Sin movimientos aún.<br>Usa los botones de abajo para empezar.</div>`;
     }else{
-      hh+=`<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse">`;
-      hh+=`<thead><tr style="border-bottom:2px solid ${mainColor}40;color:var(--t3);font-size:9px;font-weight:700">`;
-      hh+=`<th style="padding:6px 4px;text-align:left;width:55px">FECHA</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:left">CONCEPTO / NOTAS</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right;width:55px">DEBE</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right;width:55px">HABER</th>`;
-      hh+=`<th style="padding:6px 4px;text-align:right;width:60px">SALDO</th>`;
-      if(isAdmin)hh+=`<th style="padding:6px 4px;text-align:center;width:24px"></th>`;
+      // Tabla moderna estilo Stripe/Linear
+      hh+=`<div style="margin-top:6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;overflow:hidden">`;
+      hh+=`<div style="overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse">`;
+      hh+=`<thead><tr style="background:rgba(255,255,255,0.03);color:var(--t3);font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">`;
+      hh+=`<th style="padding:10px 8px;text-align:left;width:80px;border-bottom:1px solid rgba(255,255,255,0.06)">Fecha</th>`;
+      hh+=`<th style="padding:10px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)">Movimiento</th>`;
+      hh+=`<th style="padding:10px 8px;text-align:right;width:70px;border-bottom:1px solid rgba(255,255,255,0.06)">Debe</th>`;
+      hh+=`<th style="padding:10px 8px;text-align:right;width:70px;border-bottom:1px solid rgba(255,255,255,0.06)">Haber</th>`;
+      hh+=`<th style="padding:10px 8px;text-align:right;width:80px;border-bottom:1px solid rgba(255,255,255,0.06)">Saldo</th>`;
+      if(isAdmin)hh+=`<th style="padding:10px 8px;text-align:center;width:30px;border-bottom:1px solid rgba(255,255,255,0.06)"></th>`;
       hh+=`</tr></thead><tbody>`;
 
-      display.forEach(m=>{
-        let ico='',tipoTxt='',tipoColor='var(--t2)';
-        if(m.type==='cargo'){ico='➕';tipoTxt=m.service==='lab'?'Cargo Lab':(m.service==='rx'?'Cargo RX':'Cargo');tipoColor='#ef4444'}
-        else if(m.type==='abono_efectivo'){ico='💵';tipoTxt='Abono';tipoColor='#34d399'}
-        else if(m.type==='abono_venta'){ico='💰';tipoTxt='Pago a precio venta';tipoColor='#a855f7'}
-        else if(m.type==='ajuste'){ico='⚙️';tipoTxt='Ajuste';tipoColor='#94a3b8'}
+      display.forEach((m,idx)=>{
+        let ico='',tipoTxt='',tipoColor='#94a3b8',tipoBg='148,163,184';
+        if(m.type==='cargo'){ico='➕';tipoTxt=m.service==='lab'?'Cargo Lab':(m.service==='rx'?'Cargo RX':'Cargo');tipoColor='#f87171';tipoBg='248,113,113'}
+        else if(m.type==='abono_efectivo'){ico='💵';tipoTxt='Abono';tipoColor='#34d399';tipoBg='52,211,153'}
+        else if(m.type==='abono_venta'){ico='💰';tipoTxt='Pago precio venta';tipoColor='#c4b5fd';tipoBg='196,181,253'}
+        else if(m.type==='ajuste'){ico='⚙️';tipoTxt='Ajuste';tipoColor='#94a3b8';tipoBg='148,163,184'}
 
-        // Construir nota completa
         const desc=m.description||'';
-        // No duplicar si la descripción ya empieza con el tipo
         const showDesc=desc&&!desc.toLowerCase().startsWith(tipoTxt.toLowerCase())&&desc.toLowerCase()!==tipoTxt.toLowerCase();
         const extras=[];
         if(m.qty)extras.push('×'+m.qty);
         if(m.patient)extras.push('👤 '+m.patient);
 
-        hh+=`<tr style="border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top">`;
-        hh+=`<td style="padding:6px 4px;font-family:var(--mn);font-size:9px;color:var(--t2);white-space:nowrap">${m.date||''}</td>`;
-        hh+=`<td style="padding:6px 4px;font-size:10px">`;
-        hh+=`<div style="font-weight:700;color:${tipoColor}">${ico} ${tipoTxt}${extras.length?' <span style="color:var(--t3);font-weight:400">('+extras.join(', ')+')</span>':''}</div>`;
+        // Formato de fecha bonito
+        const dt=m.date||'';
+        const dateParts=dt.split('-');
+        const dtNice=dateParts.length===3?`${dateParts[2]}/${dateParts[1]}<span style="color:var(--t4);font-size:9px"> ${dateParts[0]}</span>`:dt;
+
+        const isLast=idx===display.length-1;
+        hh+=`<tr style="${isLast?'':'border-bottom:1px solid rgba(255,255,255,0.04);'}vertical-align:top;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background=''">`;
+        hh+=`<td style="padding:12px 8px;font-family:var(--mn);font-size:10px;color:var(--t2);white-space:nowrap">${dtNice}</td>`;
+        hh+=`<td style="padding:12px 8px;font-size:11px">`;
+        // Badge de tipo
+        hh+=`<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:rgba(${tipoBg},0.12);border:1px solid rgba(${tipoBg},0.25);color:${tipoColor};font-weight:700;font-size:10px;letter-spacing:.01em">${ico} ${tipoTxt}${extras.length?` <span style="color:var(--t3);font-weight:400;margin-left:2px">${extras.join(', ')}</span>`:''}</div>`;
         if(showDesc){
-          hh+=`<div style="font-size:10px;color:var(--t1);margin-top:3px;padding:4px 8px;background:rgba(255,255,255,0.04);border-left:2px solid ${tipoColor}40;border-radius:3px;font-style:italic;white-space:pre-wrap;word-break:break-word">📝 ${desc}</div>`;
+          hh+=`<div style="font-size:11px;color:var(--t1);margin-top:8px;padding:8px 12px;background:rgba(${tipoBg},0.06);border-left:3px solid rgba(${tipoBg},0.5);border-radius:6px;line-height:1.5;white-space:pre-wrap;word-break:break-word"><span style="color:var(--t3);font-size:10px;margin-right:4px">📝</span>${desc}</div>`;
         }
         hh+=`</td>`;
-        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);color:${m.debe>0?'#ef4444':'var(--t3)'};font-weight:${m.debe>0?'700':'400'}">${m.debe>0?'$'+m.debe.toFixed(2):'—'}</td>`;
-        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);color:${m.haber>0?'#34d399':'var(--t3)'};font-weight:${m.haber>0?'700':'400'}">${m.haber>0?'$'+m.haber.toFixed(2):'—'}</td>`;
-        hh+=`<td style="padding:6px 4px;text-align:right;font-family:var(--mn);font-weight:800;color:${m.running>0.01?'#ef4444':(m.running<-0.01?'#34d399':'var(--t3)')}">$${m.running.toFixed(2)}</td>`;
-        if(isAdmin)hh+=`<td style="padding:6px 4px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--t3)">🗑</button></td>`;
+        hh+=`<td style="padding:12px 8px;text-align:right;font-family:var(--mn);color:${m.debe>0?'#f87171':'var(--t4)'};font-weight:${m.debe>0?'700':'400'};font-size:11px">${m.debe>0?'+$'+m.debe.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:12px 8px;text-align:right;font-family:var(--mn);color:${m.haber>0?'#34d399':'var(--t4)'};font-weight:${m.haber>0?'700':'400'};font-size:11px">${m.haber>0?'−$'+m.haber.toFixed(2):'—'}</td>`;
+        hh+=`<td style="padding:12px 8px;text-align:right;font-family:var(--mn);font-weight:800;font-size:12px;color:${m.running>0.01?'#f87171':(m.running<-0.01?'#34d399':'var(--t3)')}">$${m.running.toFixed(2)}</td>`;
+        if(isAdmin)hh+=`<td style="padding:12px 8px;text-align:center"><button onclick="pvDelMov('${pv.id}','${m.id}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--t4);opacity:0.5;transition:all 0.15s;padding:4px;border-radius:4px" onmouseover="this.style.opacity=1;this.style.color='#ef4444';this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.opacity=0.5;this.style.color='var(--t4)';this.style.background='none'">🗑</button></td>`;
         hh+=`</tr>`;
       });
 
-      hh+=`</tbody></table></div>`;
+      hh+=`</tbody></table></div></div>`;
     }
 
-    // Botones de acción
+    // Botones de acción - Diseño moderno
     if(isAdmin){
-      hh+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid ${mainColor}30">`;
-      hh+=`<button onclick="pvAddDeuda('${pv.id}')" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid #ef444440;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">➕ Agregar Deuda</button>`;
-      hh+=`<button onclick="pvAddAbono('${pv.id}')" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid #34d39940;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">💵 Registrar Abono</button>`;
-      hh+=`<button onclick="pvJornadaConvenio('${pv.id}')" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid #fbbf2440;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">🗓️ Jornada Convenio</button>`;
-      hh+=`<button onclick="pvJornadaVenta('${pv.id}')" style="background:rgba(168,85,247,0.15);color:#a855f7;border:1px solid #a855f740;border-radius:5px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer">🎯 Jornada Venta</button>`;
+      const btnStyle=(bg,col)=>`background:linear-gradient(180deg,${bg}22,${bg}11);color:${col};border:1px solid ${bg}44;border-radius:10px;padding:11px 8px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s ease;letter-spacing:.01em;display:flex;align-items:center;justify-content:center;gap:5px`;
+      const btnHover=`onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'" onmouseout="this.style.transform='';this.style.boxShadow=''"`;
+      hh+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06)">`;
+      hh+=`<button onclick="pvAddDeuda('${pv.id}')" ${btnHover} style="${btnStyle('#ef4444','#fca5a5')}"><span style="font-size:13px">➕</span> Agregar Deuda</button>`;
+      hh+=`<button onclick="pvAddAbono('${pv.id}')" ${btnHover} style="${btnStyle('#34d399','#6ee7b7')}"><span style="font-size:13px">💵</span> Registrar Abono</button>`;
+      hh+=`<button onclick="pvJornadaConvenio('${pv.id}')" ${btnHover} style="${btnStyle('#fbbf24','#fcd34d')}"><span style="font-size:13px">🗓️</span> Jornada Convenio</button>`;
+      hh+=`<button onclick="pvJornadaVenta('${pv.id}')" ${btnHover} style="${btnStyle('#a855f7','#c4b5fd')}"><span style="font-size:13px">🎯</span> Jornada Venta</button>`;
       hh+=`</div>`;
-      hh+=`<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">`;
-      hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:5px 10px;font-size:10px;cursor:pointer;color:var(--t3)">✏️ Editar</button>`;
-      hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar" style="background:rgba(255,255,255,0.04);border:1px solid var(--bd);border-radius:5px;padding:5px 10px;font-size:10px;cursor:pointer;color:var(--t3)">🗑 Eliminar</button>`;
+      hh+=`<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">`;
+      hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar proveedor" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--t2);font-weight:600;transition:all 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.08)';this.style.color='var(--t1)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.color='var(--t2)'">✏️ Editar</button>`;
+      hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar proveedor" style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;color:#fca5a5;font-weight:600;transition:all 0.15s" onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#ef4444'" onmouseout="this.style.background='rgba(239,68,68,0.05)';this.style.color='#fca5a5'">🗑 Eliminar</button>`;
       hh+=`</div>`;
     }
 
@@ -8378,13 +8402,16 @@ function contRenderProviders(){
 
   let h='';
 
-  // ═══ BOTÓN NUEVO PROVEEDOR ═══
+  // ═══ HEADER MODERNO ═══
   if(isAdmin){
-    h+=`<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center">`;
-    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">📦 Cuentas por pagar a proveedores</div>`;
-    h+=`<div style="display:flex;gap:8px;flex-wrap:wrap">`;
-    h+=`<button onclick="pvNew()" style="background:${CONT_COLOR};color:#000;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer">+ Nuevo Proveedor</button>`;
-    h+=`<button onclick="pvExport()" title="Respaldo JSON" style="background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid #60a5fa40;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer">📤</button>`;
+    h+=`<div style="margin-bottom:24px;display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;align-items:center">`;
+    h+=`<div>`;
+    h+=`<div style="font-size:20px;font-weight:800;color:var(--t1);letter-spacing:-0.02em">📦 Cuentas por pagar a proveedores</div>`;
+    h+=`<div style="font-size:12px;color:var(--t3);margin-top:4px">Lleva el control de tus deudas con laboratorios y radiólogos</div>`;
+    h+=`</div>`;
+    h+=`<div style="display:flex;gap:10px;flex-wrap:wrap">`;
+    h+=`<button onclick="pvNew()" style="background:linear-gradient(135deg,${CONT_COLOR},${CONT_COLOR}dd);color:#000;border:none;border-radius:10px;padding:11px 22px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px ${CONT_COLOR}33;transition:all 0.2s ease" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 16px ${CONT_COLOR}44'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px ${CONT_COLOR}33'">+ Nuevo Proveedor</button>`;
+    h+=`<button onclick="pvExport()" title="Respaldo JSON" style="background:rgba(96,165,250,0.1);color:#93c5fd;border:1px solid rgba(96,165,250,0.3);border-radius:10px;padding:11px 16px;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s ease" onmouseover="this.style.background='rgba(96,165,250,0.2)'" onmouseout="this.style.background='rgba(96,165,250,0.1)'">📤 Respaldo</button>`;
     h+=`</div>`;
     h+=`</div>`;
   }
@@ -8394,14 +8421,19 @@ function contRenderProviders(){
 
   // ───── COLUMNA LABORATORIOS ─────
   h+=`<div>`;
-  // Cuadro total LAB
-  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(96,165,250,0.15),rgba(96,165,250,0.05));border:2px solid rgba(96,165,250,0.4);padding:20px;margin-bottom:16px">`;
-  h+=`<div style="display:flex;align-items:center;gap:12px">`;
-  h+=`<div style="font-size:36px">🧪</div>`;
-  h+=`<div style="flex:1">`;
-  h+=`<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON LABORATORIOS</div>`;
-  h+=`<div style="font-size:28px;font-weight:900;font-family:var(--mn);color:#60a5fa;line-height:1.1">$${deudaLab.toFixed(2)}</div>`;
-  h+=`<div style="font-size:10px;color:var(--t2);margin-top:4px">${labProvs.length} proveedor${labProvs.length!==1?'es':''} de laboratorio</div>`;
+  // Cuadro total LAB - Diseño moderno glassmorphism
+  h+=`<div style="position:relative;background:linear-gradient(135deg,rgba(59,130,246,0.18) 0%,rgba(37,99,235,0.08) 50%,rgba(15,23,42,0.4) 100%);border:1px solid rgba(96,165,250,0.35);border-radius:16px;padding:24px;margin-bottom:20px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(59,130,246,0.15),inset 0 1px 0 rgba(255,255,255,0.05);overflow:hidden">`;
+  // Decoración: blob de luz
+  h+=`<div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(96,165,250,0.25),transparent 70%);border-radius:50%;pointer-events:none"></div>`;
+  h+=`<div style="position:relative;display:flex;align-items:center;gap:16px">`;
+  h+=`<div style="width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,rgba(96,165,250,0.25),rgba(59,130,246,0.1));border:1px solid rgba(96,165,250,0.3);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;box-shadow:0 4px 12px rgba(59,130,246,0.2)">🧪</div>`;
+  h+=`<div style="flex:1;min-width:0">`;
+  h+=`<div style="font-size:10px;color:#93c5fd;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px">Deuda con Laboratorios</div>`;
+  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#60a5fa;line-height:1;letter-spacing:-0.02em;text-shadow:0 2px 12px rgba(96,165,250,0.3)">$${deudaLab.toFixed(2)}</div>`;
+  h+=`<div style="display:flex;align-items:center;gap:6px;margin-top:8px">`;
+  h+=`<div style="width:6px;height:6px;border-radius:50%;background:#60a5fa;box-shadow:0 0 8px rgba(96,165,250,0.6)"></div>`;
+  h+=`<div style="font-size:11px;color:var(--t2);font-weight:500">${labProvs.length} proveedor${labProvs.length!==1?'es':''} activo${labProvs.length!==1?'s':''}</div>`;
+  h+=`</div>`;
   h+=`</div>`;
   h+=`</div>`;
   h+=`</div>`;
@@ -8420,14 +8452,18 @@ function contRenderProviders(){
 
   // ───── COLUMNA RADIOGRAFÍAS ─────
   h+=`<div>`;
-  // Cuadro total RX
-  h+=`<div class="c" style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(168,85,247,0.05));border:2px solid rgba(168,85,247,0.4);padding:20px;margin-bottom:16px">`;
-  h+=`<div style="display:flex;align-items:center;gap:12px">`;
-  h+=`<div style="font-size:36px">🩻</div>`;
-  h+=`<div style="flex:1">`;
-  h+=`<div style="font-size:11px;color:var(--t3);font-weight:700;letter-spacing:.05em">DEUDA CON RADIÓLOGOS</div>`;
-  h+=`<div style="font-size:28px;font-weight:900;font-family:var(--mn);color:#a855f7;line-height:1.1">$${deudaRx.toFixed(2)}</div>`;
-  h+=`<div style="font-size:10px;color:var(--t2);margin-top:4px">${rxProvs.length} proveedor${rxProvs.length!==1?'es':''} de radiografías</div>`;
+  // Cuadro total RX - Diseño moderno glassmorphism
+  h+=`<div style="position:relative;background:linear-gradient(135deg,rgba(168,85,247,0.18) 0%,rgba(126,34,206,0.08) 50%,rgba(15,23,42,0.4) 100%);border:1px solid rgba(168,85,247,0.35);border-radius:16px;padding:24px;margin-bottom:20px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(168,85,247,0.15),inset 0 1px 0 rgba(255,255,255,0.05);overflow:hidden">`;
+  h+=`<div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(168,85,247,0.25),transparent 70%);border-radius:50%;pointer-events:none"></div>`;
+  h+=`<div style="position:relative;display:flex;align-items:center;gap:16px">`;
+  h+=`<div style="width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,rgba(168,85,247,0.25),rgba(126,34,206,0.1));border:1px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;box-shadow:0 4px 12px rgba(168,85,247,0.2)">🩻</div>`;
+  h+=`<div style="flex:1;min-width:0">`;
+  h+=`<div style="font-size:10px;color:#d8b4fe;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px">Deuda con Radiólogos</div>`;
+  h+=`<div style="font-size:32px;font-weight:900;font-family:var(--mn);color:#a855f7;line-height:1;letter-spacing:-0.02em;text-shadow:0 2px 12px rgba(168,85,247,0.3)">$${deudaRx.toFixed(2)}</div>`;
+  h+=`<div style="display:flex;align-items:center;gap:6px;margin-top:8px">`;
+  h+=`<div style="width:6px;height:6px;border-radius:50%;background:#a855f7;box-shadow:0 0 8px rgba(168,85,247,0.6)"></div>`;
+  h+=`<div style="font-size:11px;color:var(--t2);font-weight:500">${rxProvs.length} proveedor${rxProvs.length!==1?'es':''} activo${rxProvs.length!==1?'s':''}</div>`;
+  h+=`</div>`;
   h+=`</div>`;
   h+=`</div>`;
   h+=`</div>`;
