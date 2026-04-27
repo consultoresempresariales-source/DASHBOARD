@@ -4896,35 +4896,172 @@ function agCanEditDept(deptId){
   return false;
 }
 
-async function genAgInformeDocx(){
+// ═══════════════════════════════════════════════════════════════
+// INFORME EJECUTIVO DE CUMPLIMIENTO – Aplica las 6 reglas del prompt maestro
+// Solo analiza SST y SALUD (los 2 departamentos del prompt)
+// Detecta "No Responde" automáticamente desde campo Observaciones
+// ═══════════════════════════════════════════════════════════════
+
+// Helper común: analiza datos y devuelve toda la información estructurada
+function agBuildInformeData(){
   const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const mesLabel=mNames[LOG.month]+" "+LOG.year;
-  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(allCos.length===0){alert("No hay empresas");return}
+  // Solo SST y Salud (del prompt maestro)
+  const DEPTS=[
+    {id:"sst",label:"SST",mod:"mod_seguridad"},
+    {id:"salud",label:"SALUD",mod:"mod_salud"}
+  ];
+  // Cartera total: empresas con módulo SST o Salud
+  const allCos=cos.filter(c=>c.mod_salud||c.mod_salud==null||c.mod_seguridad).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const totalCartera=allCos.length;
 
-  // Calculate stats per dept
+  // Detectar si una observación indica "No Responde"
+  const isNoResponde=(txt)=>{
+    if(!txt)return false;
+    const t=String(txt).toLowerCase();
+    return t.includes('no responde')||t.includes('no contesta')||t.includes('sin respuesta')||
+           t.includes('no responden')||t.includes('no atiende')||t.includes('no contestan')||
+           t.includes('reagendar')&&t.includes('no');
+  };
+
+  // Detectar si una empresa está activa en algún módulo
+  const isActiveAnyDept=(co)=>{
+    return DEPTS.some(d=>{
+      const est=agGetVal(co.id,d.id,'est');
+      return est==='ACTIVO'||est==null||est==='';
+    });
+  };
+
+  // Por departamento: estadísticas de cumplimiento (Regla 1, 4, 5)
   const stats={};
-  AG_DEPTS.forEach(d=>{
-    let totalCos=0,agSi=0,visSi=0,infSi=0;
+  DEPTS.forEach(d=>{
+    let totalConGestion=0,agSi=0,visSi=0,infSi=0;
+    const conGestionList=[],noResponderList=[],sinGestionList=[],inactivasList=[];
     allCos.forEach(co=>{
+      const est=agGetVal(co.id,d.id,'est');
       const ag=agGetVal(co.id,d.id,'ag');
-      if(ag==='N/A')return;
-      totalCos++;
+      const obs=agGetVal(co.id,d.id,'obs')||'';
+      if(est==='INACTIVO'){inactivasList.push({co,obs});return}
+      if(ag==='N/A'){sinGestionList.push({co,obs});return}
+      // Aquí: Activo + Ag != N/A => "con gestión"
+      totalConGestion++;
+      conGestionList.push({co,obs});
       if(ag==='SÍ')agSi++;
+      else if(isNoResponde(obs))noResponderList.push({co,obs});
       if(agGetVal(co.id,d.id,'vis')==='SÍ')visSi++;
       if(agGetVal(co.id,d.id,'inf')==='SÍ')infSi++;
     });
-    stats[d.id]={total:totalCos,ag:agSi,vis:visSi,inf:infSi,
-      agPct:totalCos>0?Math.round(agSi/totalCos*100):0,
-      visPct:totalCos>0?Math.round(visSi/totalCos*100):0,
-      infPct:totalCos>0?Math.round(infSi/totalCos*100):0};
+    const pct=v=>totalConGestion>0?Math.round(v/totalConGestion*100):0;
+    stats[d.id]={
+      label:d.label,
+      total:totalConGestion,
+      ag:agSi,vis:visSi,inf:infSi,
+      agPct:pct(agSi),visPct:pct(visSi),infPct:pct(infSi),
+      cumplimientoPct:pct(infSi),
+      conGestionList,noResponderList,sinGestionList,inactivasList
+    };
   });
-  const numEmpresas=allCos.length;
-  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].total>0);
-  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agPct,0)/depsWithData.length):0;
-  const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visPct,0)/depsWithData.length):0;
-  const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infPct,0)/depsWithData.length):0;
-  let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
+
+  // Empresas con CICLO 100% (Regla 3): en todos los deptos donde hay gestión, ag=vis=inf=SÍ
+  const ciclo100=[];
+  allCos.forEach(co=>{
+    let depsConGestion=0,depsCompletos=0;
+    const areasCompletas=[];
+    DEPTS.forEach(d=>{
+      const est=agGetVal(co.id,d.id,'est');
+      const ag=agGetVal(co.id,d.id,'ag');
+      if(est==='INACTIVO'||ag==='N/A')return;
+      depsConGestion++;
+      const vis=agGetVal(co.id,d.id,'vis');
+      const inf=agGetVal(co.id,d.id,'inf');
+      if(ag==='SÍ'&&vis==='SÍ'&&inf==='SÍ'){depsCompletos++;areasCompletas.push(d.label)}
+    });
+    if(depsConGestion>0&&depsConGestion===depsCompletos){
+      ciclo100.push({co,depsConGestion,areasCompletas});
+    }
+  });
+
+  // Empresas "No Responde" globales (en cualquier depto)
+  const noRespondeMap=new Map();
+  DEPTS.forEach(d=>{
+    stats[d.id].noResponderList.forEach(item=>{
+      const k=item.co.id;
+      if(!noRespondeMap.has(k))noRespondeMap.set(k,{co:item.co,depts:[],obs:item.obs});
+      noRespondeMap.get(k).depts.push(d.label);
+    });
+  });
+  const noRespondeGlobal=Array.from(noRespondeMap.values());
+
+  // Cuadro estadístico complementario (Regla 2): TODAS las empresas categorizadas
+  const cartera={
+    trabajadas:[],     // con SI en agendamiento en algún depto
+    noResponde:[],     // marcadas como no responde
+    sinGestionPeriodo:[], // activas pero N/A en ambos deptos
+    inactivas:[]       // estado INACTIVO
+  };
+  allCos.forEach(co=>{
+    let inactivasCount=0,naCount=0,trabajada=false,noResp=false;
+    DEPTS.forEach(d=>{
+      const est=agGetVal(co.id,d.id,'est');
+      const ag=agGetVal(co.id,d.id,'ag');
+      const obs=agGetVal(co.id,d.id,'obs')||'';
+      if(est==='INACTIVO'){inactivasCount++;return}
+      if(ag==='N/A'){naCount++;return}
+      if(ag==='SÍ')trabajada=true;
+      else if(isNoResponde(obs))noResp=true;
+    });
+    if(inactivasCount===DEPTS.length)cartera.inactivas.push(co);
+    else if(trabajada)cartera.trabajadas.push(co);
+    else if(noResp)cartera.noResponde.push(co);
+    else if(naCount>=DEPTS.length-inactivasCount&&naCount>0)cartera.sinGestionPeriodo.push(co);
+    else cartera.sinGestionPeriodo.push(co);
+  });
+
+  // Análisis "No Responde" con porcentajes (Regla 6)
+  const totActiva=cartera.trabajadas.length+cartera.noResponde.length;
+  const noRespAnalysis={
+    count:cartera.noResponde.length,
+    pctSobreCartera:totalCartera>0?Math.round(cartera.noResponde.length/totalCartera*100):0,
+    pctSobreActivas:totActiva>0?Math.round(cartera.noResponde.length/totActiva*100):0,
+    pctSST:stats.sst.total>0?Math.round(stats.sst.noResponderList.length/stats.sst.total*100):0,
+    pctSalud:stats.salud.total>0?Math.round(stats.salud.noResponderList.length/stats.salud.total*100):0,
+    // Proyección: si las "no responde" se cierran 100%, ¿cuál sería el cumplimiento?
+    proySST:stats.sst.total>0?Math.round((stats.sst.inf+stats.sst.noResponderList.length)/stats.sst.total*100):0,
+    proySalud:stats.salud.total>0?Math.round((stats.salud.inf+stats.salud.noResponderList.length)/stats.salud.total*100):0
+  };
+
+  // Detalle consolidado
+  const detalle=allCos.map(co=>{
+    const row={co,obs:''};
+    DEPTS.forEach(d=>{
+      row[d.id]={
+        est:agGetVal(co.id,d.id,'est')||'ACTIVO',
+        ag:agGetVal(co.id,d.id,'ag')||'',
+        vis:agGetVal(co.id,d.id,'vis')||'',
+        inf:agGetVal(co.id,d.id,'inf')||'',
+        obs:agGetVal(co.id,d.id,'obs')||''
+      };
+    });
+    // Concatenar observaciones únicas
+    const obsArr=[];
+    DEPTS.forEach(d=>{if(row[d.id].obs)obsArr.push(d.label+': '+row[d.id].obs)});
+    row.obs=obsArr.join(' | ');
+    return row;
+  });
+
+  return{mesLabel,DEPTS,allCos,totalCartera,stats,ciclo100,noRespondeGlobal,cartera,noRespAnalysis,detalle};
+}
+
+// Color de semáforo según porcentaje (Regla 5) — paleta corporativa
+function agSemaforo(pct){
+  if(pct>=80)return{color:'548235',label:'VERDE',bg:'E2EFDA'};
+  if(pct>=50)return{color:'BF8F00',label:'ÁMBAR',bg:'FFF2CC'};
+  return{color:'C00000',label:'ROJO',bg:'FCE4D6'};
+}
+
+async function genAgInformeDocx(){
+  const D=agBuildInformeData();
+  if(D.allCos.length===0){alert("No hay empresas");return}
 
   ss("ld");
   try{
@@ -4932,407 +5069,575 @@ async function genAgInformeDocx(){
     await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
   }
 
-  // DOCX XML helpers
+  // Paleta corporativa
+  const C={
+    azulPrim:'1F3864',azulAcc:'2E75B6',
+    verde:'548235',rojo:'C00000',ambar:'BF8F00',
+    grisClaro:'F2F2F2',negro:'000000',blanco:'FFFFFF',texto:'333333'
+  };
+
+  // Helpers DOCX
   const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const P=(txt,opts={})=>{
     const sz=opts.sz||22;const b=opts.b?'<w:b/>':'';const c=opts.c?`<w:color w:val="${opts.c}"/>`:'';
-    const al=opts.al?`<w:jc w:val="${opts.al}"/>`:''
-    const spc=opts.spc?`<w:spacing w:after="${opts.spc}"/>`:'<w:spacing w:after="120"/>';
-    return `<w:p><w:pPr>${al}${spc}</w:pPr><w:r><w:rPr><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${b}${c}<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/></w:rPr><w:t xml:space="preserve">${esc(txt)}</w:t></w:r></w:p>`;
+    const al=opts.al?`<w:jc w:val="${opts.al}"/>`:'';
+    const spc=opts.spc!==undefined?`<w:spacing w:after="${opts.spc}"/>`:'<w:spacing w:after="120"/>';
+    return `<w:p><w:pPr>${al}${spc}</w:pPr><w:r><w:rPr><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${b}${c}<w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">${esc(txt)}</w:t></w:r></w:p>`;
   };
   const TC=(txt,opts={})=>{
     const w=opts.w?`<w:tcW w:w="${opts.w}" w:type="dxa"/>`:'';
-    const sh=opts.bg?`<w:shd w:val="clear" w:fill="${opts.bg}"/>`:''
-    const bdr=opts.bdr||'';
-    return `<w:tc><w:tcPr>${w}${sh}${bdr}</w:tcPr>${P(txt,{sz:opts.sz||18,b:opts.b,c:opts.c,al:opts.al||'center'})}</w:tc>`;
+    const sh=opts.bg?`<w:shd w:val="clear" w:fill="${opts.bg}"/>`:'';
+    const bdr=`<w:tcBorders><w:top w:val="single" w:sz="4" w:color="BFBFBF"/><w:left w:val="single" w:sz="4" w:color="BFBFBF"/><w:bottom w:val="single" w:sz="4" w:color="BFBFBF"/><w:right w:val="single" w:sz="4" w:color="BFBFBF"/></w:tcBorders>`;
+    const vAlign='<w:vAlign w:val="center"/>';
+    return `<w:tc><w:tcPr>${w}${sh}${bdr}${vAlign}</w:tcPr>${P(txt,{sz:opts.sz||18,b:opts.b,c:opts.c,al:opts.al||'center',spc:60})}</w:tc>`;
   };
   const TR=cells=>`<w:tr>${cells}</w:tr>`;
+  const TBL=rows=>`<w:tbl><w:tblPr><w:tblW w:w="14000" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="BFBFBF"/><w:left w:val="single" w:sz="4" w:color="BFBFBF"/><w:bottom w:val="single" w:sz="4" w:color="BFBFBF"/><w:right w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideH w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideV w:val="single" w:sz="4" w:color="BFBFBF"/></w:tblBorders></w:tblPr>${rows}</w:tbl><w:p><w:pPr><w:spacing w:after="200"/></w:pPr></w:p>`;
+  const PB='<w:p><w:r><w:br w:type="page"/></w:r></w:p>'; // page break
 
-  // Build document body
   let body='';
 
-  // === COVER / TITLE ===
-  body+=P('','spc','400');
-  body+=P('INFORME EJECUTIVO DE CUMPLIMIENTO',{sz:36,b:true,al:'center',c:'0F172A',spc:100});
-  body+=P('AGENDAMIENTO Y GESTIÓN MENSUAL',{sz:28,b:true,al:'center',c:'2DD4BF',spc:80});
-  body+=P(mesLabel.toUpperCase(),{sz:24,b:true,al:'center',c:'64748B',spc:200});
-  body+=P('CONSULTORES EMPRESARIALES ALTAIR',{sz:20,al:'center',c:'94A3B8',spc:400});
+  // ═══ PORTADA ═══
+  body+=P('',{spc:600});
+  body+=P('',{spc:400});
+  body+=P('INFORME EJECUTIVO DE CUMPLIMIENTO',{sz:44,b:true,al:'center',c:C.azulPrim,spc:160});
+  body+=P('Departamentos de Seguridad y Salud Ocupacional',{sz:30,b:true,al:'center',c:C.azulAcc,spc:200});
+  body+=P('',{spc:400});
+  body+=P('Período: '+D.mesLabel,{sz:28,b:true,al:'center',c:C.texto,spc:200});
+  body+=P('',{spc:400});
+  body+=P('Dirigido a: Dirección Ejecutiva (CEO)',{sz:22,al:'center',c:C.texto,spc:120});
+  body+=P('Elaborado por: Equipo Interdisciplinario de Salud Ocupacional',{sz:22,al:'center',c:C.texto,spc:120});
+  body+=P('Fecha de emisión: '+new Date().toLocaleDateString('es-EC',{year:'numeric',month:'long',day:'numeric'}),{sz:22,al:'center',c:C.texto,spc:200});
+  body+=P('',{spc:400});
+  body+=P('CONSULTORES EMPRESARIALES ALTAIR',{sz:20,b:true,al:'center',c:C.azulAcc,spc:80});
+  body+=P('Documento confidencial — Uso interno gerencial',{sz:18,al:'center',c:'808080',spc:0});
+  body+=PB;
 
-  // === CUADRO 1: KPIs GLOBALES ===
-  body+=P('1. INDICADORES GLOBALES DE CUMPLIMIENTO',{sz:26,b:true,c:'0F172A',spc:200});
-  
-  // KPI Table
-  const kpiH=TR(
-    TC('INDICADOR',{bg:'0F172A',c:'FFFFFF',b:true,w:3000})+
-    TC('PROMEDIO',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
-    TC('EMPRESAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})+
-    TC('NOTA',{bg:'0F172A',c:'FFFFFF',b:true,w:1500})
-  );
-  const kpiR=(label,pct,empresas,color)=>TR(
-    TC(label,{b:true,al:'left',w:3000})+
-    TC(String(pct),{b:true,c:color,w:1500,sz:22})+
-    TC(String(empresas),{w:1500})+
-    TC('Promedio por área',{w:1500,sz:16,c:'94A3B8'})
-  );
-  body+=`<w:tbl><w:tblPr><w:tblW w:w="7500" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="4" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
-  body+=kpiH;
-  body+=kpiR('📋 AGENDAMIENTO',gA+'%',numEmpresas+' empresas','2DD4BF');
-  body+=kpiR('🏢 VISITAS REALIZADAS',gV+'%',numEmpresas+' empresas','0F5132');
-  body+=kpiR('📄 INFORMES ENTREGADOS',gI+'%',numEmpresas+' empresas','7C3AED');
-  body+=`</w:tbl>`;
-  body+=P('',{spc:300});
+  // ═══ 1. RESUMEN EJECUTIVO ═══
+  body+=P('1. RESUMEN EJECUTIVO',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('Contexto del período',{sz:24,b:true,c:C.azulAcc,spc:120});
+  body+=P('Cartera total: '+D.totalCartera+' empresas. Departamentos analizados: SST y Salud Ocupacional. Período del corte: '+D.mesLabel+'.',{sz:22,c:C.texto,spc:160});
+  body+=P('Hallazgos principales',{sz:24,b:true,c:C.azulAcc,spc:120});
 
-  // === CUADRO 2: POR ÁREA ===
-  body+=P('2. CUMPLIMIENTO POR ÁREA',{sz:26,b:true,c:'0F172A',spc:200});
-  
-  const areaH=TR(
-    TC('ÁREA',{bg:'0F172A',c:'FFFFFF',b:true,w:2000})+
-    TC('EMPRESAS',{bg:'0F172A',c:'FFFFFF',b:true,w:1100})+
-    TC('AGEND.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
-    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})+
-    TC('VISIT.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
-    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})+
-    TC('INFORM.',{bg:'0F172A',c:'FFFFFF',b:true,w:900})+
-    TC('%',{bg:'0F172A',c:'FFFFFF',b:true,w:700})
+  body+=P('• Cumplimiento SST: '+D.stats.sst.inf+' de '+D.stats.sst.total+' empresas con gestión completaron informe ('+D.stats.sst.cumplimientoPct+'%).',{sz:22,c:C.texto,spc:80});
+  body+=P('• Cumplimiento Salud: '+D.stats.salud.inf+' de '+D.stats.salud.total+' empresas con gestión completaron informe ('+D.stats.salud.cumplimientoPct+'%).',{sz:22,c:C.texto,spc:80});
+  const pctCiclo=D.totalCartera>0?Math.round(D.ciclo100.length/D.totalCartera*100):0;
+  body+=P('• Empresas con ciclo 100% completo: '+D.ciclo100.length+' ('+pctCiclo+'% de la cartera total).',{sz:22,c:C.texto,spc:80});
+  body+=P('• Empresas en estado "No Responde": '+D.noRespAnalysis.count+' ('+D.noRespAnalysis.pctSobreCartera+'% de la cartera total, '+D.noRespAnalysis.pctSobreActivas+'% sobre empresas con servicio activo).',{sz:22,c:C.texto,spc:200});
+  body+=PB;
+
+  // ═══ 2. KPIs CON SEMÁFORO ═══
+  body+=P('2. INDICADORES CLAVE DE CUMPLIMIENTO (KPI)',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('La columna "Cumplimiento" se calcula sobre las empresas con gestión activa en el período (estado ACTIVO + agendamiento ≠ N/A). El semáforo aplica: Verde ≥ 80%, Ámbar 50-79%, Rojo < 50%.',{sz:20,c:'595959',spc:200});
+
+  let kpiRows=TR(
+    TC('ÁREA',{bg:C.azulPrim,c:C.blanco,b:true,w:2000,sz:20})+
+    TC('CON GESTIÓN',{bg:C.azulPrim,c:C.blanco,b:true,w:2000,sz:20})+
+    TC('AGENDADAS',{bg:C.azulPrim,c:C.blanco,b:true,w:2400,sz:20})+
+    TC('VISITADAS',{bg:C.azulPrim,c:C.blanco,b:true,w:2400,sz:20})+
+    TC('INFORMES',{bg:C.azulPrim,c:C.blanco,b:true,w:2400,sz:20})+
+    TC('CUMPLIMIENTO %',{bg:C.azulPrim,c:C.blanco,b:true,w:2200,sz:20})+
+    TC('SEMÁFORO',{bg:C.azulPrim,c:C.blanco,b:true,w:1600,sz:20})
   );
-  body+=`<w:tbl><w:tblPr><w:tblW w:w="7900" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="4" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="4" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
-  body+=areaH;
-  AG_DEPTS.forEach((d,i)=>{
-    const s=stats[d.id];const bg=i%2?'F1F5F9':'FFFFFF';
-    body+=TR(
-      TC(d.icon+' '+d.label,{b:true,al:'left',bg,w:2000})+
-      TC(String(s.total),{bg,w:1100})+
-      TC(String(s.ag),{bg,w:900})+
-      TC(s.agPct+'%',{b:true,c:s.agPct>=80?'22C55E':s.agPct>=50?'F59E0B':'EF4444',bg,w:700})+
-      TC(String(s.vis),{bg,w:900})+
-      TC(s.visPct+'%',{b:true,c:s.visPct>=80?'22C55E':s.visPct>=50?'F59E0B':'EF4444',bg,w:700})+
-      TC(String(s.inf),{bg,w:900})+
-      TC(s.infPct+'%',{b:true,c:s.infPct>=80?'22C55E':s.infPct>=50?'F59E0B':'EF4444',bg,w:700})
+  D.DEPTS.forEach(d=>{
+    const s=D.stats[d.id];const sem=agSemaforo(s.cumplimientoPct);
+    kpiRows+=TR(
+      TC(d.label,{b:true,c:C.azulPrim})+
+      TC(String(s.total))+
+      TC(s.ag+' ('+s.agPct+'%)')+
+      TC(s.vis+' ('+s.visPct+'%)')+
+      TC(s.inf+' ('+s.infPct+'%)')+
+      TC(s.cumplimientoPct+'%',{b:true,c:sem.color})+
+      TC(sem.label,{bg:sem.bg,c:sem.color,b:true})
     );
   });
-  // Total row
-  body+=TR(
-    TC('TOTAL ('+numEmpresas+' empresas)',{b:true,bg:'2DD4BF',c:'FFFFFF',w:2000})+
-    TC(String(numEmpresas),{b:true,bg:'2DD4BF',c:'FFFFFF',w:1100})+
-    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC(gA+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
-    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC(gV+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})+
-    TC('—',{b:true,bg:'2DD4BF',c:'FFFFFF',w:900})+
-    TC(gI+'%',{b:true,bg:'2DD4BF',c:'FFFFFF',w:700})
-  );
-  body+=`</w:tbl>`;
-  body+=P('',{spc:300});
+  body+=TBL(kpiRows);
+  body+=PB;
 
-  // === CUADRO 3: ANÁLISIS POR ÁREA ===
-  body+=P('3. ANÁLISIS POR ÁREA',{sz:26,b:true,c:'0F172A',spc:200});
-  AG_DEPTS.forEach(d=>{
-    const s=stats[d.id];
-    body+=P(d.icon+' '+d.label+' — Agend: '+s.agPct+'% · Visitas: '+s.visPct+'% · Informes: '+s.infPct+'%',{sz:22,b:true,c:'0F172A',spc:80});
-    const pending=allCos.filter(co=>agGetVal(co.id,d.id,'ag')==='NO').map(c=>c.name);
-    const withInf=allCos.filter(co=>agGetVal(co.id,d.id,'inf')==='SÍ').map(c=>c.name);
-    if(s.total>0){
-      body+=P('Empresas evaluadas: '+s.total+' | Con informe: '+s.inf+' | Pendientes agendar: '+pending.length,{sz:20,c:'334155'});
-      if(pending.length>0)body+=P('Sin agendar: '+pending.join(', '),{sz:18,c:'EF4444'});
-      if(withInf.length>0)body+=P('Con informe entregado: '+withInf.join(', '),{sz:18,c:'22C55E'});
-    }else{
-      body+=P('Sin empresas evaluadas en esta área.',{sz:20,c:'94A3B8'});
-    }
-    body+=P('',{spc:150});
-  });
+  // ═══ 3. EMPRESAS CON CICLO 100% ═══
+  body+=P('3. EMPRESAS CON CICLO DE CUMPLIMIENTO 100%',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('Empresas que completaron Agendamiento + Visita + Informe en TODOS los departamentos donde tuvieron gestión activa este período.',{sz:20,c:'595959',spc:200});
 
-  // === CUADRO 4: DETALLE POR EMPRESA ===  
-  body+=`<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:br w:type="page"/></w:r></w:p>`;
-  body+=P('4. DETALLE DE GESTIÓN POR EMPRESA',{sz:26,b:true,c:'0F172A',spc:200});
-  body+=P('Estado de agendamiento (Ag), visita (Vis) e informe (Inf) por empresa y departamento.',{sz:18,c:'64748B',spc:150});
-  
-  // Detail table header
-  let dH=TC('N°',{bg:'0F172A',c:'FFFFFF',b:true,w:400,sz:14})+TC('EMPRESA',{bg:'0F172A',c:'FFFFFF',b:true,w:2200,sz:14});
-  AG_DEPTS.forEach(d=>{
-    dH+=TC(d.label,{bg:'0F172A',c:'FFFFFF',b:true,w:800,sz:14});
-  });
-  body+=`<w:tbl><w:tblPr><w:tblW w:w="8000" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="2" w:color="CBD5E1"/><w:bottom w:val="single" w:sz="2" w:color="CBD5E1"/><w:insideH w:val="single" w:sz="2" w:color="CBD5E1"/><w:insideV w:val="single" w:sz="2" w:color="CBD5E1"/></w:tblBorders></w:tblPr>`;
-  body+=TR(dH);
-  
-  allCos.forEach((co,i)=>{
-    const bg=i%2?'F8FAFC':'FFFFFF';
-    let row=TC(String(i+1),{bg,w:400,sz:14})+TC(co.name,{bg,al:'left',w:2200,sz:14});
-    AG_DEPTS.forEach(d=>{
-      const ag=agGetVal(co.id,d.id,'ag');
-      const vis=agGetVal(co.id,d.id,'vis');
-      const inf=agGetVal(co.id,d.id,'inf');
-      let status='—';let color='94A3B8';
-      if(ag==='N/A'){status='N/A';color='94A3B8'}
-      else if(inf==='SÍ'){status='✅ Inf';color='22C55E'}
-      else if(vis==='SÍ'){status='🏢 Vis';color='3B82F6'}
-      else if(ag==='SÍ'){status='📋 Ag';color='F59E0B'}
-      else{status='❌ NO';color='EF4444'}
-      row+=TC(status,{bg,w:800,sz:14,c:color,b:true});
-    });
-    body+=TR(row);
-  });
-  body+=`</w:tbl>`;
-  body+=P('',{spc:200});
-
-  // === CUADRO 5: EMPRESAS PRIORITARIAS ===
-  body+=P('5. EMPRESAS DE ATENCIÓN PRIORITARIA',{sz:26,b:true,c:'0F172A',spc:200});
-  const prioritarias=allCos.filter(co=>{
-    let pendCount=0;
-    AG_DEPTS.forEach(d=>{if(agGetVal(co.id,d.id,'ag')==='NO')pendCount++});
-    return pendCount>=2;
-  });
-  if(prioritarias.length>0){
-    prioritarias.forEach(co=>{
-      const areas=AG_DEPTS.filter(d=>agGetVal(co.id,d.id,'ag')==='NO').map(d=>d.label);
-      body+=P('⚠️ '+co.name+' — Pendiente en: '+areas.join(', '),{sz:20,c:'EF4444'});
-    });
+  if(D.ciclo100.length===0){
+    body+=P('No se registran empresas con ciclo 100% completo en este período.',{sz:22,c:C.rojo,b:true,spc:200});
   }else{
-    body+=P('No hay empresas con más de 2 áreas pendientes.',{sz:20,c:'22C55E'});
+    let c100Rows=TR(
+      TC('N°',{bg:C.azulPrim,c:C.blanco,b:true,w:600})+
+      TC('EMPRESA',{bg:C.azulPrim,c:C.blanco,b:true,w:5000,al:'left'})+
+      TC('ÁREAS COMPLETADAS',{bg:C.azulPrim,c:C.blanco,b:true,w:4000})+
+      TC('CICLO',{bg:C.azulPrim,c:C.blanco,b:true,w:1500})+
+      TC('ESTATUS',{bg:C.azulPrim,c:C.blanco,b:true,w:2000})
+    );
+    D.ciclo100.forEach((it,i)=>{
+      c100Rows+=TR(
+        TC(String(i+1))+
+        TC(it.co.name||'',{al:'left',b:true})+
+        TC(it.areasCompletas.join(' + '))+
+        TC(it.depsConGestion+'/'+it.depsConGestion)+
+        TC('✓ COMPLETO',{bg:'E2EFDA',c:C.verde,b:true})
+      );
+    });
+    body+=TBL(c100Rows);
+    body+=P('Total: '+D.ciclo100.length+' empresas ('+pctCiclo+'% sobre la cartera total de '+D.totalCartera+').',{sz:22,b:true,c:C.azulPrim,spc:200});
   }
-  body+=P('',{spc:300});
+  body+=PB;
 
-  // === FOOTER ===
-  body+=P('Consultores Empresariales ALTAIR — '+mesLabel,{sz:16,al:'center',c:'94A3B8'});
-  body+=P('Documento generado automáticamente desde el Sistema Integral SST',{sz:14,al:'center',c:'CBD5E1'});
+  // ═══ 4. EMPRESAS "NO RESPONDE" ═══
+  body+=P('4. EMPRESAS EN ESTADO "NO RESPONDE"',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('Empresas que, pese a tener servicio activo, no han confirmado o no han respondido a los intentos de coordinación. Detectadas automáticamente desde el campo Observaciones.',{sz:20,c:'595959',spc:200});
 
-  // Assemble DOCX
-  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  if(D.noRespondeGlobal.length===0){
+    body+=P('No se registran empresas en estado "No Responde" en este período.',{sz:22,c:C.verde,b:true,spc:200});
+  }else{
+    let nrRows=TR(
+      TC('N°',{bg:C.azulPrim,c:C.blanco,b:true,w:600})+
+      TC('EMPRESA',{bg:C.azulPrim,c:C.blanco,b:true,w:4500,al:'left'})+
+      TC('ÁREAS AFECTADAS',{bg:C.azulPrim,c:C.blanco,b:true,w:3000})+
+      TC('OBSERVACIÓN',{bg:C.azulPrim,c:C.blanco,b:true,w:4000,al:'left'})+
+      TC('ACCIÓN PROPUESTA',{bg:C.azulPrim,c:C.blanco,b:true,w:1500})
+    );
+    D.noRespondeGlobal.forEach((it,i)=>{
+      nrRows+=TR(
+        TC(String(i+1))+
+        TC(it.co.name||'',{al:'left',b:true})+
+        TC(it.depts.join(' + '),{c:C.rojo,b:true})+
+        TC(it.obs.slice(0,80),{al:'left',sz:16})+
+        TC('Cierre 30 días',{bg:'FCE4D6',c:C.rojo,b:true,sz:16})
+      );
+    });
+    body+=TBL(nrRows);
+
+    body+=P('Análisis de impacto en cartera',{sz:24,b:true,c:C.azulAcc,spc:120});
+    body+=P('• % sobre cartera total ('+D.totalCartera+' empresas): '+D.noRespAnalysis.pctSobreCartera+'%.',{sz:22,c:C.texto,spc:80});
+    body+=P('• % sobre empresas con servicio activo: '+D.noRespAnalysis.pctSobreActivas+'%.',{sz:22,c:C.texto,spc:80});
+    body+=P('• % sobre empresas con gestión SST: '+D.noRespAnalysis.pctSST+'%.',{sz:22,c:C.texto,spc:80});
+    body+=P('• % sobre empresas con gestión Salud: '+D.noRespAnalysis.pctSalud+'%.',{sz:22,c:C.texto,spc:160});
+
+    body+=P('Proyección si responden y completan ciclo',{sz:24,b:true,c:C.azulAcc,spc:120});
+    body+=P('• Cumplimiento SST proyectado: '+D.stats.sst.cumplimientoPct+'% → '+D.noRespAnalysis.proySST+'% (mejora '+(D.noRespAnalysis.proySST-D.stats.sst.cumplimientoPct)+' pp).',{sz:22,c:C.texto,spc:80});
+    body+=P('• Cumplimiento Salud proyectado: '+D.stats.salud.cumplimientoPct+'% → '+D.noRespAnalysis.proySalud+'% (mejora '+(D.noRespAnalysis.proySalud-D.stats.salud.cumplimientoPct)+' pp).',{sz:22,c:C.texto,spc:160});
+
+    body+=P('Recomendación: Establecer plazo máximo de 30 días para obtener respuesta. Si persiste el silencio, escalar a Dirección Ejecutiva del cliente y evaluar terminación contractual.',{sz:22,b:true,c:C.azulPrim,spc:200});
+  }
+  body+=PB;
+
+  // ═══ 5. CUADRO ESTADÍSTICO COMPLEMENTARIO ═══
+  body+=P('5. CUADRO ESTADÍSTICO COMPLEMENTARIO',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('Composición total de la cartera ('+D.totalCartera+' empresas)',{sz:24,b:true,c:C.azulAcc,spc:160});
+
+  const pctCart=v=>D.totalCartera>0?Math.round(v/D.totalCartera*100):0;
+  let cartRows=TR(
+    TC('CATEGORÍA',{bg:C.azulPrim,c:C.blanco,b:true,w:5000,al:'left'})+
+    TC('CANTIDAD',{bg:C.azulPrim,c:C.blanco,b:true,w:2000})+
+    TC('% CARTERA',{bg:C.azulPrim,c:C.blanco,b:true,w:2000})+
+    TC('DETALLE',{bg:C.azulPrim,c:C.blanco,b:true,w:5000,al:'left'})
+  );
+  cartRows+=TR(
+    TC('Trabajadas en el período',{al:'left',b:true,c:C.verde})+
+    TC(String(D.cartera.trabajadas.length))+
+    TC(pctCart(D.cartera.trabajadas.length)+'%')+
+    TC('Con SI en agendamiento en al menos un departamento',{al:'left',sz:16,c:'595959'})
+  );
+  cartRows+=TR(
+    TC('No respondieron',{al:'left',b:true,c:C.rojo})+
+    TC(String(D.cartera.noResponde.length))+
+    TC(pctCart(D.cartera.noResponde.length)+'%')+
+    TC('Activas pero sin respuesta a intentos de coordinación',{al:'left',sz:16,c:'595959'})
+  );
+  cartRows+=TR(
+    TC('Sin gestión en el período',{al:'left',b:true,c:C.ambar})+
+    TC(String(D.cartera.sinGestionPeriodo.length))+
+    TC(pctCart(D.cartera.sinGestionPeriodo.length)+'%')+
+    TC('Activas con N/A (contrato bimensual o mes alterno)',{al:'left',sz:16,c:'595959'})
+  );
+  cartRows+=TR(
+    TC('Inactivas',{al:'left',b:true,c:'595959'})+
+    TC(String(D.cartera.inactivas.length))+
+    TC(pctCart(D.cartera.inactivas.length)+'%')+
+    TC('Estado INACTIVO en todos los departamentos',{al:'left',sz:16,c:'595959'})
+  );
+  cartRows+=TR(
+    TC('TOTAL CARTERA',{bg:C.grisClaro,al:'left',b:true,c:C.azulPrim})+
+    TC(String(D.totalCartera),{bg:C.grisClaro,b:true,c:C.azulPrim})+
+    TC('100%',{bg:C.grisClaro,b:true,c:C.azulPrim})+
+    TC('',{bg:C.grisClaro})
+  );
+  body+=TBL(cartRows);
+  body+=P('Aclaración: Este cuadro contextualiza la cartera completa. Para el cálculo de cumplimiento operativo aplican únicamente las empresas con gestión activa en el período (sección 2).',{sz:18,c:'595959',spc:200});
+  body+=PB;
+
+  // ═══ 6. DETALLE CONSOLIDADO POR EMPRESA ═══
+  body+=P('6. DETALLE CONSOLIDADO POR EMPRESA',{sz:32,b:true,c:C.azulPrim,spc:200});
+  body+=P('Matriz operativa de las '+D.totalCartera+' empresas. Convenciones: SI = realizado, NO = pendiente, N/A = no aplica este mes.',{sz:20,c:'595959',spc:200});
+
+  let detRows=TR(
+    TC('N°',{bg:C.azulPrim,c:C.blanco,b:true,w:500,sz:18})+
+    TC('EMPRESA',{bg:C.azulPrim,c:C.blanco,b:true,w:3500,al:'left',sz:18})+
+    // SST group
+    TC('SST Est.',{bg:C.azulAcc,c:C.blanco,b:true,w:1100,sz:16})+
+    TC('Ag.',{bg:C.azulAcc,c:C.blanco,b:true,w:800,sz:16})+
+    TC('Vis.',{bg:C.azulAcc,c:C.blanco,b:true,w:800,sz:16})+
+    TC('Inf.',{bg:C.azulAcc,c:C.blanco,b:true,w:800,sz:16})+
+    // Salud group
+    TC('Sal. Est.',{bg:C.verde,c:C.blanco,b:true,w:1100,sz:16})+
+    TC('Ag.',{bg:C.verde,c:C.blanco,b:true,w:800,sz:16})+
+    TC('Vis.',{bg:C.verde,c:C.blanco,b:true,w:800,sz:16})+
+    TC('Inf.',{bg:C.verde,c:C.blanco,b:true,w:800,sz:16})+
+    TC('OBSERVACIONES',{bg:C.azulPrim,c:C.blanco,b:true,w:3000,al:'left',sz:16})
+  );
+  const colorVal=(v)=>{
+    if(v==='SÍ')return C.verde;
+    if(v==='NO')return C.rojo;
+    if(v==='N/A')return '808080';
+    return C.texto;
+  };
+  D.detalle.forEach((row,i)=>{
+    const sst=row.sst,sal=row.salud;
+    detRows+=TR(
+      TC(String(i+1),{sz:16})+
+      TC(row.co.name||'',{al:'left',sz:16,b:true})+
+      TC(sst.est,{sz:16,c:sst.est==='INACTIVO'?'808080':C.texto})+
+      TC(sst.ag||'-',{sz:16,c:colorVal(sst.ag),b:true})+
+      TC(sst.vis||'-',{sz:16,c:colorVal(sst.vis),b:true})+
+      TC(sst.inf||'-',{sz:16,c:colorVal(sst.inf),b:true})+
+      TC(sal.est,{sz:16,c:sal.est==='INACTIVO'?'808080':C.texto})+
+      TC(sal.ag||'-',{sz:16,c:colorVal(sal.ag),b:true})+
+      TC(sal.vis||'-',{sz:16,c:colorVal(sal.vis),b:true})+
+      TC(sal.inf||'-',{sz:16,c:colorVal(sal.inf),b:true})+
+      TC((row.obs||'-').slice(0,90),{al:'left',sz:14})
+    );
+  });
+  body+=TBL(detRows);
+  body+=PB;
+
+  // ═══ 7. CONCLUSIONES Y RECOMENDACIONES ═══
+  body+=P('7. CONCLUSIONES Y RECOMENDACIONES',{sz:32,b:true,c:C.azulPrim,spc:200});
+
+  body+=P('7.1 Logros del período',{sz:24,b:true,c:C.azulAcc,spc:120});
+  if(D.ciclo100.length>0)body+=P('• '+D.ciclo100.length+' empresas alcanzaron el ciclo 100% en sus áreas con gestión activa.',{sz:22,c:C.texto,spc:80});
+  if(D.stats.sst.cumplimientoPct>=80)body+=P('• El departamento de SST superó el 80% de cumplimiento ('+D.stats.sst.cumplimientoPct+'%), entrando en zona verde del semáforo.',{sz:22,c:C.verde,spc:80});
+  if(D.stats.salud.cumplimientoPct>=80)body+=P('• El departamento de Salud superó el 80% de cumplimiento ('+D.stats.salud.cumplimientoPct+'%), entrando en zona verde del semáforo.',{sz:22,c:C.verde,spc:80});
+  if(D.stats.sst.cumplimientoPct<80&&D.stats.salud.cumplimientoPct<80&&D.ciclo100.length===0){
+    body+=P('• Se mantiene la operación con la cartera vigente; los avances parciales identificados son la base para las acciones del siguiente período.',{sz:22,c:C.texto,spc:80});
+  }
+  body+=P('',{spc:120});
+
+  body+=P('7.2 Oportunidades de mejora',{sz:24,b:true,c:C.azulAcc,spc:120});
+  if(D.stats.sst.cumplimientoPct<80)body+=P('• SST: cumplimiento al '+D.stats.sst.cumplimientoPct+'% — '+(D.stats.sst.total-D.stats.sst.inf)+' empresas con gestión sin informe socializado.',{sz:22,c:C.rojo,b:true,spc:80});
+  if(D.stats.salud.cumplimientoPct<80)body+=P('• Salud: cumplimiento al '+D.stats.salud.cumplimientoPct+'% — '+(D.stats.salud.total-D.stats.salud.inf)+' empresas con gestión sin informe socializado.',{sz:22,c:C.rojo,b:true,spc:80});
+  if(D.noRespondeGlobal.length>0){
+    const nombres=D.noRespondeGlobal.slice(0,5).map(x=>x.co.name).join(', ');
+    body+=P('• Casos puntuales de "No Responde": '+nombres+(D.noRespondeGlobal.length>5?' y otros':'')+'.',{sz:22,c:C.texto,spc:80});
+  }
+  body+=P('',{spc:120});
+
+  body+=P('7.3 Acciones propuestas para el siguiente período',{sz:24,b:true,c:C.azulAcc,spc:120});
+  let nAcc=1;
+  body+=P(nAcc+++'. Activar contacto formal por correo y WhatsApp con todas las empresas en estado "No Responde", con plazo máximo de 30 días para confirmar agendamiento.',{sz:22,c:C.texto,spc:80});
+  body+=P(nAcc+++'. Priorizar la socialización de los informes ya elaborados pero no entregados, calendarizando reuniones con los responsables de cada empresa.',{sz:22,c:C.texto,spc:80});
+  if(D.stats.sst.cumplimientoPct<50||D.stats.salud.cumplimientoPct<50){
+    body+=P(nAcc+++'. Convocar reunión interna del equipo interdisciplinario para revisar bloqueos operativos, ya que al menos un departamento se encuentra en zona roja del semáforo.',{sz:22,c:C.rojo,spc:80});
+  }
+  body+=P(nAcc+++'. Verificar manualmente las empresas con frecuencia bimensual cuyo mes "no toca" (estado N/A) para confirmar que la próxima visita esté agendada antes del próximo corte.',{sz:22,c:C.texto,spc:80});
+  body+=P(nAcc+++'. Mantener semáforo en tablero gerencial y revisar avance semanalmente con los responsables de SST y Salud.',{sz:22,c:C.texto,spc:200});
+
+  body+=P('',{spc:200});
+  body+=P('— FIN DEL INFORME —',{sz:18,al:'center',c:'808080',spc:200});
+
+  // ───── ENSAMBLAR DOCX ─────
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:body>${body}
-<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1080" w:bottom="1440" w:left="1080"/></w:sectPr>
+<w:sectPr>
+  <w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>
+  <w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360"/>
+</w:sectPr>
 </w:body></w:document>`;
 
-  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`;
-
-  const wordRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-</Relationships>`;
-
-  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 </Types>`;
 
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
   const zip=new JSZip();
-  zip.file("[Content_Types].xml",contentTypes);
-  zip.file("_rels/.rels",rels);
-  zip.file("word/_rels/document.xml.rels",wordRels);
-  zip.file("word/document.xml",docXml);
+  zip.file("[Content_Types].xml",ct);
+  zip.folder("_rels").file(".rels",rels);
+  zip.folder("word").file("document.xml",doc);
 
   const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download='Informe_Cumplimiento_'+mNames[LOG.month]+'_'+LOG.year+'.docx';
+  a.download='Informe_Cumplimiento_SST_Salud_'+["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][LOG.month]+LOG.year+'.docx';
   a.click();URL.revokeObjectURL(a.href);
   ss("ok");
   }catch(e){alert("Error generando informe: "+e.message);ss("er");console.error(e)}
 }
 
 async function genAgInformePptx(){
-  const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const mesLabel=mNames[LOG.month]+" "+LOG.year;
-  const allCos=cos.filter(c=>c.mod_salud||c.mod_seguridad||c.mod_tthh||c.mod_datos||c.mod_ambiente).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(allCos.length===0){alert("No hay empresas");return}
-
-  // Stats
-  const stats={};
-  AG_DEPTS.forEach(d=>{
-    let tot=0,ag=0,vis=0,inf=0;
-    allCos.forEach(co=>{
-      if(agGetVal(co.id,d.id,'ag')==='N/A')return;
-      tot++;
-      if(agGetVal(co.id,d.id,'ag')==='SÍ')ag++;
-      if(agGetVal(co.id,d.id,'vis')==='SÍ')vis++;
-      if(agGetVal(co.id,d.id,'inf')==='SÍ')inf++;
-    });
-    stats[d.id]={tot,ag,vis,inf,agP:tot?Math.round(ag/tot*100):0,visP:tot?Math.round(vis/tot*100):0,infP:tot?Math.round(inf/tot*100):0};
-  });
-  const numEmpresas=allCos.length;
-  const depsWithData=AG_DEPTS.filter(d=>stats[d.id].tot>0);
-  const avgAg=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].agP,0)/depsWithData.length):0;
-  const avgVis=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].visP,0)/depsWithData.length):0;
-  const avgInf=depsWithData.length>0?Math.round(depsWithData.reduce((a,d)=>a+stats[d.id].infP,0)/depsWithData.length):0;
-  let gT=numEmpresas,gA=avgAg,gV=avgVis,gI=avgInf;
+  const D=agBuildInformeData();
+  if(D.allCos.length===0){alert("No hay empresas");return}
 
   ss("ld");
   try{
-  // Load PptxGenJS
-  if(typeof PptxGenJS==='undefined'){
+  if(typeof PptxGenJS==="undefined"){
     await new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});
   }
 
+  // Paleta corporativa
+  const AZUL_PRIM='1F3864',AZUL_ACC='2E75B6',VERDE='548235',ROJO='C00000',AMBAR='BF8F00',
+        GRIS_CLARO='F2F2F2',TXT='333333',BG='FFFFFF',WH='FFFFFF';
+
   const pres=new PptxGenJS();
-  pres.layout='LAYOUT_16x9';
-  pres.author='Consultores Empresariales ALTAIR';
-  pres.title='Informe Ejecutivo de Cumplimiento - '+mesLabel;
+  pres.layout='LAYOUT_WIDE';
+  pres.title='Informe Cumplimiento - '+D.mesLabel;
 
-  const DK='0F172A',WH='FFFFFF',GY='64748B',LG='F1F5F9',TEAL='2DD4BF',PURP='7C3AED',GRN='22C55E',RED='EF4444',YEL='F59E0B';
-  const shd=()=>({type:'outer',blur:4,offset:2,color:'000000',opacity:0.25});
+  const semColor=pct=>pct>=80?VERDE:(pct>=50?AMBAR:ROJO);
+  const pctCart=v=>D.totalCartera>0?Math.round(v/D.totalCartera*100):0;
 
-  // ===== SLIDE 1: PORTADA =====
+  // ═══ SLIDE 1: PORTADA ═══
   const s1=pres.addSlide();
-  s1.background={fill:DK};
-  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.08,fill:{color:TEAL}});
-  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:5.545,w:'100%',h:0.08,fill:{color:TEAL}});
-  s1.addText('INFORME EJECUTIVO',{x:0.5,y:1.0,w:9,h:0.8,fontSize:40,fontFace:'Georgia',color:WH,bold:true});
-  s1.addText('DE CUMPLIMIENTO',{x:0.5,y:1.7,w:9,h:0.7,fontSize:36,fontFace:'Georgia',color:TEAL,bold:true});
-  s1.addShape(pres.shapes.RECTANGLE,{x:0.5,y:2.6,w:3,h:0.04,fill:{color:TEAL}});
-  s1.addText('Agendamiento y Gestión Mensual',{x:0.5,y:2.8,w:9,h:0.5,fontSize:18,fontFace:'Calibri',color:GY});
-  s1.addText(mesLabel.toUpperCase(),{x:0.5,y:3.4,w:9,h:0.6,fontSize:24,fontFace:'Calibri',color:TEAL,bold:true});
-  s1.addText('CONSULTORES EMPRESARIALES ALTAIR',{x:0.5,y:4.6,w:9,h:0.4,fontSize:12,fontFace:'Calibri',color:GY,charSpacing:4});
+  s1.background={fill:BG};
+  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.4,fill:{color:AZUL_PRIM}});
+  s1.addShape(pres.shapes.RECTANGLE,{x:0,y:7.1,w:'100%',h:0.4,fill:{color:AZUL_PRIM}});
+  s1.addText('INFORME EJECUTIVO',{x:0.5,y:1.5,w:12.33,h:0.9,fontSize:48,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
+  s1.addText('DE CUMPLIMIENTO',{x:0.5,y:2.3,w:12.33,h:0.7,fontSize:36,fontFace:'Arial',color:AZUL_ACC,bold:true,align:'center'});
+  s1.addShape(pres.shapes.RECTANGLE,{x:5.66,y:3.2,w:2,h:0.05,fill:{color:AZUL_ACC}});
+  s1.addText('Departamentos de Seguridad y Salud Ocupacional',{x:0.5,y:3.5,w:12.33,h:0.5,fontSize:20,fontFace:'Arial',color:TXT,align:'center'});
+  s1.addText('Período: '+D.mesLabel,{x:0.5,y:4.2,w:12.33,h:0.6,fontSize:24,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
+  s1.addText('Dirigido a: Dirección Ejecutiva (CEO)',{x:0.5,y:5.2,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:TXT,align:'center'});
+  s1.addText('Elaborado por: Equipo Interdisciplinario de Salud Ocupacional',{x:0.5,y:5.6,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:TXT,align:'center'});
+  s1.addText('Fecha de emisión: '+new Date().toLocaleDateString('es-EC'),{x:0.5,y:6.0,w:12.33,h:0.4,fontSize:13,fontFace:'Arial',color:'808080',align:'center'});
+  s1.addText('CONSULTORES EMPRESARIALES ALTAIR  ·  Documento confidencial',{x:0.5,y:7.15,w:12.33,h:0.3,fontSize:11,fontFace:'Arial',color:WH,bold:true,align:'center',charSpacing:3});
 
-  // ===== SLIDE 2: KPIs GLOBALES =====
+  // ═══ SLIDE 2: 4 CIFRAS GRANDES ═══
   const s2=pres.addSlide();
-  s2.background={fill:DK};
-  s2.addText('INDICADORES GLOBALES',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
-  s2.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+  s2.background={fill:BG};
+  s2.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s2.addText('RESUMEN EJECUTIVO',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
+  s2.addText(D.mesLabel,{x:0.5,y:0.8,w:12.33,h:0.3,fontSize:14,fontFace:'Arial',color:AZUL_ACC,align:'center'});
 
-  const kpis=[
-    {label:'AGENDAMIENTO',val:gA,det:numEmpresas+' empresas',color:TEAL},
-    {label:'VISITAS',val:gV,det:numEmpresas+' empresas',color:GRN},
-    {label:'INFORMES',val:gI,det:numEmpresas+' empresas',color:PURP}
+  const kpiData=[
+    {label:'Empresas con Ciclo 100%',value:D.ciclo100.length,sub:pctCart(D.ciclo100.length)+'% de la cartera',color:VERDE,x:0.5},
+    {label:'Cumplimiento SST',value:D.stats.sst.cumplimientoPct+'%',sub:D.stats.sst.inf+' de '+D.stats.sst.total+' empresas',color:semColor(D.stats.sst.cumplimientoPct),x:3.7},
+    {label:'Cumplimiento Salud',value:D.stats.salud.cumplimientoPct+'%',sub:D.stats.salud.inf+' de '+D.stats.salud.total+' empresas',color:semColor(D.stats.salud.cumplimientoPct),x:6.9},
+    {label:'No Responde',value:D.noRespAnalysis.count,sub:D.noRespAnalysis.pctSobreCartera+'% de la cartera',color:ROJO,x:10.1}
   ];
-  kpis.forEach((k,i)=>{
-    const x=0.5+i*3.2;
-    s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x,y:1.3,w:2.9,h:2.2,fill:{color:k.color},shadow:shd(),rectRadius:0.15});
-    s2.addText(k.label,{x,y:1.4,w:2.9,h:0.5,fontSize:13,fontFace:'Calibri',color:WH,bold:true,align:'center'});
-    s2.addText(k.val+'%',{x,y:1.8,w:2.9,h:1.0,fontSize:54,fontFace:'Georgia',color:WH,bold:true,align:'center',valign:'middle'});
-    s2.addText(k.det,{x,y:2.9,w:2.9,h:0.4,fontSize:12,fontFace:'Calibri',color:WH,align:'center'});
+  kpiData.forEach(k=>{
+    s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:k.x,y:1.6,w:3,h:4.5,fill:{color:GRIS_CLARO},line:{color:k.color,width:3},rectRadius:0.1});
+    s2.addText(k.label,{x:k.x+0.1,y:1.8,w:2.8,h:0.6,fontSize:12,fontFace:'Arial',color:TXT,bold:true,align:'center',charSpacing:2});
+    s2.addText(String(k.value),{x:k.x,y:2.7,w:3,h:1.8,fontSize:72,fontFace:'Arial',color:k.color,bold:true,align:'center'});
+    s2.addText(k.sub,{x:k.x+0.1,y:5.2,w:2.8,h:0.6,fontSize:13,fontFace:'Arial',color:TXT,align:'center'});
   });
+  s2.addText('Cartera total analizada: '+D.totalCartera+' empresas',{x:0.5,y:6.7,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:'595959',italic:true,align:'center'});
 
-  // Semáforo
-  const globalPct=gA;
-  const semColor=globalPct>=80?GRN:globalPct>=50?YEL:RED;
-  const semLabel=globalPct>=80?'BUENO':globalPct>=50?'EN PROGRESO':'CRÍTICO';
-  s2.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:3.5,y:3.8,w:3,h:1.2,fill:{color:semColor},shadow:shd(),rectRadius:0.1});
-  s2.addText(semLabel,{x:3.5,y:3.85,w:3,h:0.5,fontSize:16,fontFace:'Calibri',color:WH,bold:true,align:'center'});
-  s2.addText('Cumplimiento Global: '+globalPct+'%',{x:3.5,y:4.3,w:3,h:0.5,fontSize:12,fontFace:'Calibri',color:WH,align:'center'});
-
-  // ===== SLIDE 3: CUMPLIMIENTO POR ÁREA =====
+  // ═══ SLIDE 3: KPIs CON SEMÁFORO ═══
   const s3=pres.addSlide();
-  s3.background={fill:WH};
-  s3.addText('CUMPLIMIENTO POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:DK,bold:true});
-  s3.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+  s3.background={fill:BG};
+  s3.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s3.addText('KPIs POR DEPARTAMENTO',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
 
-  // Table
-  const hdr=[{text:'ÁREA',options:{fill:DK,color:WH,bold:true,fontSize:10}},{text:'TOTAL',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'AGEND.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'VISIT.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'INFORM.',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}},{text:'%',options:{fill:DK,color:WH,bold:true,fontSize:10,align:'center'}}];
-  const rows=[hdr];
-  AG_DEPTS.forEach((d,i)=>{
-    const s=stats[d.id];const bg=i%2?LG:WH;
-    const pc=v=>({text:v+'%',options:{fontSize:11,bold:true,color:v>=80?GRN:v>=50?YEL:RED,align:'center',fill:bg}});
-    rows.push([
-      {text:d.icon+' '+d.label,options:{fontSize:10,bold:true,fill:bg}},
-      {text:String(s.tot),options:{fontSize:10,align:'center',fill:bg}},
-      {text:String(s.ag),options:{fontSize:10,align:'center',fill:bg}},
-      pc(s.agP),
-      {text:String(s.vis),options:{fontSize:10,align:'center',fill:bg}},
-      pc(s.visP),
-      {text:String(s.inf),options:{fontSize:10,align:'center',fill:bg}},
-      pc(s.infP)
+  const kpiTable=[
+    [
+      {text:'ÁREA',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'CON GESTIÓN',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'AGENDADAS',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'VISITADAS',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'INFORMES',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'CUMPLIMIENTO',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}},
+      {text:'SEMÁFORO',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:14}}
+    ]
+  ];
+  D.DEPTS.forEach(d=>{
+    const s=D.stats[d.id];const sc=semColor(s.cumplimientoPct);
+    kpiTable.push([
+      {text:d.label,options:{bold:true,color:AZUL_PRIM,align:'center',fontSize:13}},
+      {text:String(s.total),options:{align:'center',fontSize:13}},
+      {text:s.ag+' ('+s.agPct+'%)',options:{align:'center',fontSize:13}},
+      {text:s.vis+' ('+s.visPct+'%)',options:{align:'center',fontSize:13}},
+      {text:s.inf+' ('+s.infPct+'%)',options:{align:'center',fontSize:13}},
+      {text:s.cumplimientoPct+'%',options:{bold:true,color:sc,align:'center',fontSize:14}},
+      {text:s.cumplimientoPct>=80?'● VERDE':(s.cumplimientoPct>=50?'● ÁMBAR':'● ROJO'),options:{fill:sc,color:WH,bold:true,align:'center',fontSize:13}}
     ]);
   });
-  // Total row
-  rows.push([
-    {text:'TOTAL',options:{fontSize:11,bold:true,fill:TEAL,color:WH}},
-    {text:String(numEmpresas),options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gA+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gV+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:'—',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}},
-    {text:gI+'%',options:{fontSize:11,bold:true,fill:TEAL,color:WH,align:'center'}}
-  ]);
-  s3.addTable(rows,{x:0.5,y:1.2,w:9,colW:[2.2,0.9,0.9,0.8,0.9,0.8,0.9,0.8],border:{type:'solid',pt:0.5,color:'CBD5E1'},rowH:0.4});
+  s3.addTable(kpiTable,{x:0.5,y:1.3,w:12.33,colW:[1.5,2,1.8,1.8,1.8,1.8,1.63],fontFace:'Arial',border:{type:'solid',color:'BFBFBF',pt:1},rowH:0.7});
 
-  // ===== SLIDE 4: ANÁLISIS POR ÁREA (barras) =====
+  s3.addText('Cumplimiento = % de empresas con gestión activa que completaron el informe socializado.',{x:0.5,y:5.0,w:12.33,h:0.3,fontSize:11,fontFace:'Arial',color:'595959',italic:true,align:'center'});
+  s3.addText('Verde ≥ 80%   ·   Ámbar 50-79%   ·   Rojo < 50%',{x:0.5,y:5.4,w:12.33,h:0.3,fontSize:12,fontFace:'Arial',color:TXT,bold:true,align:'center'});
+
+  // ═══ SLIDE 4: GRÁFICO DE BARRAS ═══
   const s4=pres.addSlide();
-  s4.background={fill:DK};
-  s4.addText('ANÁLISIS POR ÁREA',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
-  s4.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:TEAL}});
+  s4.background={fill:BG};
+  s4.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s4.addText('CUMPLIMIENTO SST vs SALUD',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
 
-  AG_DEPTS.forEach((d,i)=>{
-    const s=stats[d.id];
-    const y=1.2+i*0.7;
-    const barW=5.5;
-    // Label
-    s4.addText(d.icon+' '+d.label,{x:0.5,y,w:1.8,h:0.5,fontSize:11,fontFace:'Calibri',color:WH,bold:true,valign:'middle'});
-    // Bar background
-    s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW,h:0.3,fill:{color:'1E293B'}});
-    // Agendamiento bar
-    if(s.agP>0)s4.addShape(pres.shapes.RECTANGLE,{x:2.5,y:y+0.1,w:barW*s.agP/100,h:0.3,fill:{color:TEAL}});
-    // % label
-    s4.addText(s.agP+'%',{x:8.2,y,w:1.2,h:0.5,fontSize:14,fontFace:'Georgia',color:s.agP>=80?GRN:s.agP>=50?YEL:RED,bold:true,align:'center',valign:'middle'});
+  const chartData=[
+    {name:'Agendadas',labels:['SST','SALUD'],values:[D.stats.sst.agPct,D.stats.salud.agPct]},
+    {name:'Visitadas',labels:['SST','SALUD'],values:[D.stats.sst.visPct,D.stats.salud.visPct]},
+    {name:'Informes',labels:['SST','SALUD'],values:[D.stats.sst.infPct,D.stats.salud.infPct]}
+  ];
+  s4.addChart(pres.charts.BAR,chartData,{
+    x:1,y:1.2,w:11.33,h:5.5,
+    barDir:'col',barGrouping:'clustered',
+    chartColors:[AZUL_ACC,VERDE,AMBAR],
+    showLegend:true,legendPos:'b',
+    showValue:true,dataLabelFontSize:11,dataLabelColor:TXT,
+    catAxisLabelFontSize:14,catAxisLabelColor:TXT,
+    valAxisMinVal:0,valAxisMaxVal:100,
+    valAxisLabelFontSize:10,
+    title:'Porcentaje de cumplimiento por etapa (%)',
+    showTitle:true,titleFontSize:14,titleColor:AZUL_PRIM
   });
 
-  // ===== SLIDE 5: DETALLE POR EMPRESA =====
+  // ═══ SLIDE 5: CICLO 100% ═══
   const s5=pres.addSlide();
-  s5.background={fill:WH};
-  s5.addText('DETALLE POR EMPRESA',{x:0.5,y:0.15,w:9,h:0.45,fontSize:22,fontFace:'Georgia',color:DK,bold:true});
+  s5.background={fill:BG};
+  s5.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s5.addText('EMPRESAS CON CICLO 100% COMPLETO',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
 
-  const dHdr=[{text:'N°',options:{fill:DK,color:WH,bold:true,fontSize:7,align:'center'}},{text:'EMPRESA',options:{fill:DK,color:WH,bold:true,fontSize:7}}];
-  AG_DEPTS.forEach(d=>{dHdr.push({text:d.label,options:{fill:DK,color:WH,bold:true,fontSize:7,align:'center'}})});
-  const dRows=[dHdr];
+  if(D.ciclo100.length===0){
+    s5.addText('Sin empresas con ciclo 100% en este período.',{x:0.5,y:3,w:12.33,h:1,fontSize:24,fontFace:'Arial',color:ROJO,bold:true,align:'center'});
+  }else{
+    s5.addText(D.ciclo100.length+' empresas completaron Agendamiento + Visita + Informe',{x:0.5,y:0.9,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:VERDE,bold:true,align:'center'});
+    const cols=Math.min(2,Math.ceil(D.ciclo100.length/8));
+    const itemsPerCol=Math.ceil(D.ciclo100.length/cols);
+    for(let col=0;col<cols;col++){
+      const list=D.ciclo100.slice(col*itemsPerCol,(col+1)*itemsPerCol);
+      let txt='';
+      list.forEach((it,i)=>{txt+=(col*itemsPerCol+i+1)+'. '+(it.co.name||'')+'  ['+it.areasCompletas.join('+')+']\n'});
+      s5.addText(txt,{x:0.5+col*6.2,y:1.5,w:6,h:5.5,fontSize:14,fontFace:'Arial',color:TXT,valign:'top'});
+    }
+  }
+  s5.addText(pctCart(D.ciclo100.length)+'% de la cartera total ('+D.totalCartera+' empresas)',{x:0.5,y:7,w:12.33,h:0.4,fontSize:13,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
 
-  allCos.forEach((co,i)=>{
-    const bg=i%2?LG:WH;
-    const row=[{text:String(i+1),options:{fontSize:7,align:'center',fill:bg}},{text:(co.name||'').substring(0,28),options:{fontSize:7,fill:bg}}];
-    AG_DEPTS.forEach(d=>{
-      const ag=agGetVal(co.id,d.id,'ag');
+  // ═══ SLIDE 6: NO RESPONDE ═══
+  const s6=pres.addSlide();
+  s6.background={fill:BG};
+  s6.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s6.addText('ANÁLISIS "NO RESPONDE"',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
+
+  if(D.noRespondeGlobal.length===0){
+    s6.addText('Sin empresas en estado "No Responde" en este período.',{x:0.5,y:3,w:12.33,h:1,fontSize:24,fontFace:'Arial',color:VERDE,bold:true,align:'center'});
+  }else{
+    let txt=D.noRespondeGlobal.length+' empresas sin respuesta:\n\n';
+    D.noRespondeGlobal.forEach((it,i)=>{txt+=(i+1)+'. '+(it.co.name||'')+'  ['+it.depts.join('+')+']\n'});
+    s6.addText(txt,{x:0.5,y:1.0,w:6.5,h:5,fontSize:14,fontFace:'Arial',color:TXT,valign:'top'});
+
+    // Porcentajes en columna derecha
+    s6.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:7.3,y:1.0,w:5.5,h:2.6,fill:{color:GRIS_CLARO},line:{color:ROJO,width:2},rectRadius:0.1});
+    s6.addText('Impacto en cartera',{x:7.4,y:1.1,w:5.3,h:0.4,fontSize:14,fontFace:'Arial',color:ROJO,bold:true});
+    s6.addText('• Cartera total: '+D.noRespAnalysis.pctSobreCartera+'%\n• Servicio activo: '+D.noRespAnalysis.pctSobreActivas+'%\n• Gestión SST: '+D.noRespAnalysis.pctSST+'%\n• Gestión Salud: '+D.noRespAnalysis.pctSalud+'%',{x:7.5,y:1.6,w:5.2,h:1.9,fontSize:13,fontFace:'Arial',color:TXT,valign:'top'});
+
+    s6.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:7.3,y:3.9,w:5.5,h:2.1,fill:{color:GRIS_CLARO},line:{color:VERDE,width:2},rectRadius:0.1});
+    s6.addText('Proyección si responden',{x:7.4,y:4.0,w:5.3,h:0.4,fontSize:14,fontFace:'Arial',color:VERDE,bold:true});
+    s6.addText('• SST: '+D.stats.sst.cumplimientoPct+'% → '+D.noRespAnalysis.proySST+'%\n• Salud: '+D.stats.salud.cumplimientoPct+'% → '+D.noRespAnalysis.proySalud+'%',{x:7.5,y:4.5,w:5.2,h:1.4,fontSize:14,fontFace:'Arial',color:TXT,bold:true});
+  }
+  s6.addText('Recomendación: plazo máximo 30 días para obtener respuesta',{x:0.5,y:6.8,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:AZUL_PRIM,bold:true,italic:true,align:'center'});
+
+  // ═══ SLIDE 7: COMPOSICIÓN CARTERA (PIE) ═══
+  const s7=pres.addSlide();
+  s7.background={fill:BG};
+  s7.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s7.addText('COMPOSICIÓN DE LA CARTERA',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
+
+  const pieData=[{
+    name:'Cartera',
+    labels:['Trabajadas','No responde','Sin gestión','Inactivas'],
+    values:[D.cartera.trabajadas.length,D.cartera.noResponde.length,D.cartera.sinGestionPeriodo.length,D.cartera.inactivas.length]
+  }];
+  s7.addChart(pres.charts.DOUGHNUT,pieData,{
+    x:0.5,y:1.0,w:7,h:6,
+    chartColors:[VERDE,ROJO,AMBAR,'808080'],
+    showLegend:true,legendPos:'b',legendFontSize:14,
+    showValue:true,dataLabelFontSize:14,dataLabelColor:WH,
+    showPercent:true,
+    title:'Total: '+D.totalCartera+' empresas',
+    showTitle:true,titleFontSize:16,titleColor:AZUL_PRIM
+  });
+
+  // Tabla resumen al lado
+  const cartTable=[
+    [{text:'CATEGORÍA',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:13}},{text:'CANT.',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:13}},{text:'%',options:{fill:AZUL_PRIM,color:WH,bold:true,align:'center',fontSize:13}}],
+    [{text:'Trabajadas',options:{color:VERDE,bold:true,fontSize:12}},{text:String(D.cartera.trabajadas.length),options:{align:'center',fontSize:12}},{text:pctCart(D.cartera.trabajadas.length)+'%',options:{align:'center',fontSize:12}}],
+    [{text:'No responde',options:{color:ROJO,bold:true,fontSize:12}},{text:String(D.cartera.noResponde.length),options:{align:'center',fontSize:12}},{text:pctCart(D.cartera.noResponde.length)+'%',options:{align:'center',fontSize:12}}],
+    [{text:'Sin gestión',options:{color:AMBAR,bold:true,fontSize:12}},{text:String(D.cartera.sinGestionPeriodo.length),options:{align:'center',fontSize:12}},{text:pctCart(D.cartera.sinGestionPeriodo.length)+'%',options:{align:'center',fontSize:12}}],
+    [{text:'Inactivas',options:{color:'808080',bold:true,fontSize:12}},{text:String(D.cartera.inactivas.length),options:{align:'center',fontSize:12}},{text:pctCart(D.cartera.inactivas.length)+'%',options:{align:'center',fontSize:12}}],
+    [{text:'TOTAL',options:{fill:GRIS_CLARO,color:AZUL_PRIM,bold:true,fontSize:13}},{text:String(D.totalCartera),options:{fill:GRIS_CLARO,bold:true,color:AZUL_PRIM,align:'center',fontSize:13}},{text:'100%',options:{fill:GRIS_CLARO,bold:true,color:AZUL_PRIM,align:'center',fontSize:13}}]
+  ];
+  s7.addTable(cartTable,{x:7.8,y:1.5,w:5,colW:[2.5,1.2,1.3],fontFace:'Arial',border:{type:'solid',color:'BFBFBF',pt:1},rowH:0.6});
+
+  // ═══ SLIDE 8: CASOS DE ATENCIÓN ═══
+  const s8=pres.addSlide();
+  s8.background={fill:BG};
+  s8.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s8.addText('CASOS DE ATENCIÓN',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
+
+  // Empresas visitadas pero sin informe
+  const sinInforme=[];
+  D.allCos.forEach(co=>{
+    D.DEPTS.forEach(d=>{
       const vis=agGetVal(co.id,d.id,'vis');
       const inf=agGetVal(co.id,d.id,'inf');
-      let txt='—',clr=GY;
-      if(ag==='N/A'){txt='N/A';clr=GY}
-      else if(inf==='SÍ'){txt='✅';clr=GRN}
-      else if(vis==='SÍ'){txt='🏢';clr='3B82F6'}
-      else if(ag==='SÍ'){txt='📋';clr=YEL}
-      else{txt='❌';clr=RED}
-      row.push({text:txt,options:{fontSize:8,align:'center',fill:bg,color:clr,bold:true}});
+      if(vis==='SÍ'&&inf!=='SÍ'){
+        sinInforme.push({co,dept:d.label});
+      }
     });
-    dRows.push(row);
   });
 
-  const colWidths=[0.4,2.8];AG_DEPTS.forEach(()=>colWidths.push(1.1));
-  s5.addTable(dRows,{x:0.3,y:0.65,w:9.4,colW:colWidths,border:{type:'solid',pt:0.3,color:'CBD5E1'},rowH:0.18,fontSize:7});
-
-  // ===== SLIDE 6: EMPRESAS PRIORITARIAS =====
-  const s6=pres.addSlide();
-  s6.background={fill:DK};
-  s6.addText('EMPRESAS PRIORITARIAS',{x:0.5,y:0.3,w:9,h:0.6,fontSize:28,fontFace:'Georgia',color:WH,bold:true});
-  s6.addShape(pres.shapes.RECTANGLE,{x:0.5,y:0.85,w:2,h:0.04,fill:{color:RED}});
-  s6.addText('Empresas con 2 o más áreas sin agendar',{x:0.5,y:0.95,w:9,h:0.4,fontSize:12,fontFace:'Calibri',color:GY});
-
-  const prios=allCos.filter(co=>{let p=0;AG_DEPTS.forEach(d=>{if(agGetVal(co.id,d.id,'ag')==='NO')p++});return p>=2});
-  if(prios.length>0){
-    prios.forEach((co,i)=>{
-      if(i>=8)return;
-      const areas=AG_DEPTS.filter(d=>agGetVal(co.id,d.id,'ag')==='NO').map(d=>d.icon+' '+d.label).join('  ');
-      const y=1.5+i*0.5;
-      s6.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:0.5,y,w:9,h:0.4,fill:{color:'1E293B'},rectRadius:0.05});
-      s6.addText('⚠️ '+co.name,{x:0.7,y,w:4,h:0.4,fontSize:11,fontFace:'Calibri',color:RED,bold:true,valign:'middle'});
-      s6.addText(areas,{x:5,y,w:4.3,h:0.4,fontSize:10,fontFace:'Calibri',color:GY,valign:'middle',align:'right'});
-    });
+  s8.addText('Informes pendientes (visita realizada, falta socializar):',{x:0.5,y:0.9,w:12.33,h:0.4,fontSize:16,fontFace:'Arial',color:AMBAR,bold:true});
+  if(sinInforme.length===0){
+    s8.addText('Sin pendientes — todos los informes están al día.',{x:0.5,y:1.4,w:12.33,h:0.5,fontSize:16,fontFace:'Arial',color:VERDE,italic:true});
   }else{
-    s6.addText('✅ No hay empresas con más de 2 áreas pendientes',{x:1,y:2,w:8,h:1,fontSize:18,fontFace:'Calibri',color:GRN,align:'center'});
+    let txt='';
+    sinInforme.slice(0,15).forEach((it,i)=>{txt+=(i+1)+'. '+(it.co.name||'')+'  ('+it.dept+')\n'});
+    if(sinInforme.length>15)txt+='... y '+(sinInforme.length-15)+' más';
+    s8.addText(txt,{x:0.5,y:1.4,w:12.33,h:5.5,fontSize:13,fontFace:'Arial',color:TXT,valign:'top'});
+  }
+  s8.addText('Total casos pendientes: '+sinInforme.length,{x:0.5,y:7,w:12.33,h:0.4,fontSize:14,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
+
+  // ═══ SLIDE 9: ACCIONES PROPUESTAS ═══
+  const s9=pres.addSlide();
+  s9.background={fill:BG};
+  s9.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.6,fill:{color:AZUL_PRIM}});
+  s9.addText('ACCIONES PARA EL SIGUIENTE PERÍODO',{x:0.5,y:0.1,w:12.33,h:0.4,fontSize:22,fontFace:'Arial',color:WH,bold:true,align:'center'});
+
+  let acciones=[
+    '1. Activar contacto formal con todas las empresas en estado "No Responde", con plazo máximo de 30 días.',
+    '2. Priorizar la socialización de los informes elaborados pero no entregados, calendarizando reuniones con responsables.',
+    '3. Verificar empresas con frecuencia bimensual cuyo mes "no toca", confirmando próxima visita antes del corte.',
+    '4. Mantener semáforo en tablero gerencial y revisar avance semanalmente con los responsables de cada departamento.',
+    '5. Documentar lecciones aprendidas del período y actualizar el plan operativo del siguiente ciclo.'
+  ];
+  if(D.stats.sst.cumplimientoPct<50||D.stats.salud.cumplimientoPct<50){
+    acciones.splice(2,0,'⚠ Convocar reunión interna del equipo para revisar bloqueos operativos (semáforo en zona roja).');
   }
 
-  // ===== SLIDE 7: CIERRE =====
-  const s7=pres.addSlide();
-  s7.background={fill:DK};
-  s7.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.08,fill:{color:TEAL}});
-  s7.addShape(pres.shapes.RECTANGLE,{x:0,y:5.545,w:'100%',h:0.08,fill:{color:TEAL}});
-  s7.addText('CONSULTORES EMPRESARIALES',{x:0.5,y:1.5,w:9,h:0.8,fontSize:32,fontFace:'Georgia',color:WH,bold:true,align:'center'});
-  s7.addText('ALTAIR',{x:0.5,y:2.2,w:9,h:0.8,fontSize:40,fontFace:'Georgia',color:TEAL,bold:true,align:'center'});
-  s7.addShape(pres.shapes.RECTANGLE,{x:4,y:3.1,w:2,h:0.04,fill:{color:TEAL}});
-  s7.addText(mesLabel,{x:0.5,y:3.3,w:9,h:0.5,fontSize:16,fontFace:'Calibri',color:GY,align:'center'});
-  s7.addText('Sistema Integral SST — Informe generado automáticamente',{x:0.5,y:4.5,w:9,h:0.4,fontSize:10,fontFace:'Calibri',color:GY,align:'center'});
+  acciones.forEach((acc,i)=>{
+    const y=1.2+i*0.85;
+    s9.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:0.5,y,w:12.33,h:0.7,fill:{color:GRIS_CLARO},line:{color:AZUL_ACC,width:1},rectRadius:0.05});
+    s9.addText(acc,{x:0.7,y:y+0.1,w:12,h:0.55,fontSize:13,fontFace:'Arial',color:TXT,valign:'middle'});
+  });
 
-  await pres.writeFile({fileName:'Presentacion_Cumplimiento_'+mNames[LOG.month]+'_'+LOG.year+'.pptx'});
+  // ═══ SLIDE 10: CIERRE ═══
+  const s10=pres.addSlide();
+  s10.background={fill:BG};
+  s10.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:'100%',h:0.4,fill:{color:AZUL_PRIM}});
+  s10.addShape(pres.shapes.RECTANGLE,{x:0,y:7.1,w:'100%',h:0.4,fill:{color:AZUL_PRIM}});
+  s10.addText('CONSULTORES EMPRESARIALES',{x:0.5,y:1.8,w:12.33,h:0.7,fontSize:32,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
+  s10.addText('ALTAIR',{x:0.5,y:2.6,w:12.33,h:0.9,fontSize:48,fontFace:'Arial',color:AZUL_ACC,bold:true,align:'center'});
+  s10.addShape(pres.shapes.RECTANGLE,{x:6,y:3.7,w:1.33,h:0.05,fill:{color:AZUL_ACC}});
+  s10.addText('Equipo Interdisciplinario de Salud Ocupacional',{x:0.5,y:4.0,w:12.33,h:0.5,fontSize:18,fontFace:'Arial',color:TXT,align:'center'});
+  s10.addText(D.mesLabel,{x:0.5,y:4.7,w:12.33,h:0.5,fontSize:20,fontFace:'Arial',color:AZUL_PRIM,bold:true,align:'center'});
+  s10.addText('Documento confidencial — Uso interno gerencial',{x:0.5,y:5.6,w:12.33,h:0.4,fontSize:12,fontFace:'Arial',color:'808080',italic:true,align:'center'});
+  s10.addText('Generado automáticamente desde el dashboard ALTAIR',{x:0.5,y:7.15,w:12.33,h:0.3,fontSize:11,fontFace:'Arial',color:WH,align:'center',charSpacing:3});
+
+  await pres.writeFile({fileName:'Presentacion_Cumplimiento_SST_Salud_'+["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][LOG.month]+LOG.year+'.pptx'});
   ss("ok");
   }catch(e){alert("Error: "+e.message);ss("er");console.error(e)}
 }
