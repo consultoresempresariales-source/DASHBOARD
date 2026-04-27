@@ -8388,9 +8388,14 @@ function contRenderProviders(){
       hh+=`<button onclick="pvJornadaConvenio('${pv.id}')" ${btnHover} style="${btnStyle('#fbbf24','#fcd34d')}"><span style="font-size:13px">🗓️</span> Jornada Convenio</button>`;
       hh+=`<button onclick="pvJornadaVenta('${pv.id}')" ${btnHover} style="${btnStyle('#a855f7','#c4b5fd')}"><span style="font-size:13px">🎯</span> Jornada Venta</button>`;
       hh+=`</div>`;
-      hh+=`<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">`;
+      hh+=`<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap">`;
+      // Botón Excel a la izquierda
+      hh+=`<button onclick="pvExportExcel('${pv.id}')" title="Descargar todo el historial en Excel" style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.08));border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:7px 14px;font-size:11px;cursor:pointer;color:#86efac;font-weight:700;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px" onmouseover="this.style.background='linear-gradient(135deg,rgba(34,197,94,0.25),rgba(34,197,94,0.15))';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(34,197,94,0.2)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(34,197,94,0.15),rgba(34,197,94,0.08))';this.style.transform='';this.style.boxShadow=''"><span style="font-size:13px">📥</span> Descargar Excel</button>`;
+      // Editar/Eliminar a la derecha
+      hh+=`<div style="display:flex;gap:8px">`;
       hh+=`<button onclick="pvEdit('${pv.id}')" title="Editar proveedor" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;color:var(--t2);font-weight:600;transition:all 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.08)';this.style.color='var(--t1)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.color='var(--t2)'">✏️ Editar</button>`;
       hh+=`<button onclick="pvDel('${pv.id}')" title="Eliminar proveedor" style="background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;color:#fca5a5;font-weight:600;transition:all 0.15s" onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='#ef4444'" onmouseout="this.style.background='rgba(239,68,68,0.05)';this.style.color='#fca5a5'">🗑 Eliminar</button>`;
+      hh+=`</div>`;
       hh+=`</div>`;
     }
 
@@ -8988,6 +8993,101 @@ async function pvDelMov(pvId,movId){
     await pvLoad();
     contRender();
   }catch(e){alert("Error al eliminar: "+e.message)}
+}
+
+// Exportar todos los movimientos de un proveedor a Excel
+function pvExportExcel(id){
+  const pv=(CONT.providers||[]).find(p=>p.id===id);if(!pv)return;
+  if(typeof XLSX==='undefined'){alert("XLSX no está cargado");return}
+
+  // Ordenar por fecha de registro (orden cronológico de captura)
+  const movs=[...(pv.movements||[])].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+
+  // ───── HOJA 1: RESUMEN ─────
+  const saldoActual=pvSaldo(pv);
+  const totalCargos=movs.filter(m=>m.type==='cargo').reduce((a,m)=>a+(m.amount||0),0);
+  const totalAbonos=movs.filter(m=>m.type==='abono_efectivo'||m.type==='abono_venta').reduce((a,m)=>a+(m.amount||0),0);
+  const totalAjustes=movs.filter(m=>m.type==='ajuste').reduce((a,m)=>a+(m.amount||0),0);
+
+  const resumen=[
+    ['ESTADO DE CUENTA — PROVEEDOR',''],
+    ['',''],
+    ['Proveedor:',pv.name||'—'],
+    ['RUC/Cédula:',pv.ruc||'—'],
+    ['Teléfono:',pv.phone||'—'],
+    ['Email:',pv.email||'—'],
+    ['',''],
+    ['Servicios configurados:',''],
+    ['  Laboratorio - Convenio:',pv.services&&pv.services.lab?'$'+pv.services.lab.convenio.toFixed(2):'—'],
+    ['  Laboratorio - Venta:',pv.services&&pv.services.lab?'$'+pv.services.lab.venta.toFixed(2):'—'],
+    ['  Radiografía - Convenio:',pv.services&&pv.services.rx?'$'+pv.services.rx.convenio.toFixed(2):'—'],
+    ['  Radiografía - Venta:',pv.services&&pv.services.rx?'$'+pv.services.rx.venta.toFixed(2):'—'],
+    ['',''],
+    ['RESUMEN DE MOVIMIENTOS',''],
+    ['Total cargos (deudas):','$'+totalCargos.toFixed(2)],
+    ['Total abonos (pagos):','$'+totalAbonos.toFixed(2)],
+    ['Total ajustes:','$'+totalAjustes.toFixed(2)],
+    ['Cantidad de movimientos:',movs.length],
+    ['',''],
+    ['SALDO ACTUAL:','$'+saldoActual.toFixed(2)],
+    ['Estado:',saldoActual>0.01?'POR PAGAR':(saldoActual<-0.01?'A FAVOR':'AL DÍA')],
+    ['',''],
+    ['Fecha de exportación:',new Date().toLocaleString('es-EC')]
+  ];
+
+  // ───── HOJA 2: MOVIMIENTOS DETALLADOS ─────
+  const headerMov=['#','Fecha','Tipo','Servicio','Concepto / Notas','Cantidad','Paciente','Debe','Haber','Saldo','Registrado'];
+  let running=0;
+  const rowsMov=movs.map((m,i)=>{
+    let debe=0,haber=0,tipo='';
+    if(m.type==='cargo'){debe=m.amount||0;running+=debe;tipo='Cargo (Deuda)'}
+    else if(m.type==='abono_efectivo'){haber=m.amount||0;running-=haber;tipo='Abono Efectivo'}
+    else if(m.type==='abono_venta'){haber=m.amount||0;running-=haber;tipo='Pago Precio Venta'}
+    else if(m.type==='ajuste'){
+      if((m.amount||0)>=0){debe=m.amount||0;running+=debe;tipo='Ajuste (+)'}
+      else{haber=Math.abs(m.amount||0);running-=haber;tipo='Ajuste (−)'}
+    }
+    const svc=m.service==='lab'?'Laboratorio':(m.service==='rx'?'Radiografía':'—');
+    const reg=m.createdAt?new Date(m.createdAt).toLocaleString('es-EC'):'—';
+    return[
+      i+1,
+      m.date||'—',
+      tipo,
+      svc,
+      m.description||'—',
+      m.qty||'—',
+      m.patient||'—',
+      debe>0?debe:'',
+      haber>0?haber:'',
+      running,
+      reg
+    ];
+  });
+
+  // Fila final con totales
+  rowsMov.push(['','','','','','','','','','','']);
+  rowsMov.push(['','','TOTALES','','','','',totalCargos,totalAbonos,saldoActual,'']);
+
+  // Construir libro
+  const wb=XLSX.utils.book_new();
+
+  // Hoja 1: Resumen
+  const wsResumen=XLSX.utils.aoa_to_sheet(resumen);
+  wsResumen['!cols']=[{wch:32},{wch:30}];
+  // Estilos básicos: hacer el título en negrita (XLSX simple no soporta estilos directamente, pero el ancho ayuda)
+  XLSX.utils.book_append_sheet(wb,wsResumen,'Resumen');
+
+  // Hoja 2: Movimientos
+  const wsMov=XLSX.utils.aoa_to_sheet([headerMov,...rowsMov]);
+  wsMov['!cols']=[
+    {wch:5},{wch:12},{wch:20},{wch:14},{wch:45},{wch:10},{wch:20},{wch:12},{wch:12},{wch:14},{wch:20}
+  ];
+  XLSX.utils.book_append_sheet(wb,wsMov,'Movimientos');
+
+  // Descargar
+  const safeName=(pv.name||'proveedor').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,40);
+  const today=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb,`Estado_Cuenta_${safeName}_${today}.xlsx`);
 }
 
 // Exportar / Importar JSON (respaldo local adicional)
