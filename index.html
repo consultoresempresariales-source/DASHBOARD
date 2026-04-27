@@ -8140,17 +8140,17 @@ async function contDelLogo(){
 // Con respaldo automático en localStorage
 // ============================================================
 
-function pvKey(){return 'cont_providers_'+(CONT.companyId||'default')}
+function pvKey(){return 'cont_providers_global'}
 
 function pvUid(){return 'pv_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)}
 
 // Carga proveedores desde Supabase (con fallback a localStorage)
 async function pvLoad(){
-  if(!CONT.companyId){CONT.providers=[];return []}
+  // Pestaña independiente: no requiere empresa contable
   try{
-    const{data:provs,error}=await sb.from("cont_providers").select("*").eq("cont_company_id",CONT.companyId).eq("active",true).order("name");
+    const{data:provs,error}=await sb.from("cont_providers").select("*").eq("active",true).order("name");
     if(error)throw error;
-    const{data:movs,error:e2}=await sb.from("cont_provider_movements").select("*").eq("cont_company_id",CONT.companyId).order("movement_date",{ascending:false});
+    const{data:movs,error:e2}=await sb.from("cont_provider_movements").select("*").order("movement_date",{ascending:false});
     if(e2)throw e2;
     const list=(provs||[]).map(p=>{
       const services={};
@@ -8530,14 +8530,13 @@ function pvOpen(id){
 }
 
 async function pvNew(){
-  if(!CONT.companyId){alert("Selecciona una empresa contable primero");return}
   const name=prompt("Nombre del proveedor:");if(!name||!name.trim())return;
   const ruc=prompt("RUC/Cédula (opcional):")||'';
   const phone=prompt("Teléfono (opcional):")||'';
   const email=prompt("Email (opcional):")||'';
 
   const tieneLab=confirm("¿Este proveedor ofrece EXÁMENES DE LABORATORIO?\n\n✅ Sí\n❌ No");
-  const payload={cont_company_id:CONT.companyId,name:name.trim(),ruc:ruc.trim(),phone:phone.trim(),email:email.trim(),active:true};
+  const payload={name:name.trim(),ruc:ruc.trim(),phone:phone.trim(),email:email.trim(),active:true};
   if(tieneLab){
     payload.lab_convenio=parseFloat(prompt("Precio CONVENIO de laboratorio (lo que pagas al proveedor):","7.30"))||0;
     payload.lab_venta=parseFloat(prompt("Precio VENTA de laboratorio (lo que cobras al cliente):","14.00"))||0;
@@ -8631,7 +8630,7 @@ async function pvAddDeuda(id){
 
   try{
     const{error}=await sb.from("cont_provider_movements").insert({
-      provider_id:id,cont_company_id:CONT.companyId,
+      provider_id:id,
       type:'cargo',service:svc,amount:amount,description:concepto,
       movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
     });
@@ -8654,7 +8653,7 @@ async function pvAddAbono(id){
 
   try{
     const{error}=await sb.from("cont_provider_movements").insert({
-      provider_id:id,cont_company_id:CONT.companyId,
+      provider_id:id,
       type:'abono_efectivo',amount:amount,description:concepto,
       movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
     });
@@ -8701,14 +8700,14 @@ async function pvJornadaConvenio(id){
     // Registramos: cargo (por la jornada) + abono efectivo (pagado ese mismo día)
     // Resultado neto: la deuda NO cambia, pero queda registrada la operación
     const{error:e1}=await sb.from("cont_provider_movements").insert({
-      provider_id:id,cont_company_id:CONT.companyId,
+      provider_id:id,
       type:'cargo',service:svcKey,qty:qty,amount:convenioTotal,
       description:`Jornada convenio${note?' — '+note:''}`,
       movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
     });
     if(e1)throw e1;
     const{error:e2}=await sb.from("cont_provider_movements").insert({
-      provider_id:id,cont_company_id:CONT.companyId,
+      provider_id:id,
       type:'abono_efectivo',amount:convenioTotal,
       description:`Pago jornada convenio${note?' — '+note:''}`,
       movement_date:date,created_by:(CURRENT_USER&&CURRENT_USER.nombre)||''
@@ -8758,7 +8757,7 @@ async function pvJornadaVenta(id){
 
   try{
     const{error}=await sb.from("cont_provider_movements").insert({
-      provider_id:id,cont_company_id:CONT.companyId,
+      provider_id:id,
       type:'abono_venta',service:svcKey,qty:qty,amount:diferencia,
       venta_total:ventaTotal,convenio_total:convenioTotal,
       description:`Jornada a precio venta${note?' — '+note:''}`,
@@ -8921,7 +8920,6 @@ async function pvAjuste(id){
   try{
     const{error}=await sb.from("cont_provider_movements").insert({
       provider_id:id,
-      cont_company_id:CONT.companyId,
       type:'ajuste',
       amount:signo*monto,
       description:desc,
