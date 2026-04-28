@@ -4325,8 +4325,10 @@ function logRender(){
   const mNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   // Workers can only see calendar tabs, not budget/coverage/destinations
   if(!_canViewLog&&(tab==='budget'||tab==='destinations'||tab==='coverage')){LOG.tab='calendar'}
-  // Contador only sees agendamiento, resumen, cobrar
-  if(IS_CONTADOR()&&LOG.tab!=='agendamiento'&&LOG.tab!=='resumen'&&LOG.tab!=='enviados'){LOG.tab='enviados'}
+  // Contador only sees agendamiento, cobrar
+  if(IS_CONTADOR()&&LOG.tab!=='agendamiento'&&LOG.tab!=='enviados'){LOG.tab='enviados'}
+  // Redirigir si todavía está en 'resumen' (pestaña eliminada)
+  if(LOG.tab==='resumen'){LOG.tab='agendamiento'}
   // Allow agendamiento and resumen for all users (read-only for non-admin/jefe)
   const fTab=LOG.tab;
 
@@ -4419,15 +4421,14 @@ function logRender(){
   }
   // Agendamiento, Resumen, Cobrar: visible for ALL users
   h+=`<div onclick="LOG.tab='agendamiento';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='agendamiento'?'#10b981':'transparent'};color:${fTab==='agendamiento'?'#10b981':'var(--t3)'};transition:all 0.2s">📋 Agendamiento</div>`;
-  h+=`<div onclick="LOG.tab='resumen';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='resumen'?'#818cf8':'transparent'};color:${fTab==='resumen'?'#818cf8':'var(--t3)'};transition:all 0.2s">📊 Resumen</div>`;
   h+=`<div onclick="LOG.tab='enviados';logRender()" style="padding:12px 20px;cursor:pointer;font-size:13px;font-weight:700;border-bottom:3px solid ${fTab==='enviados'?'#f472b6':'transparent'};color:${fTab==='enviados'?'#f472b6':'var(--t3)'};transition:all 0.2s">💰 Cobrar</div>`;
   h+=`</div>`;
 
   // Month navigator (always visible)
-  if(LOG.calView!=='week'||fTab==='agendamiento'||fTab==='resumen'){
+  if(LOG.calView!=='week'||fTab==='agendamiento'){
     h+=`<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px">`;
     h+=`<button onclick="logPrevMonth()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">◀</button>`;
-    h+=`<span style="font-size:16px;font-weight:800;color:${fTab==='agendamiento'?'#10b981':fTab==='resumen'?'#818cf8':LOG_COLOR}">${mNames[LOG.month]} ${LOG.year}</span>`;
+    h+=`<span style="font-size:16px;font-weight:800;color:${fTab==='agendamiento'?'#10b981':LOG_COLOR}">${mNames[LOG.month]} ${LOG.year}</span>`;
     h+=`<button onclick="logNextMonth()" style="background:none;border:1px solid var(--bd);color:var(--t1);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:14px">▶</button>`;
     if(isAdmin&&fTab==='calendar'){
       h+=`<div style="position:relative;margin-left:16px"><button onclick="document.getElementById('waGroupMenu').style.display=document.getElementById('waGroupMenu').style.display==='none'?'block':'none'" style="background:#25d366;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📱 Enviar al Grupo ▾</button>`;
@@ -4448,12 +4449,11 @@ function logRender(){
   else if(fTab==="coverage") h+=logRenderCoverage();
   else if(fTab==="destinations") h+=logRenderDestinations();
   else if(fTab==="agendamiento") h+=logRenderAgendamiento();
-  else if(fTab==="resumen") h+=logRenderResumen();
   else if(fTab==="enviados") h+=logRenderEnviados();
 
   mc.innerHTML=h;
   // Restore scroll positions for agendamiento/resumen/cobrar tables
-  if(fTab==='agendamiento'||fTab==='resumen'||fTab==='enviados'){
+  if(fTab==='agendamiento'||fTab==='enviados'){
     const _st=LOG._agScrollTop,_sl=LOG._agScrollLeft,_ms=LOG._mainScroll;
     requestAnimationFrame(()=>{
       const agTable=document.getElementById('agTableWrap');
