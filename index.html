@@ -10424,9 +10424,11 @@ async function attDoFichaje(action){
       const isLate=nowMinutes>expMinutes;
       const lateMin=isLate?nowMinutes-(expH*60+expM):0;
 
+      // Capturar nombre del usuario (probar todos los campos posibles)
+      const userName=CURRENT_USER.name||CURRENT_USER.nombre||CURRENT_USER.full_name||CURRENT_USER.fullName||CURRENT_USER.username||CURRENT_USER.email||CURRENT_USER.cedula||'Usuario';
       const{error}=await sb.from("attendance_records").insert({
         user_id:CURRENT_USER.id,
-        user_name:CURRENT_USER.name||CURRENT_USER.nombre||CURRENT_USER.username||'',
+        user_name:userName,
         work_date:today,
         check_in:nowISO,
         is_late:isLate,
