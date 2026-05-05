@@ -371,7 +371,7 @@ async function autoLogin(){
 function applyUserRole(){
   if(!CURRENT_USER)return;
   // Modal de fichaje al iniciar sesión (solo una vez por sesión)
-  setTimeout(()=>{if(typeof attShowFichajeModal==="function"&&!window._attShownOnce){window._attShownOnce=true;attShowFichajeModal()}},800);
+  setTimeout(()=>{if(typeof attShowFichajeModal==="function"&&!window._attShownOnce){window._attShownOnce=true;attShowFichajeModal();attShowFloatingButton()}},800);
   const u=CURRENT_USER;const isAdmin=u.role==="admin";
   const _isJefe=u.role==='jefe'||(u.modules&&u.modules.includes('jefe'));
   // Apply jefe read-only mode
@@ -442,7 +442,7 @@ function applyUserRole(){
   // Post-login: show pending trips notification for workers (not jefe)
   if(!isAdmin&&!IS_JEFE()){setTimeout(()=>showPostLoginNotifications(),800)}
 }
-function doLogout(){CURRENT_USER=null;localStorage.removeItem("poa_user");document.body.classList.remove('jefe-readonly');
+function doLogout(){CURRENT_USER=null;localStorage.removeItem("poa_user");document.body.classList.remove('jefe-readonly');if(typeof attHideFloatingButton==="function")attHideFloatingButton();window._attShownOnce=false;
   ["salud","seguridad","talento","datos","config","pendientes","renovaciones","logistica"].forEach(m=>{const el=document.getElementById("sb-"+m);if(el)el.style.display="none"});
   document.getElementById("sb-logout").style.display="none";document.getElementById("sb-switch").style.display="none";
   document.getElementById("lgCed").value="";document.getElementById("lgPwd").value="";document.getElementById("lgErr").textContent="";
@@ -10467,6 +10467,9 @@ async function attDoFichaje(action){
     const labels={'check_in':'Entrada','lunch_out':'Salida almuerzo','lunch_in':'Regreso almuerzo','check_out':'Salida'};
     attShowToast(`✅ ${labels[action]} registrada a las ${t}`);
 
+    // Actualizar botón flotante con el siguiente paso
+    attRenderFloatingButton();
+
     // Si hay siguiente acción, mostrar resumen para que sepa cuándo viene la próxima
     setTimeout(()=>attShowSummaryBanner(),500);
   }catch(e){
@@ -10482,6 +10485,77 @@ function attShowToast(msg){
   document.body.appendChild(el);
   setTimeout(()=>el.remove(),3500);
 }
+
+
+
+// ─────────────────────────────────────────────────────────────────
+// BOTÓN FLOTANTE DE FICHAJE (siempre visible)
+// ─────────────────────────────────────────────────────────────────
+async function attShowFloatingButton(){
+  if(!CURRENT_USER)return;
+  // No mostrar si tiene justificación activa
+  const just=await attCheckJustification(CURRENT_USER.id);
+  if(just)return;
+
+  await attLoadToday();
+  attRenderFloatingButton();
+  // Auto-actualizar cada 30 segundos
+  if(window._attFloatInt)clearInterval(window._attFloatInt);
+  window._attFloatInt=setInterval(()=>attRenderFloatingButton(),30000);
+}
+
+function attRenderFloatingButton(){
+  const old=document.getElementById('attFloatBtn');if(old)old.remove();
+
+  const action=attNextAction(ATT.todayRecord);
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0');
+  const mm=String(now.getMinutes()).padStart(2,'0');
+
+  const cfgs={
+    'check_in':{label:'Marcar Entrada',icon:'🟢',color:'#10b981',expected:ATT.config.work_start},
+    'lunch_out':{label:'Salida Almuerzo',icon:'🍽️',color:'#f59e0b',expected:ATT.config.lunch_start},
+    'lunch_in':{label:'Regreso Almuerzo',icon:'✅',color:'#3b82f6',expected:ATT.config.lunch_end},
+    'check_out':{label:'Marcar Salida',icon:'🔴',color:'#ef4444',expected:ATT.config.work_end},
+    'completed':{label:'Jornada Completa',icon:'✓',color:'#10b981',expected:''}
+  };
+  const cfg=cfgs[action];
+
+  // Verificar si está atrasado para esta acción
+  let urgent=false;
+  if(action!=='completed'&&cfg.expected){
+    const[eH,eM]=cfg.expected.split(':').map(Number);
+    const expMin=eH*60+eM+ATT.config.tolerance;
+    const nowMin=now.getHours()*60+now.getMinutes();
+    if(nowMin>expMin)urgent=true;
+  }
+
+  const pulseAnim=urgent?'animation:attPulse 1.5s ease-in-out infinite':'';
+  const isCompleted=action==='completed';
+
+  const html=`
+    <div id="attFloatBtn" onclick="${isCompleted?'attShowSummaryBanner()':'attShowFichajeModal()'}" style="position:fixed;bottom:20px;right:20px;z-index:9990;cursor:pointer;${pulseAnim}">
+      <div style="background:linear-gradient(135deg,${cfg.color},${cfg.color}cc);color:#fff;border-radius:50px;padding:12px 18px 12px 14px;box-shadow:0 8px 24px ${cfg.color}66,0 0 0 4px ${cfg.color}22;display:flex;align-items:center;gap:10px;font-family:Arial,sans-serif;font-weight:700;font-size:13px;border:1px solid rgba(255,255,255,0.15);transition:all 0.2s" onmouseover="this.style.transform='translateY(-2px) scale(1.03)';this.style.boxShadow='0 12px 30px ${cfg.color}88,0 0 0 4px ${cfg.color}33'" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px ${cfg.color}66,0 0 0 4px ${cfg.color}22'">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${cfg.icon}</div>
+        <div style="text-align:left;line-height:1.2">
+          <div style="font-size:10px;opacity:0.9;font-weight:600;letter-spacing:.05em;text-transform:uppercase">${isCompleted?'Hoy':'Próximo'}</div>
+          <div style="font-size:13px;font-weight:800">${cfg.label}</div>
+          <div style="font-size:11px;font-family:'Courier New',monospace;font-weight:600;opacity:0.95;margin-top:1px">${hh}:${mm}${urgent?' ⚠':''}</div>
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes attPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+    </style>
+  `;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+function attHideFloatingButton(){
+  const b=document.getElementById('attFloatBtn');if(b)b.remove();
+  if(window._attFloatInt){clearInterval(window._attFloatInt);window._attFloatInt=null}
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // PESTAÑA ADMIN: PANEL DE ASISTENCIA
