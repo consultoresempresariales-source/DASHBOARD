@@ -113,6 +113,7 @@ canvas{width:100%!important;max-height:220px}
 
   <div style="flex:1"></div>
   <div class="sb-item" onclick="switchModule('pendientes')" id="sb-pendientes" style="display:none"><span class="sb-icon">📋</span><span class="sb-label">TAREAS</span></div>
+  <div class="sb-item" onclick="switchModule('asistencia')" id="sb-asistencia" style="display:none"><span class="sb-icon">⏰</span><span class="sb-label">ASIST.</span></div>
   <div class="sb-item" onclick="switchModule('renovaciones')" id="sb-renovaciones" style="display:none"><span class="sb-icon">🔔</span><span class="sb-label">RENOV.</span></div>
   <div class="sb-item" onclick="switchModule('config')" id="sb-config"><span class="sb-icon">⚙️</span><span class="sb-label">CONFIG</span></div>
   <div style="flex:1"></div>
@@ -236,6 +237,7 @@ canvas{width:100%!important;max-height:220px}
 </div>
 <div class="mn" id="logMc"></div>
 </div>
+<div id="asistenciaModule" style="display:none"><div class="mn" id="mainCol" style="padding:20px"></div></div>
 <div id="contableModule" style="display:none">
 <div class="hd" id="contHd" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
 <div style="display:flex;align-items:center;gap:12px"><div class="lg" id="contCoLogo" style="background:linear-gradient(135deg,#eab308,#f59e0b)">💰</div><div class="bn"><h1 id="contBN">Contabilidad</h1><p id="contBS" style="color:var(--t3)">Facturación, Cobros y Gastos</p></div><div class="mod-badge" style="background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.3)">💰 Contabilidad</div></div>
@@ -368,6 +370,8 @@ async function autoLogin(){
 }
 function applyUserRole(){
   if(!CURRENT_USER)return;
+  // Modal de fichaje al iniciar sesión (solo una vez por sesión)
+  setTimeout(()=>{if(typeof attShowFichajeModal==="function"&&!window._attShownOnce){window._attShownOnce=true;attShowFichajeModal()}},800);
   const u=CURRENT_USER;const isAdmin=u.role==="admin";
   const _isJefe=u.role==='jefe'||(u.modules&&u.modules.includes('jefe'));
   // Apply jefe read-only mode
@@ -413,6 +417,7 @@ function applyUserRole(){
   if(isAdmin){
     const cfgEl=document.getElementById("sb-config");if(cfgEl)cfgEl.style.display="block";
     const pendEl=document.getElementById("sb-pendientes");if(pendEl)pendEl.style.display="block";
+    const attEl=document.getElementById("sb-asistencia");if(attEl)attEl.style.display="block";
   }
   // Logística: show for all users
   const logEl=document.getElementById("sb-logistica");
@@ -596,7 +601,7 @@ async function forgotPassword(){
   await sb.from("app_users").update({password_reset_requested:true}).eq("id",data[0].id);
   errEl.style.color="#34d399";errEl.textContent="✅ Solicitud enviada. El administrador restablecerá su contraseña pronto."
 }
-function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","renovacionesModule","talentoModule","datosModule","ambienteModule","logisticaModule","contableModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",renovaciones:"renovacionesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule",contable:"contableModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}else if(m==="contable"){contLoad()}}
+function switchModule(m){MOD=m;document.querySelectorAll(".sb-item").forEach(e=>e.classList.remove("active"));document.getElementById("sb-"+m)?.classList.add("active");["saludModule","seguridadModule","configModule","pendientesModule","renovacionesModule","talentoModule","datosModule","ambienteModule","logisticaModule","contableModule","asistenciaModule"].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display="none"});const modMap={salud:"saludModule",seguridad:"seguridadModule",config:"configModule",pendientes:"pendientesModule",renovaciones:"renovacionesModule",talento:"talentoModule",datos:"datosModule",ambiente:"ambienteModule",logistica:"logisticaModule",contable:"contableModule",asistencia:"asistenciaModule"};const target=document.getElementById(modMap[m]);if(target)target.style.display="block";if(m==="seguridad"){loadCos().then(()=>{const sc=cos.find(x=>x.mod_seguridad===true);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>{render();sstLoad()})}else{sstLoad()}}).catch(()=>sstLoad())}else if(m==="salud"){const _canViewAll=IS_ADMIN_OR_JEFE();const sc=_canViewAll?cos[0]:cos.find(x=>x.mod_salud===true||x.mod_salud==null);if(sc&&sc.id!==CID){CID=sc.id;loadYears().then(()=>loadCD()).then(()=>render())}else{render()}}else if(m==="config"){renderConfig()}else if(m==="pendientes"){renderPendientes()}else if(m==="talento"){tthhLoad()}else if(m==="datos"){datosLoad()}else if(m==="ambiente"){ambienteLoad()}else if(m==="logistica"){logLoad()}else if(m==="contable"){contLoad()}else if(m==="asistencia"){attRenderAdminPanel()}}
 const MO=["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"],MF=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const CATS=[{id:"admin",name:"G. Administrativa",color:"#2dd4bf",icon:"🏛"},{id:"tecnica",name:"G. Técnica",color:"#818cf8",icon:"⚙️"},{id:"talento",name:"G. Talento Humano",color:"#f472b6",icon:"👥"},{id:"operativos",name:"Proc. Operativos",color:"#fb923c",icon:"📋"},{id:"psicosocial",name:"R. Psicosociales",color:"#a78bfa",icon:"🧠"},{id:"drogas",name:"Prev. Drogas",color:"#34d399",icon:"🛡"},{id:"servicios",name:"Serv. Permanentes",color:"#fbbf24",icon:"🔧"}];
 const EXT=[{id:"ingreso",label:"Ex. Ingreso",color:"#2dd4bf"},{id:"periodico",label:"Ex. Periódico",color:"#818cf8"},{id:"reintegro",label:"Ex. Reintegro",color:"#f472b6"},{id:"egreso",label:"Ex. Egreso",color:"#fb923c"}];
@@ -10170,4 +10175,775 @@ async function logSendNotifications(tripId){
     if(tid){const tr=LOG.trips.find(x=>x.id===tid);if(tr){const ms=LOG.members.filter(m=>m.trip_id===tid);LOG.editTrip={...tr,num_people:ms.length||1};LOG.tab='form';logRender()}}
   }catch(e){alert('Error al enviar: '+e.message)}
 }
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO DE CONTROL DE ASISTENCIA Y PUNTUALIDAD
+// ═══════════════════════════════════════════════════════════════
+
+const ATT={
+  config:{work_start:'08:00',work_end:'17:00',lunch_start:'13:00',lunch_end:'14:00',lunch_dur:60,tolerance:10},
+  todayRecord:null,
+  showModal:false
+};
+
+// Cargar configuración y registro de hoy del usuario actual
+async function attLoadToday(){
+  if(!CURRENT_USER)return;
+  try{
+    const{data:cfg}=await sb.from("attendance_config").select("*").limit(1).single();
+    if(cfg){
+      ATT.config={
+        work_start:cfg.work_start_time?cfg.work_start_time.slice(0,5):'08:00',
+        work_end:cfg.work_end_time?cfg.work_end_time.slice(0,5):'17:00',
+        lunch_start:cfg.lunch_start_time?cfg.lunch_start_time.slice(0,5):'13:00',
+        lunch_end:cfg.lunch_end_time?cfg.lunch_end_time.slice(0,5):'14:00',
+        lunch_dur:cfg.lunch_duration_minutes||60,
+        tolerance:cfg.tolerance_minutes||10
+      };
+    }
+    const today=new Date().toISOString().slice(0,10);
+    const{data}=await sb.from("attendance_records").select("*").eq("user_id",CURRENT_USER.id).eq("work_date",today).maybeSingle();
+    ATT.todayRecord=data||null;
+  }catch(e){console.error("attLoadToday:",e)}
+}
+
+// Verificar si el usuario está en período de justificación (maternidad/permiso)
+async function attCheckJustification(userId){
+  const today=new Date().toISOString().slice(0,10);
+  try{
+    const{data}=await sb.from("attendance_justifications").select("*")
+      .eq("user_id",userId)
+      .eq("status","aprobado")
+      .lte("start_date",today)
+      .gte("end_date",today);
+    return data&&data.length>0?data[0]:null;
+  }catch(e){return null}
+}
+
+// Determinar qué fichada toca registrar
+function attNextAction(rec){
+  if(!rec||!rec.check_in)return'check_in';
+  if(!rec.lunch_out)return'lunch_out';
+  if(!rec.lunch_in)return'lunch_in';
+  if(!rec.check_out)return'check_out';
+  return'completed';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MODAL DE FICHAJE (aparece al login)
+// ─────────────────────────────────────────────────────────────────
+async function attShowFichajeModal(){
+  if(!CURRENT_USER)return;
+
+  // No mostrar si ya tiene justificación activa hoy
+  const just=await attCheckJustification(CURRENT_USER.id);
+  if(just){
+    attShowJustificationBanner(just);
+    return;
+  }
+
+  await attLoadToday();
+
+  // Cerrar modal si ya completó todas las fichadas del día
+  const action=attNextAction(ATT.todayRecord);
+  if(action==='completed'){
+    // Mostrar resumen breve y cerrar
+    attShowSummaryBanner();
+    return;
+  }
+
+  attRenderFichajeModal();
+}
+
+function attRenderFichajeModal(){
+  // Eliminar modal previo si existe
+  const old=document.getElementById('attFichajeModal');if(old)old.remove();
+
+  const action=attNextAction(ATT.todayRecord);
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0');
+  const mm=String(now.getMinutes()).padStart(2,'0');
+  const ss=String(now.getSeconds()).padStart(2,'0');
+  const dateStr=now.toLocaleDateString('es-EC',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Determinar info según acción
+  const actionConfig={
+    'check_in':{label:'REGISTRAR ENTRADA',icon:'🟢',color:'#10b981',bg:'rgba(16,185,129,0.15)',expectedTime:ATT.config.work_start,desc:'Marca tu hora de llegada al trabajo'},
+    'lunch_out':{label:'SALIDA AL ALMUERZO',icon:'🍽️',color:'#f59e0b',bg:'rgba(245,158,11,0.15)',expectedTime:ATT.config.lunch_start,desc:'Hora de almuerzo (1 hora)'},
+    'lunch_in':{label:'REGRESO DEL ALMUERZO',icon:'✅',color:'#3b82f6',bg:'rgba(59,130,246,0.15)',expectedTime:ATT.config.lunch_end,desc:'Volver al trabajo después del almuerzo'},
+    'check_out':{label:'REGISTRAR SALIDA',icon:'🔴',color:'#ef4444',bg:'rgba(239,68,68,0.15)',expectedTime:ATT.config.work_end,desc:'Fin de la jornada laboral'}
+  };
+  const cfg=actionConfig[action];
+
+  // Saludo según hora
+  const h=now.getHours();
+  const greeting=h<12?'Buenos días':(h<19?'Buenas tardes':'Buenas noches');
+
+  // Verificar si va tarde (solo para check_in)
+  let lateWarning='';
+  if(action==='check_in'){
+    const[expH,expM]=ATT.config.work_start.split(':').map(Number);
+    const expMinutes=expH*60+expM+ATT.config.tolerance;
+    const nowMinutes=now.getHours()*60+now.getMinutes();
+    if(nowMinutes>expMinutes){
+      const lateMin=nowMinutes-(expH*60+expM);
+      lateWarning=`<div style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:12px;margin:14px 0;color:#fca5a5;font-size:13px;text-align:center;font-weight:700">⚠️ Llegas ${lateMin} minutos tarde</div>`;
+    }
+  }
+
+  // Mostrar progreso del día
+  let progress='';
+  if(ATT.todayRecord){
+    const r=ATT.todayRecord;
+    progress+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:18px">';
+    const steps=[
+      {l:'Entrada',ts:r.check_in,done:!!r.check_in},
+      {l:'Almuerzo',ts:r.lunch_out,done:!!r.lunch_out},
+      {l:'Regreso',ts:r.lunch_in,done:!!r.lunch_in},
+      {l:'Salida',ts:r.check_out,done:!!r.check_out}
+    ];
+    steps.forEach(s=>{
+      const t=s.ts?new Date(s.ts).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}):'—';
+      progress+=`<div style="background:${s.done?'rgba(16,185,129,0.1)':'rgba(255,255,255,0.03)'};border:1px solid ${s.done?'rgba(16,185,129,0.3)':'rgba(255,255,255,0.08)'};border-radius:8px;padding:8px 4px;text-align:center">`;
+      progress+=`<div style="font-size:9px;color:${s.done?'#34d399':'var(--t3)'};font-weight:700;letter-spacing:.05em">${s.l}</div>`;
+      progress+=`<div style="font-size:13px;font-family:var(--mn);font-weight:800;color:${s.done?'#34d399':'var(--t4)'};margin-top:3px">${t}</div>`;
+      progress+='</div>';
+    });
+    progress+='</div>';
+  }
+
+  const html=`
+    <div id="attFichajeModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;animation:attFadeIn 0.3s ease">
+      <div style="background:linear-gradient(180deg,#1e293b,#0f172a);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:32px;max-width:480px;width:100%;box-shadow:0 25px 50px rgba(0,0,0,0.5);animation:attSlideUp 0.4s ease">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:13px;color:var(--t3);font-weight:600;letter-spacing:.05em">${greeting},</div>
+          <div style="font-size:22px;font-weight:800;color:var(--t1);margin-top:4px">${CURRENT_USER.nombre||CURRENT_USER.username||'Usuario'}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px;text-transform:capitalize">${dateStr}</div>
+        </div>
+
+        <div style="text-align:center;background:rgba(0,0,0,0.3);border-radius:14px;padding:24px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.05)">
+          <div style="font-size:60px;font-weight:900;font-family:var(--mn);color:${cfg.color};letter-spacing:-0.04em;line-height:1;text-shadow:0 4px 20px ${cfg.color}40" id="attLiveClock">${hh}:${mm}<span style="font-size:32px;color:var(--t3)">:${ss}</span></div>
+          <div style="font-size:11px;color:var(--t3);margin-top:6px;font-weight:600">Hora del sistema (no editable)</div>
+        </div>
+
+        ${lateWarning}
+
+        <button id="attFichajeBtn" onclick="attDoFichaje('${action}')" style="width:100%;background:linear-gradient(135deg,${cfg.color},${cfg.color}dd);color:#fff;border:none;border-radius:14px;padding:18px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px ${cfg.color}55;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.02em" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 12px 30px ${cfg.color}66'" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 24px ${cfg.color}55'">
+          <span style="font-size:24px">${cfg.icon}</span>
+          ${cfg.label}
+        </button>
+
+        <div style="font-size:11px;color:var(--t3);text-align:center;margin-top:10px">${cfg.desc} · Esperado: ${cfg.expectedTime}</div>
+
+        ${progress}
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px;justify-content:space-between;align-items:center">
+          <button onclick="attCloseModal()" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t3);border-radius:8px;padding:8px 14px;font-size:11px;cursor:pointer;font-weight:600">⏭ Saltar por ahora</button>
+          ${CURRENT_USER.role==='admin'?`<button onclick="attCloseModal();switchModule('asistencia');" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:8px;padding:8px 14px;font-size:11px;cursor:pointer;font-weight:700">📊 Panel Admin</button>`:''}
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes attFadeIn{from{opacity:0}to{opacity:1}}
+      @keyframes attSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+  `;
+  document.body.insertAdjacentHTML('beforeend',html);
+
+  // Reloj en vivo
+  if(window._attClockInt)clearInterval(window._attClockInt);
+  window._attClockInt=setInterval(()=>{
+    const el=document.getElementById('attLiveClock');if(!el)return;
+    const n=new Date();
+    const h=String(n.getHours()).padStart(2,'0');
+    const m=String(n.getMinutes()).padStart(2,'0');
+    const s=String(n.getSeconds()).padStart(2,'0');
+    el.innerHTML=`${h}:${m}<span style="font-size:32px;color:var(--t3)">:${s}</span>`;
+  },1000);
+}
+
+function attCloseModal(){
+  const m=document.getElementById('attFichajeModal');if(m)m.remove();
+  if(window._attClockInt){clearInterval(window._attClockInt);window._attClockInt=null}
+}
+
+// Banner cuando ya completó el día
+function attShowSummaryBanner(){
+  if(!ATT.todayRecord)return;
+  const r=ATT.todayRecord;
+  const fmtT=ts=>ts?new Date(ts).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}):'—';
+  const html=`
+    <div id="attSummaryBanner" style="position:fixed;top:20px;right:20px;background:linear-gradient(180deg,rgba(16,185,129,0.95),rgba(5,150,105,0.95));backdrop-filter:blur(10px);color:#fff;padding:14px 20px;border-radius:14px;box-shadow:0 10px 30px rgba(16,185,129,0.4);z-index:9998;max-width:320px;font-family:Arial,sans-serif;animation:attSlideRight 0.4s ease;cursor:pointer" onclick="this.remove()">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;opacity:0.9">✅ JORNADA COMPLETA</div>
+      <div style="font-size:13px;margin-top:6px;font-weight:700">${CURRENT_USER.nombre||CURRENT_USER.username}</div>
+      <div style="font-size:11px;margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;opacity:0.95">
+        <div>🟢 ${fmtT(r.check_in)}</div>
+        <div>🍽️ ${fmtT(r.lunch_out)}</div>
+        <div>✅ ${fmtT(r.lunch_in)}</div>
+        <div>🔴 ${fmtT(r.check_out)}</div>
+      </div>
+      <div style="font-size:10px;margin-top:6px;opacity:0.8">Click para cerrar</div>
+    </div>
+    <style>@keyframes attSlideRight{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}</style>
+  `;
+  document.body.insertAdjacentHTML('beforeend',html);
+  setTimeout(()=>{const b=document.getElementById('attSummaryBanner');if(b)b.remove()},6000);
+}
+
+// Banner cuando está en período justificado
+function attShowJustificationBanner(just){
+  const types={maternidad:'🤰 Maternidad',permiso_medico:'🏥 Permiso Médico',vacaciones:'🏖️ Vacaciones',permiso_personal:'📋 Permiso Personal',otro:'📝 Justificación'};
+  const html=`
+    <div id="attJustBanner" style="position:fixed;top:20px;right:20px;background:linear-gradient(180deg,rgba(168,85,247,0.95),rgba(126,34,206,0.95));backdrop-filter:blur(10px);color:#fff;padding:14px 20px;border-radius:14px;box-shadow:0 10px 30px rgba(168,85,247,0.4);z-index:9998;max-width:340px;font-family:Arial,sans-serif;animation:attSlideRight 0.4s ease">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;opacity:0.9">${types[just.type]||just.type}</div>
+      <div style="font-size:13px;margin-top:6px;font-weight:700">${CURRENT_USER.nombre||CURRENT_USER.username}</div>
+      <div style="font-size:11px;margin-top:6px;opacity:0.95">Período: ${just.start_date} → ${just.end_date}</div>
+      ${just.reason?`<div style="font-size:10px;margin-top:4px;opacity:0.85;font-style:italic">"${just.reason}"</div>`:''}
+      <div style="font-size:10px;margin-top:8px;opacity:0.8;cursor:pointer" onclick="document.getElementById('attJustBanner').remove()">Click para cerrar</div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend',html);
+  setTimeout(()=>{const b=document.getElementById('attJustBanner');if(b)b.remove()},10000);
+}
+
+// Ejecutar fichaje
+async function attDoFichaje(action){
+  const btn=document.getElementById('attFichajeBtn');
+  if(btn){btn.disabled=true;btn.style.opacity='0.6';btn.innerHTML='⏳ Registrando...'}
+
+  const now=new Date();
+  const today=now.toISOString().slice(0,10);
+  const nowISO=now.toISOString();
+
+  try{
+    if(action==='check_in'){
+      // Crear registro nuevo
+      const[expH,expM]=ATT.config.work_start.split(':').map(Number);
+      const expMinutes=expH*60+expM+ATT.config.tolerance;
+      const nowMinutes=now.getHours()*60+now.getMinutes();
+      const isLate=nowMinutes>expMinutes;
+      const lateMin=isLate?nowMinutes-(expH*60+expM):0;
+
+      const{error}=await sb.from("attendance_records").insert({
+        user_id:CURRENT_USER.id,
+        user_name:CURRENT_USER.nombre||CURRENT_USER.username||'',
+        work_date:today,
+        check_in:nowISO,
+        is_late:isLate,
+        late_minutes:lateMin
+      });
+      if(error)throw error;
+    }else{
+      // Actualizar registro existente
+      if(!ATT.todayRecord){alert("No hay registro de entrada de hoy");return}
+      const update={[action]:nowISO,updated_at:nowISO};
+
+      // Calcular minutos de almuerzo
+      if(action==='lunch_in'&&ATT.todayRecord.lunch_out){
+        const lo=new Date(ATT.todayRecord.lunch_out);
+        update.lunch_minutes=Math.round((now-lo)/60000);
+      }
+      // Calcular minutos trabajados
+      if(action==='check_out'&&ATT.todayRecord.check_in){
+        const ci=new Date(ATT.todayRecord.check_in);
+        let workedMs=now-ci;
+        // Restar tiempo de almuerzo si lo hubo
+        if(ATT.todayRecord.lunch_out&&ATT.todayRecord.lunch_in){
+          const lo=new Date(ATT.todayRecord.lunch_out);
+          const li=new Date(ATT.todayRecord.lunch_in);
+          workedMs-=(li-lo);
+        }
+        update.worked_minutes=Math.round(workedMs/60000);
+      }
+
+      const{error}=await sb.from("attendance_records").update(update).eq("id",ATT.todayRecord.id);
+      if(error)throw error;
+    }
+
+    // Recargar y mostrar feedback
+    await attLoadToday();
+    attCloseModal();
+    const t=now.toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});
+    const labels={'check_in':'Entrada','lunch_out':'Salida almuerzo','lunch_in':'Regreso almuerzo','check_out':'Salida'};
+    attShowToast(`✅ ${labels[action]} registrada a las ${t}`);
+
+    // Si hay siguiente acción, mostrar resumen para que sepa cuándo viene la próxima
+    setTimeout(()=>attShowSummaryBanner(),500);
+  }catch(e){
+    alert("Error al registrar: "+e.message);
+    if(btn){btn.disabled=false;btn.style.opacity='1'}
+  }
+}
+
+function attShowToast(msg){
+  const el=document.createElement('div');
+  el.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:14px 24px;border-radius:12px;font-weight:700;font-size:14px;z-index:99999;box-shadow:0 10px 30px rgba(16,185,129,0.5);animation:attToastIn 0.3s ease';
+  el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PESTAÑA ADMIN: PANEL DE ASISTENCIA
+// ═══════════════════════════════════════════════════════════════
+
+let _attView={mode:'week',weekStart:null,month:null,year:null};
+
+function attInitView(){
+  const now=new Date();
+  // Inicio de semana = lunes
+  const dow=now.getDay();
+  const offset=dow===0?-6:1-dow;
+  const ws=new Date(now);ws.setDate(ws.getDate()+offset);ws.setHours(0,0,0,0);
+  _attView.weekStart=ws.toISOString().slice(0,10);
+  _attView.month=now.getMonth();
+  _attView.year=now.getFullYear();
+}
+
+async function attRenderAdminPanel(){
+  const mc=document.getElementById('mainCol');
+  if(!mc)return;
+  if(!_attView.weekStart)attInitView();
+
+  mc.innerHTML='<div style="padding:20px;color:var(--t3);text-align:center">⏳ Cargando asistencia...</div>';
+
+  try{
+    // Cargar últimos 60 días
+    const today=new Date();
+    const sinceDate=new Date(today);sinceDate.setDate(sinceDate.getDate()-60);
+    const since=sinceDate.toISOString().slice(0,10);
+
+    const[recR,justR,usersR]=await Promise.all([
+      sb.from("attendance_records").select("*").gte("work_date",since).order("work_date",{ascending:false}),
+      sb.from("attendance_justifications").select("*").order("start_date",{ascending:false}),
+      sb.from("app_users").select("id,nombre,username,role,active").eq("active",true)
+    ]);
+
+    const records=recR.data||[];
+    const justs=justR.data||[];
+    const users=usersR.data||[];
+
+    let h='';
+
+    // ─── HEADER ───
+    h+=`<div style="margin-bottom:24px">`;
+    h+=`<div style="font-size:24px;font-weight:800;color:var(--t1);letter-spacing:-0.02em">👥 Control de Asistencia</div>`;
+    h+=`<div style="font-size:12px;color:var(--t3);margin-top:4px">Registro de puntualidad, jornadas laborales y justificaciones</div>`;
+    h+=`</div>`;
+
+    // ─── TABS ───
+    h+=`<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">`;
+    h+=`<button onclick="_attView.mode='week';attRenderAdminPanel()" style="background:${_attView.mode==='week'?'linear-gradient(135deg,#3b82f6,#2563eb)':'rgba(255,255,255,0.04)'};color:${_attView.mode==='week'?'#fff':'var(--t2)'};border:1px solid ${_attView.mode==='week'?'#3b82f6':'rgba(255,255,255,0.08)'};border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">📅 Semanal</button>`;
+    h+=`<button onclick="_attView.mode='month';attRenderAdminPanel()" style="background:${_attView.mode==='month'?'linear-gradient(135deg,#3b82f6,#2563eb)':'rgba(255,255,255,0.04)'};color:${_attView.mode==='month'?'#fff':'var(--t2)'};border:1px solid ${_attView.mode==='month'?'#3b82f6':'rgba(255,255,255,0.08)'};border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">🗓️ Mensual</button>`;
+    h+=`<button onclick="_attView.mode='just';attRenderAdminPanel()" style="background:${_attView.mode==='just'?'linear-gradient(135deg,#a855f7,#7e22ce)':'rgba(255,255,255,0.04)'};color:${_attView.mode==='just'?'#fff':'var(--t2)'};border:1px solid ${_attView.mode==='just'?'#a855f7':'rgba(255,255,255,0.08)'};border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">🏥 Justificaciones</button>`;
+    h+=`<div style="flex:1"></div>`;
+    h+=`<button onclick="attNewJustification()" style="background:linear-gradient(135deg,#a855f7,#7e22ce);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer">+ Justificación</button>`;
+    h+=`<button onclick="attExportExcel()" style="background:linear-gradient(135deg,rgba(34,197,94,0.18),rgba(34,197,94,0.08));color:#86efac;border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer">📥 Excel</button>`;
+    h+=`</div>`;
+
+    if(_attView.mode==='week'){
+      h+=attRenderWeek(records,users,justs);
+    }else if(_attView.mode==='month'){
+      h+=attRenderMonth(records,users,justs);
+    }else{
+      h+=attRenderJustifications(justs);
+    }
+
+    mc.innerHTML=h;
+    window._attRecords=records;
+    window._attUsers=users;
+    window._attJusts=justs;
+  }catch(e){
+    mc.innerHTML=`<div style="padding:20px;color:#ef4444">Error: ${e.message}</div>`;
+    console.error(e);
+  }
+}
+
+// Vista semanal
+function attRenderWeek(records,users,justs){
+  const ws=new Date(_attView.weekStart);
+  const days=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(ws);d.setDate(d.getDate()+i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  const dayNames=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+  let h='';
+
+  // Navegación de semana
+  h+=`<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:18px">`;
+  h+=`<button onclick="attChangeWeek(-1)" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t2);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">← Semana anterior</button>`;
+  const fLabel=new Date(days[0]).toLocaleDateString('es-EC',{day:'numeric',month:'short'});
+  const lLabel=new Date(days[6]).toLocaleDateString('es-EC',{day:'numeric',month:'short',year:'numeric'});
+  h+=`<div style="font-size:14px;font-weight:800;color:var(--t1);padding:8px 18px">${fLabel} — ${lLabel}</div>`;
+  h+=`<button onclick="attChangeWeek(1)" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t2);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">Semana siguiente →</button>`;
+  h+=`</div>`;
+
+  // Tabla
+  h+=`<div style="overflow-x:auto;background:rgba(0,0,0,0.2);border-radius:12px;border:1px solid rgba(255,255,255,0.06)">`;
+  h+=`<table style="width:100%;font-size:11px;border-collapse:collapse;min-width:900px">`;
+  h+=`<thead><tr style="background:rgba(255,255,255,0.04);color:var(--t3);font-weight:700;font-size:10px;letter-spacing:.05em">`;
+  h+=`<th style="padding:12px 10px;text-align:left;position:sticky;left:0;background:#1e293b;z-index:1">EMPLEADO</th>`;
+  days.forEach((d,i)=>{
+    const dt=new Date(d);
+    const isToday=d===new Date().toISOString().slice(0,10);
+    const isWeekend=i>=5;
+    h+=`<th style="padding:12px 6px;text-align:center;${isToday?'background:rgba(59,130,246,0.1);':''}${isWeekend?'opacity:0.5;':''}">`;
+    h+=`<div>${dayNames[i]}</div><div style="font-size:14px;color:${isToday?'#60a5fa':'var(--t2)'};font-weight:800;margin-top:2px">${dt.getDate()}</div>`;
+    h+=`</th>`;
+  });
+  h+=`<th style="padding:12px 10px;text-align:center">TOTAL HRS</th>`;
+  h+=`</tr></thead><tbody>`;
+
+  users.forEach(u=>{
+    let totalMin=0;
+    h+=`<tr style="border-top:1px solid rgba(255,255,255,0.04)">`;
+    h+=`<td style="padding:10px;font-weight:700;color:var(--t1);position:sticky;left:0;background:#1e293b;z-index:1">${u.nombre||u.username||'—'}<div style="font-size:9px;color:var(--t3);font-weight:400">${u.role||''}</div></td>`;
+    days.forEach((d,i)=>{
+      const r=records.find(rr=>rr.user_id===u.id&&rr.work_date===d);
+      const j=justs.find(jj=>jj.user_id===u.id&&jj.start_date<=d&&jj.end_date>=d&&jj.status==='aprobado');
+      const isWeekend=i>=5;
+      const isFuture=d>new Date().toISOString().slice(0,10);
+      let cell='';
+      if(j){
+        const types={maternidad:'🤰',permiso_medico:'🏥',vacaciones:'🏖️',permiso_personal:'📋',otro:'📝'};
+        cell=`<div style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:4px;font-size:14px" title="${j.type}">${types[j.type]||'📝'}</div>`;
+      }else if(r&&r.check_in){
+        const wHrs=r.worked_minutes?Math.round(r.worked_minutes/60*10)/10:0;
+        if(wHrs)totalMin+=r.worked_minutes;
+        const lateColor=r.is_late?'#ef4444':'#10b981';
+        const lateIcon=r.is_late?'⚠':'✓';
+        cell=`<div style="font-size:13px;font-weight:700;color:${lateColor}" title="${r.is_late?'Tarde '+r.late_minutes+' min':'Puntual'}">${lateIcon} ${wHrs?wHrs+'h':'⏳'}</div>`;
+      }else if(!isWeekend&&!isFuture){
+        cell=`<div style="color:var(--t4);font-size:14px" title="Sin registro">—</div>`;
+      }else{
+        cell=`<div style="color:var(--t4);font-size:14px;opacity:0.4">·</div>`;
+      }
+      h+=`<td style="padding:8px 4px;text-align:center;${isFuture||isWeekend?'opacity:0.5':''}">${cell}</td>`;
+    });
+    const totalH=Math.round(totalMin/60*10)/10;
+    h+=`<td style="padding:10px;text-align:center;font-weight:800;color:${totalH>=40?'#10b981':totalH>=30?'#fbbf24':'#ef4444'};font-family:var(--mn);font-size:14px">${totalH}h</td>`;
+    h+=`</tr>`;
+  });
+  h+=`</tbody></table></div>`;
+
+  h+=`<div style="margin-top:16px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--t3)">`;
+  h+=`<div>✓ <span style="color:#10b981;font-weight:700">Puntual</span></div>`;
+  h+=`<div>⚠ <span style="color:#ef4444;font-weight:700">Tardanza</span></div>`;
+  h+=`<div>⏳ <span style="color:#fbbf24;font-weight:700">Pendiente</span></div>`;
+  h+=`<div>— <span>Sin registro</span></div>`;
+  h+=`<div>🤰🏥🏖️📋 <span>Justificado</span></div>`;
+  h+=`</div>`;
+
+  return h;
+}
+
+function attChangeWeek(delta){
+  const d=new Date(_attView.weekStart);
+  d.setDate(d.getDate()+(delta*7));
+  _attView.weekStart=d.toISOString().slice(0,10);
+  attRenderAdminPanel();
+}
+
+// Vista mensual: resumen por empleado
+function attRenderMonth(records,users,justs){
+  let h='';
+  const mNames=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Navegación
+  h+=`<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:18px">`;
+  h+=`<button onclick="attChangeMonth(-1)" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t2);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">← Mes anterior</button>`;
+  h+=`<div style="font-size:14px;font-weight:800;color:var(--t1);padding:8px 18px">${mNames[_attView.month]} ${_attView.year}</div>`;
+  h+=`<button onclick="attChangeMonth(1)" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t2);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer">Mes siguiente →</button>`;
+  h+=`</div>`;
+
+  // Calcular stats por usuario para el mes
+  const monthPrefix=`${_attView.year}-${String(_attView.month+1).padStart(2,'0')}`;
+  const monthRecords=records.filter(r=>r.work_date.startsWith(monthPrefix));
+
+  // Cards por empleado
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">`;
+
+  users.forEach(u=>{
+    const userRecs=monthRecords.filter(r=>r.user_id===u.id);
+    const totalMin=userRecs.reduce((a,r)=>a+(r.worked_minutes||0),0);
+    const totalH=Math.round(totalMin/60*10)/10;
+    const daysWorked=userRecs.filter(r=>r.check_in).length;
+    const tardanzas=userRecs.filter(r=>r.is_late).length;
+    const puntualidadPct=daysWorked>0?Math.round((daysWorked-tardanzas)/daysWorked*100):0;
+    const semColor=puntualidadPct>=90?'#10b981':puntualidadPct>=70?'#fbbf24':'#ef4444';
+
+    h+=`<div style="background:linear-gradient(180deg,rgba(30,41,59,0.6),rgba(15,23,42,0.6));border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,0.2)">`;
+    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">`;
+    const initial=(u.nombre||u.username||'?').charAt(0).toUpperCase();
+    h+=`<div style="width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,${semColor}33,${semColor}11);border:1px solid ${semColor}44;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:${semColor}">${initial}</div>`;
+    h+=`<div style="flex:1;min-width:0">`;
+    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1)">${u.nombre||u.username||'—'}</div>`;
+    h+=`<div style="font-size:10px;color:var(--t3)">${u.role||''}</div>`;
+    h+=`</div>`;
+    h+=`</div>`;
+
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+    h+=`<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--t3);font-weight:700">DÍAS TRABAJADOS</div><div style="font-size:20px;font-weight:800;color:#60a5fa;font-family:var(--mn)">${daysWorked}</div></div>`;
+    h+=`<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--t3);font-weight:700">TOTAL HORAS</div><div style="font-size:20px;font-weight:800;color:#10b981;font-family:var(--mn)">${totalH}</div></div>`;
+    h+=`<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--t3);font-weight:700">TARDANZAS</div><div style="font-size:20px;font-weight:800;color:${tardanzas>0?'#ef4444':'#10b981'};font-family:var(--mn)">${tardanzas}</div></div>`;
+    h+=`<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:10px;text-align:center"><div style="font-size:9px;color:var(--t3);font-weight:700">PUNTUALIDAD</div><div style="font-size:20px;font-weight:800;color:${semColor};font-family:var(--mn)">${puntualidadPct}%</div></div>`;
+    h+=`</div>`;
+
+    h+=`<button onclick="attShowUserDetail('${u.id}','${u.nombre||u.username}')" style="margin-top:12px;width:100%;background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.25);color:#60a5fa;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">Ver detalle del mes</button>`;
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+
+  return h;
+}
+
+function attChangeMonth(delta){
+  _attView.month+=delta;
+  if(_attView.month<0){_attView.month=11;_attView.year--}
+  else if(_attView.month>11){_attView.month=0;_attView.year++}
+  attRenderAdminPanel();
+}
+
+async function attShowUserDetail(userId,userName){
+  const monthPrefix=`${_attView.year}-${String(_attView.month+1).padStart(2,'0')}`;
+  const recs=(window._attRecords||[]).filter(r=>r.user_id===userId&&r.work_date.startsWith(monthPrefix)).sort((a,b)=>a.work_date.localeCompare(b.work_date));
+  const fmtT=ts=>ts?new Date(ts).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}):'—';
+
+  let html=`<div id="attUserDetailModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.remove()">`;
+  html+=`<div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;max-width:900px;width:100%;max-height:90vh;overflow:auto">`;
+  html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">`;
+  html+=`<div><div style="font-size:18px;font-weight:800;color:var(--t1)">📅 ${userName}</div><div style="font-size:11px;color:var(--t3)">Detalle del mes</div></div>`;
+  html+=`<button onclick="document.getElementById('attUserDetailModal').remove()" style="background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer">×</button>`;
+  html+=`</div>`;
+
+  if(recs.length===0){
+    html+=`<div style="padding:30px;text-align:center;color:var(--t3)">Sin registros en este mes</div>`;
+  }else{
+    html+=`<table style="width:100%;font-size:11px;border-collapse:collapse">`;
+    html+=`<thead><tr style="background:rgba(255,255,255,0.04);color:var(--t3);font-size:10px;font-weight:700">`;
+    html+=`<th style="padding:8px;text-align:left">FECHA</th><th style="padding:8px">ENTRADA</th><th style="padding:8px">ALMUERZO</th><th style="padding:8px">REGRESO</th><th style="padding:8px">SALIDA</th><th style="padding:8px">HORAS</th><th style="padding:8px">ESTADO</th>`;
+    if(CURRENT_USER&&CURRENT_USER.role==='admin')html+=`<th style="padding:8px"></th>`;
+    html+=`</tr></thead><tbody>`;
+    recs.forEach(r=>{
+      const wH=r.worked_minutes?Math.round(r.worked_minutes/60*10)/10:0;
+      const date=new Date(r.work_date+'T00:00:00').toLocaleDateString('es-EC',{weekday:'short',day:'2-digit',month:'short'});
+      html+=`<tr style="border-top:1px solid rgba(255,255,255,0.04)">`;
+      html+=`<td style="padding:8px;font-weight:600">${date}</td>`;
+      html+=`<td style="padding:8px;text-align:center;font-family:var(--mn);color:${r.is_late?'#ef4444':'#10b981'};font-weight:700">${fmtT(r.check_in)}${r.is_late?` <span style="font-size:9px">(+${r.late_minutes}min)</span>`:''}</td>`;
+      html+=`<td style="padding:8px;text-align:center;font-family:var(--mn)">${fmtT(r.lunch_out)}</td>`;
+      html+=`<td style="padding:8px;text-align:center;font-family:var(--mn)">${fmtT(r.lunch_in)}</td>`;
+      html+=`<td style="padding:8px;text-align:center;font-family:var(--mn)">${fmtT(r.check_out)}</td>`;
+      html+=`<td style="padding:8px;text-align:center;font-family:var(--mn);font-weight:800;color:${wH>=8?'#10b981':wH>=6?'#fbbf24':'#ef4444'}">${wH}h</td>`;
+      html+=`<td style="padding:8px;text-align:center">${r.is_late?'<span style="color:#ef4444;font-weight:700">TARDE</span>':'<span style="color:#10b981;font-weight:700">PUNTUAL</span>'}</td>`;
+      if(CURRENT_USER&&CURRENT_USER.role==='admin')html+=`<td style="padding:8px"><button onclick="attEditRecord('${r.id}')" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;border-radius:6px;padding:4px 8px;font-size:10px;cursor:pointer">✏️</button></td>`;
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table>`;
+  }
+  html+=`</div></div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+// Vista de justificaciones
+function attRenderJustifications(justs){
+  let h='';
+  if(justs.length===0){
+    h+=`<div style="padding:60px;text-align:center;color:var(--t3);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);border-radius:14px"><div style="font-size:36px;margin-bottom:10px">📋</div>Sin justificaciones registradas.<br><br>Haz clic en "+ Justificación" para registrar la primera.</div>`;
+    return h;
+  }
+
+  h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px">`;
+  const types={maternidad:{i:'🤰',c:'#ec4899',l:'Maternidad'},permiso_medico:{i:'🏥',c:'#3b82f6',l:'Permiso Médico'},vacaciones:{i:'🏖️',c:'#10b981',l:'Vacaciones'},permiso_personal:{i:'📋',c:'#f59e0b',l:'Permiso Personal'},otro:{i:'📝',c:'#94a3b8',l:'Otro'}};
+  justs.forEach(j=>{
+    const t=types[j.type]||types.otro;
+    const today=new Date().toISOString().slice(0,10);
+    const isActive=j.start_date<=today&&j.end_date>=today;
+    h+=`<div style="background:linear-gradient(180deg,rgba(30,41,59,0.6),rgba(15,23,42,0.6));border:1px solid ${t.c}33;border-radius:14px;padding:18px;${isActive?'box-shadow:0 0 0 2px '+t.c+'44':''}">`;
+    h+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">`;
+    h+=`<div style="width:44px;height:44px;border-radius:11px;background:${t.c}22;border:1px solid ${t.c}44;display:flex;align-items:center;justify-content:center;font-size:22px">${t.i}</div>`;
+    h+=`<div style="flex:1">`;
+    h+=`<div style="font-size:11px;color:${t.c};font-weight:800;letter-spacing:.05em">${t.l.toUpperCase()}${isActive?' · ACTIVO':''}</div>`;
+    h+=`<div style="font-size:14px;font-weight:800;color:var(--t1);margin-top:2px">${j.user_name}</div>`;
+    h+=`</div>`;
+    h+=`</div>`;
+    h+=`<div style="font-size:11px;color:var(--t2);margin-bottom:8px">📆 ${j.start_date} → ${j.end_date}</div>`;
+    if(j.reason)h+=`<div style="font-size:11px;color:var(--t1);font-style:italic;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid ${t.c}66">"${j.reason}"</div>`;
+    h+=`<div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--t3)">`;
+    h+=`<span>Aprobado por: ${j.approved_by||'—'}</span>`;
+    h+=`<button onclick="attDeleteJustification('${j.id}','${j.user_name}')" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:6px;padding:4px 10px;font-size:10px;cursor:pointer">🗑 Eliminar</button>`;
+    h+=`</div>`;
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  return h;
+}
+
+async function attNewJustification(){
+  const users=window._attUsers||[];
+  if(users.length===0){alert("No hay usuarios cargados, recarga la página");return}
+
+  // Pedir usuario
+  const usersList=users.map((u,i)=>`${i+1}. ${u.nombre||u.username}`).join('\n');
+  const userIdx=parseInt(prompt(`¿Para qué empleado?\n\n${usersList}\n\nEscribe el número:`));
+  if(isNaN(userIdx)||userIdx<1||userIdx>users.length){alert("Número inválido");return}
+  const u=users[userIdx-1];
+
+  // Tipo
+  const typeOpts='1. Maternidad\n2. Permiso médico\n3. Vacaciones\n4. Permiso personal\n5. Otro';
+  const tIdx=parseInt(prompt(`Tipo de justificación:\n\n${typeOpts}\n\nEscribe el número:`));
+  if(isNaN(tIdx)||tIdx<1||tIdx>5){alert("Tipo inválido");return}
+  const types=['maternidad','permiso_medico','vacaciones','permiso_personal','otro'];
+  const type=types[tIdx-1];
+
+  // Fechas
+  const today=new Date().toISOString().slice(0,10);
+  const start=prompt("Fecha INICIO (YYYY-MM-DD):",today);if(!start)return;
+  const end=prompt("Fecha FIN (YYYY-MM-DD):",start);if(!end)return;
+
+  // Razón
+  const reason=prompt("Razón / observaciones:")||'';
+
+  try{
+    const{error}=await sb.from("attendance_justifications").insert({
+      user_id:u.id,
+      user_name:u.nombre||u.username,
+      type:type,
+      start_date:start,
+      end_date:end,
+      reason:reason,
+      status:'aprobado',
+      approved_by:CURRENT_USER.nombre||CURRENT_USER.username
+    });
+    if(error)throw error;
+    alert("✅ Justificación registrada");
+    attRenderAdminPanel();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function attDeleteJustification(id,name){
+  if(!confirm(`¿Eliminar la justificación de ${name}?`))return;
+  try{
+    const{error}=await sb.from("attendance_justifications").delete().eq("id",id);
+    if(error)throw error;
+    attRenderAdminPanel();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+async function attEditRecord(id){
+  const rec=(window._attRecords||[]).find(r=>r.id===id);
+  if(!rec){alert("Registro no encontrado");return}
+
+  const fmtTime=ts=>ts?new Date(ts).toTimeString().slice(0,5):'';
+  const fields=[
+    ['check_in','Entrada (HH:MM)',fmtTime(rec.check_in)],
+    ['lunch_out','Salida almuerzo (HH:MM)',fmtTime(rec.lunch_out)],
+    ['lunch_in','Regreso almuerzo (HH:MM)',fmtTime(rec.lunch_in)],
+    ['check_out','Salida (HH:MM)',fmtTime(rec.check_out)]
+  ];
+
+  const update={};
+  for(const[key,label,current]of fields){
+    const v=prompt(`${label} (deja vacío para no cambiar):`,current);
+    if(v===null)return;
+    if(v.trim()===''){update[key]=null;continue}
+    if(!/^\d{2}:\d{2}$/.test(v)){alert("Formato inválido en "+label);return}
+    const dt=new Date(rec.work_date+'T'+v+':00');
+    update[key]=dt.toISOString();
+  }
+  const reason=prompt("Razón del cambio:","Corrección admin");
+  if(!reason)return;
+
+  // Recalcular
+  if(update.check_in){
+    const ci=new Date(update.check_in);
+    const[expH,expM]=ATT.config.work_start.split(':').map(Number);
+    const expMinutes=expH*60+expM+ATT.config.tolerance;
+    const ciMinutes=ci.getHours()*60+ci.getMinutes();
+    update.is_late=ciMinutes>expMinutes;
+    update.late_minutes=update.is_late?ciMinutes-(expH*60+expM):0;
+  }
+  if(update.lunch_out&&update.lunch_in){
+    update.lunch_minutes=Math.round((new Date(update.lunch_in)-new Date(update.lunch_out))/60000);
+  }
+  if(update.check_in&&update.check_out){
+    let ms=new Date(update.check_out)-new Date(update.check_in);
+    if(update.lunch_out&&update.lunch_in)ms-=(new Date(update.lunch_in)-new Date(update.lunch_out));
+    update.worked_minutes=Math.round(ms/60000);
+  }
+  update.edited_by_admin=true;
+  update.edit_reason=reason;
+  update.updated_at=new Date().toISOString();
+
+  try{
+    const{error}=await sb.from("attendance_records").update(update).eq("id",id);
+    if(error)throw error;
+    alert("✅ Registro actualizado");
+    document.getElementById('attUserDetailModal')?.remove();
+    attRenderAdminPanel();
+  }catch(e){alert("Error: "+e.message)}
+}
+
+// Exportar a Excel
+function attExportExcel(){
+  if(typeof XLSX==='undefined'){alert("XLSX no disponible");return}
+  const records=window._attRecords||[];
+  const users=window._attUsers||[];
+  const justs=window._attJusts||[];
+  if(records.length===0){alert("No hay registros");return}
+
+  const fmtT=ts=>ts?new Date(ts).toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}):'';
+
+  // Hoja 1: Detallado
+  const headers=['Fecha','Empleado','Rol','Entrada','Salida Almuerzo','Regreso Almuerzo','Salida','Min. Almuerzo','Horas Trabajadas','Tarde','Min. Tarde','Editado','Notas'];
+  const rows=records.map(r=>{
+    const u=users.find(uu=>uu.id===r.user_id)||{};
+    return[
+      r.work_date,
+      r.user_name||'',
+      u.role||'',
+      fmtT(r.check_in),
+      fmtT(r.lunch_out),
+      fmtT(r.lunch_in),
+      fmtT(r.check_out),
+      r.lunch_minutes||0,
+      r.worked_minutes?Math.round(r.worked_minutes/60*10)/10:0,
+      r.is_late?'SI':'NO',
+      r.late_minutes||0,
+      r.edited_by_admin?'SI':'NO',
+      r.edit_reason||''
+    ];
+  });
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=[{wch:12},{wch:25},{wch:14},{wch:10},{wch:14},{wch:14},{wch:10},{wch:12},{wch:14},{wch:8},{wch:10},{wch:10},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'Asistencia Detallada');
+
+  // Hoja 2: Resumen mensual
+  const months={};
+  records.forEach(r=>{
+    const k=r.work_date.slice(0,7)+'|'+r.user_id;
+    if(!months[k])months[k]={month:r.work_date.slice(0,7),user:r.user_name,days:0,hours:0,late:0};
+    months[k].days++;
+    months[k].hours+=(r.worked_minutes||0)/60;
+    if(r.is_late)months[k].late++;
+  });
+  const sumHeaders=['Mes','Empleado','Días Trabajados','Total Horas','Tardanzas','Puntualidad %'];
+  const sumRows=Object.values(months).map(m=>[m.month,m.user,m.days,Math.round(m.hours*10)/10,m.late,m.days>0?Math.round((m.days-m.late)/m.days*100)+'%':'—']);
+  const ws2=XLSX.utils.aoa_to_sheet([sumHeaders,...sumRows]);
+  ws2['!cols']=[{wch:10},{wch:25},{wch:14},{wch:14},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen Mensual');
+
+  // Hoja 3: Justificaciones
+  const jHeaders=['Empleado','Tipo','Inicio','Fin','Razón','Aprobado Por','Estado'];
+  const jRows=justs.map(j=>[j.user_name,j.type,j.start_date,j.end_date,j.reason||'',j.approved_by||'',j.status]);
+  const ws3=XLSX.utils.aoa_to_sheet([jHeaders,...jRows]);
+  ws3['!cols']=[{wch:25},{wch:18},{wch:12},{wch:12},{wch:40},{wch:20},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Justificaciones');
+
+  XLSX.writeFile(wb,`Asistencia_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 </script></body></html>
